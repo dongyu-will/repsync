@@ -161,3 +161,92 @@ func TestCorruptRegistrationIsPreserved(t *testing.T) {
 		t.Fatal("corrupt registry was overwritten")
 	}
 }
+
+func TestProjectRemovalAndRelocationPreserveFiles(t *testing.T) {
+	t.Parallel()
+	f := newSyncFixture(t, "# Project rules\nKeep release gates.\n", true)
+	pending := f.preview(t)
+	record := f.apply(t)
+	target := filepath.Join(f.project, "AGENTS.md")
+	content := readSyncFile(t, target)
+	moved := filepath.Join(filepath.Dir(f.project), "moved project")
+	if err := os.Rename(f.project, moved); err != nil {
+		t.Fatal(err)
+	}
+	next, err := f.service.RelocateProject(f.project, moved)
+	if err != nil || next.Path != moved {
+		t.Fatalf("repair missing directory: %+v %v", next, err)
+	}
+	if readSyncFile(t, filepath.Join(moved, "AGENTS.md")) != content {
+		t.Fatal("relocate modified project")
+	}
+	if _, err := f.service.ApplyUpdate(pending.Token); err == nil {
+		t.Fatal("old preview survived relocation")
+	}
+	if _, err := f.service.RestoreUpdate(record.ID); err == nil {
+		t.Fatal("old backup followed another directory")
+	}
+	other, err := f.service.Add(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.RelocateProject(next.Path, other.Path); err == nil {
+		t.Fatal("merged registered projects")
+	}
+	if err := f.service.RemoveProject(next.Path); err != nil {
+		t.Fatal(err)
+	}
+	if readSyncFile(t, filepath.Join(moved, "AGENTS.md")) != content {
+		t.Fatal("remove deleted project")
+	}
+	if _, err := f.service.Add(moved); err != nil {
+		t.Fatal(err)
+	}
+	// A missing directory can still be unregistered.
+	if err := os.Rename(moved, f.project); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.service.RemoveProject(moved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Add(f.project); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.RestoreUpdate(record.ID); err != nil {
+		t.Fatal("original backup lost:", err)
+	}
+}
+
+func TestProjectRegistrationChangesRejectRunningTasks(t *testing.T) {
+	t.Parallel()
+	s := workspace.NewService(filepath.Join(t.TempDir(), "projects.json"))
+	t.Cleanup(s.Shutdown)
+	path := batchProject(t, s, workspace.LocalServiceDefinition{ID: "worker", Name: "Worker", Command: []string{"/bin/sleep", "30"}})
+	if _, err := s.StartProjects([]string{path}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveProject(path); err == nil {
+		t.Fatal("unregistered active service")
+	}
+	if _, err := s.RelocateProject(path, t.TempDir()); err == nil {
+		t.Fatal("relocated active service")
+	}
+	if _, err := s.StopProjects([]string{path}); err != nil {
+		t.Fatal(err)
+	}
+	writeSyncFile(t, filepath.Join(path, ".repsync.json"), `{"pipelines":[{"id":"build","name":"Build","kind":"cd","steps":[["/bin/sleep","30"]],"timeoutSeconds":60}]}`)
+	config, err := s.Pipelines(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := s.StartPipeline(path, "build", config.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RemoveProject(path); err == nil {
+		t.Fatal("unregistered active pipeline")
+	}
+	if err := s.StopPipeline(path, run.ID); err != nil {
+		t.Fatal(err)
+	}
+}

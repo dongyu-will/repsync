@@ -1,0 +1,75 @@
+{
+  "pipelines": [
+    {
+      "id": "ci",
+      "name": "本地 CI",
+      "kind": "ci",
+      "timeoutSeconds": 1800,
+      "steps": [
+        [
+          "npm",
+          "--prefix",
+          "frontend",
+          "run",
+          "check"
+        ],
+        [
+          "go",
+          "vet",
+          "./..."
+        ],
+        [
+          "go",
+          "test",
+          "-tags=integration",
+          "-race",
+          "./internal/workspace"
+        ],
+        [
+          "npm",
+          "--prefix",
+          "frontend",
+          "run",
+          "build"
+        ]
+      ]
+    },
+    {
+      "id": "package",
+      "name": "桌面打包",
+      "kind": "cd",
+      "timeoutSeconds": 1800,
+      "steps": [
+        [
+          "go",
+          "tool",
+          "mygo",
+          "build"
+        ]
+      ]
+    }
+  ],
+  "services": [
+    {
+      "id": "frontend",
+      "name": "前端预览",
+      "command": [
+        "npm",
+        "--prefix",
+        "frontend",
+        "run",
+        "dev"
+      ],
+      "url": "http://127.0.0.1:5178"
+    }
+  ],
+  "reviewResources": [
+    {
+      "id": "user-state",
+      "name": "项目登记与本机历史备份",
+      "kind": "manual",
+      "target": "",
+      "guide": "核对系统用户配置目录 repsync 中的项目登记、规范备份、清理恢复引用及 review 交接记录是否有独立保留方式；本检查不自动复制或删除这些数据。"
+    }
+  ]
+}

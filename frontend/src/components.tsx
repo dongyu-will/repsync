@@ -1,11 +1,11 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, SelectHTMLAttributes } from "react";
 import {
   ArrowUpRight,
   ChevronRight,
+  ChevronDown,
   FileCode2,
   Folder,
   FolderGit2,
-  Folders,
   GitBranch,
   Layers2,
   Plus,
@@ -19,11 +19,9 @@ const icons = {
   close: X,
   chevron: ChevronRight,
   search: Search,
-  inbox: Folders,
   plus: Plus,
   folder: Folder,
   layers: Layers2,
-  download: RefreshCw,
   settings: Settings2,
   project: FolderGit2,
   branch: GitBranch,
@@ -92,5 +90,30 @@ export function Empty({
       <h2 className="text-lg font-semibold leading-6">{title}</h2>
       <div className="mt-1.5 text-sm leading-5 text-muted">{children}</div>
     </div>
+  );
+}
+
+export function Select({
+  className = "",
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span
+      className={`relative inline-grid min-w-0 max-w-full align-middle has-[:disabled]:opacity-45 ${className}`}
+    >
+      <select
+        {...props}
+        className="col-start-1 row-start-1 h-9 w-full min-w-0 appearance-none truncate rounded-md border border-control bg-white pl-3 pr-9 text-sm font-normal text-ink transition-[background-color,border-color] enabled:cursor-pointer enabled:hover:bg-sidebar disabled:cursor-not-allowed"
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={16}
+        strokeWidth={1.75}
+        aria-hidden="true"
+        className="pointer-events-none col-start-1 row-start-1 mr-3 self-center justify-self-end text-muted"
+      />
+    </span>
   );
 }

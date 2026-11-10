@@ -1,68 +1,80 @@
+import { useState } from "react";
 import type { Inspection } from "./mygo";
-import { Empty } from "./components";
 import ProjectDocuments from "./ProjectDocuments";
+import SharedRules from "./SharedRules";
+import ProjectPipelines from "./ProjectPipelines";
+import ProjectCommands from "./ProjectCommands";
+import ProjectRules from "./ProjectRules";
+import ProjectGit, { type GitSection } from "./ProjectGit";
+import ProjectReviewPanel from "./ProjectReview";
 
-export type ProjectTab = "概览" | "命令" | "文档";
+export type ProjectTab = "概览" | "工作树" | "CI/CD" | "规范" | "文档";
 
 export default function ProjectContent({
   details,
   tab,
+  onOpenShared,
+  onUpdated,
+  onOpenStashes,
+  gitSection,
+  onOpenCI,
 }: {
   details: Inspection;
   tab: ProjectTab;
+  onOpenShared: () => void;
+  onUpdated: () => void;
+  onOpenStashes: () => void;
+  gitSection: GitSection;
+  onOpenCI: () => void;
 }) {
   return (
-    <>
+    <div
+      className={tab === "文档" ? "flex h-full min-h-0 flex-col" : "contents"}
+    >
       {details.warnings.map((warning, i) => (
         <p
           key={i}
-          className="mb-4 break-words rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-900"
+          className="mb-4 shrink-0 break-words rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-900"
         >
           {warning}
         </p>
       ))}
-      {tab === "文档" ? (
-        <>
-          <div className="section-heading">
-            <h2>项目文档</h2>
-            <p>项目根目录的 Markdown 文件 · 只读</p>
-          </div>
-          <ProjectDocuments
-            key={details.project.path}
-            path={details.project.path}
-            names={details.documents}
-          />
-        </>
-      ) : tab === "命令" ? (
-        <>
-          <div className="section-heading">
-            <h2>项目命令</h2>
-            <p>读取根目录 package.json · 命令执行与日志尚未接通。</p>
-          </div>
-          {Object.keys(details.scripts).length ? (
-            <div className="grouped-list">
-              {Object.entries(details.scripts).map(([name, command]) => (
-                <div key={name} className="info-row">
-                  <strong className="font-medium">{name}</strong>
-                  <code className="text-muted">{command}</code>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Empty icon="file" title="没有发现 package.json 命令">
-              项目已有的其他命令入口暂未解析。
-            </Empty>
-          )}
-        </>
+      {tab === "工作树" ? (
+        <ProjectGit
+          key={details.project.path}
+          path={details.project.path}
+          initialSection={gitSection}
+          onUpdated={onUpdated}
+        />
+      ) : tab === "CI/CD" ? (
+        <ProjectPipelines
+          key={details.project.path}
+          path={details.project.path}
+        />
+      ) : tab === "规范" ? (
+        <ProjectStandards
+          key={details.project.path}
+          details={details}
+          onOpenShared={onOpenShared}
+          onUpdated={onUpdated}
+        />
+      ) : tab === "文档" ? (
+        <ProjectDocuments
+          key={details.project.path}
+          path={details.project.path}
+          names={details.documents}
+        />
       ) : (
         <>
-          <div className="section-heading">
-            <h2>项目概览</h2>
-          </div>
+          <ProjectReviewPanel
+            key={details.project.path}
+            path={details.project.path}
+            onGit={onOpenStashes}
+            onCI={onOpenCI}
+            stashCount={details.stashKnown ? details.stashCount : 0}
+          />
           <dl className="grouped-list">
             {[
-              ["目录", details.project.path],
-              ["Git", details.git ? details.branch : "非 Git 项目"],
               [
                 "工作区",
                 !details.git
@@ -74,10 +86,6 @@ export default function ProjectContent({
                       : "工作区干净",
               ],
               ["项目文档", `${details.documents.length} 个 Markdown 文件`],
-              [
-                "命令",
-                `${Object.keys(details.scripts).length} 个 package.json 脚本`,
-              ],
             ].map(([label, value]) => (
               <div key={label} className="info-row">
                 <dt className="text-muted">{label}</dt>
@@ -85,8 +93,67 @@ export default function ProjectContent({
               </div>
             ))}
           </dl>
+          <section
+            aria-label="本地服务"
+            className="mt-5 border-t border-line pt-5"
+          >
+            <ProjectCommands
+              key={details.project.path}
+              path={details.project.path}
+              scripts={details.scripts}
+            />
+          </section>
         </>
       )}
-    </>
+    </div>
+  );
+}
+
+function ProjectStandards({
+  details,
+  onOpenShared,
+  onUpdated,
+}: {
+  details: Inspection;
+  onOpenShared: () => void;
+  onUpdated: () => void;
+}) {
+  const [section, setSection] = useState("project");
+  return (
+    <div className="space-y-5">
+      <div
+        role="group"
+        aria-label="规范分区"
+        className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
+      >
+        {[
+          ["project", "项目规则"],
+          ["shared", "公共规范"],
+        ].map(([id, title]) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={section === id}
+            aria-controls={`standards-${id}`}
+            onClick={() => setSection(id)}
+            className={`min-h-8 rounded-md px-3 text-sm ${section === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
+          >
+            {title}
+          </button>
+        ))}
+      </div>
+      <div id="standards-project" hidden={section !== "project"}>
+        <ProjectRules path={details.project.path} onUpdated={onUpdated} />
+      </div>
+      <div id="standards-shared" hidden={section !== "shared"}>
+        <SharedRules
+          projects={[details.project]}
+          project={details.project}
+          showProjectRules={false}
+          onOpenShared={onOpenShared}
+          onUpdated={onUpdated}
+        />
+      </div>
+    </div>
   );
 }

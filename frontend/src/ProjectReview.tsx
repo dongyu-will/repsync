@@ -1,0 +1,809 @@
+import { useReducer, useRef, type FormEvent, type ReactNode } from "react";
+import { isMyGo } from "mygo-runtime";
+import { Service, type ProjectReview, type ReviewResource } from "./mygo";
+import { Button, Select } from "./components";
+import { reviewPreview } from "./review-preview";
+
+const native = isMyGo();
+const sections = [
+  ["changes", "改动"],
+  ["checks", "检查"],
+  ["delivery", "交付"],
+  ["resources", "数据与环境"],
+  ["handover", "交接"],
+] as const;
+type Section = (typeof sections)[number][0];
+const status: Record<string, string> = {
+  pending: "待核验",
+  unknown: "未知",
+  observed: "已读取本地状态",
+  recorded: "已记录核验",
+  success: "通过",
+  failure: "未通过",
+  failed: "未通过",
+  stale: "已变化",
+  current: "内容一致",
+  not_applicable: "不适用",
+  exists: "存在",
+  missing: "缺失",
+  set: "已定义",
+  needs_confirmation: "需人工核验",
+  tracked: "Git 已跟踪",
+  ignored: "被 Git 忽略",
+  untracked: "未纳入 Git",
+  not_applicable_tracking: "",
+};
+const date = (value: string) =>
+  new Date(value).toLocaleString("zh-CN", { hour12: false });
+type State = {
+  report: ProjectReview | null;
+  section: Section;
+  pending: boolean;
+  error: string;
+  notice: string;
+  expanded: boolean;
+  resourceTarget: string;
+};
+
+export default function ProjectReviewPanel({
+  path,
+  onGit,
+  onCI,
+  stashCount,
+}: {
+  path: string;
+  onGit: () => void;
+  onCI: () => void;
+  stashCount: number;
+}) {
+  const [state, update] = useReducer(
+    (s: State, p: Partial<State>) => ({ ...s, ...p }),
+    {
+      report: native ? null : reviewPreview(path),
+      section: "changes",
+      pending: false,
+      error: "",
+      notice: "",
+      expanded: false,
+      resourceTarget: "",
+    },
+  );
+  const { report, pending } = state;
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  async function perform(action: () => Promise<unknown>, notice: string) {
+    if (!native) return false;
+    update({ pending: true, error: "", notice: "" });
+    try {
+      await action();
+      const report = await Service.reviewProject(path);
+      update({ report, notice });
+      return true;
+    } catch (error) {
+      update({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    } finally {
+      update({ pending: false });
+    }
+  }
+  async function refresh() {
+    update({ pending: true, error: "", notice: "" });
+    try {
+      update({ report: await Service.reviewProject(path) });
+    } catch (error) {
+      update({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      update({ pending: false });
+    }
+  }
+  async function submit(
+    event: FormEvent<HTMLFormElement>,
+    action: (data: FormData) => Promise<unknown>,
+    notice: string,
+  ) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    if (await perform(() => action(data), notice)) form.reset();
+  }
+  const value = (data: FormData, name: string) => String(data.get(name) || "");
+  const select = (section: string) => {
+    update({ section: section as Section, expanded: true });
+    requestAnimationFrame(() =>
+      detailsRef.current?.scrollIntoView({ block: "start" }),
+    );
+  };
+  return (
+    <section
+      aria-label="项目待处理"
+      className="mb-5 space-y-3 border-b border-line pb-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">
+          待处理{report ? ` · ${report.issues.length}` : ""}
+        </h2>
+        <Button disabled={!native || pending} onClick={refresh}>
+          {pending ? "正在检查…" : "检查当前状态"}
+        </Button>
+      </div>
+      {state.error && (
+        <p
+          role="alert"
+          className="break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
+        >
+          {state.error}
+        </p>
+      )}
+      {state.notice && (
+        <p role="status" className="text-sm text-muted">
+          {state.notice}
+        </p>
+      )}
+      {!report ? (
+        <>
+          <p className="text-sm text-muted">
+            手动读取改动、检查记录、交付与数据状态。
+          </p>
+          {stashCount > 0 && (
+            <div
+              role="status"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            >
+              <p>还有 {stashCount} 条 stash 待处理</p>
+              <button
+                className="rounded px-2 py-1 underline underline-offset-2"
+                onClick={onGit}
+              >
+                查看 stash
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-xs text-muted">
+            读取于 {date(report.checkedAt)} · 不代表提交、推送或发布已完成
+          </p>
+          {report.issues.length ? (
+            <ul className="grouped-list">
+              {report.issues.slice(0, 5).map((issue) => (
+                <li
+                  key={issue.kind}
+                  className="flex items-center justify-between gap-3 border-b border-line-subtle px-3 py-2 text-sm last:border-0"
+                >
+                  <span className="min-w-0 break-words">{issue.message}</span>
+                  <button
+                    className="shrink-0 rounded px-2 py-1 text-accent hover:bg-selection"
+                    onClick={() =>
+                      issue.kind === "stash" ? onGit() : select(issue.section)
+                    }
+                  >
+                    查看
+                  </button>
+                </li>
+              ))}
+              {report.issues.length > 5 && (
+                <li className="px-3 py-2 text-xs text-muted">
+                  另有 {report.issues.length - 5} 项，见各分区。
+                </li>
+              )}
+            </ul>
+          ) : (
+            <p role="status" className="text-sm">
+              未发现已声明范围内的待处理项。
+            </p>
+          )}
+          <details
+            ref={detailsRef}
+            open={state.expanded}
+            onToggle={(event) => update({ expanded: event.currentTarget.open })}
+          >
+            <summary className="cursor-pointer py-1 text-sm font-medium">
+              查看详情与记录
+            </summary>
+            <div className="mt-3 space-y-4">
+              <div
+                role="group"
+                aria-label="收尾检查分区"
+                className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg bg-sidebar p-1"
+              >
+                {sections.map(([id, label]) => (
+                  <button
+                    key={id}
+                    aria-pressed={state.section === id}
+                    onClick={() => select(id)}
+                    className={`min-h-8 rounded-md px-3 text-sm ${state.section === id ? "bg-white font-medium" : "text-muted hover:text-ink"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {state.section === "changes" && (
+                <>
+                  <dl className="grouped-list">
+                    <Info label="上游引用">
+                      {report.snapshot.upstream || "未配置或无法读取"}
+                    </Info>
+                    <Info label="提交差异">
+                      {report.snapshot.upstreamKnown
+                        ? `领先 ${report.snapshot.ahead} / 落后 ${report.snapshot.behind}`
+                        : "未核验"}
+                    </Info>
+                    <Info label="最近获取">
+                      {report.snapshot.fetchedAt
+                        ? date(report.snapshot.fetchedAt)
+                        : "未知"}
+                    </Info>
+                  </dl>
+                  <p className="text-xs leading-5 text-muted">
+                    以上按本地 Git 引用计算，未联网确认远程现状。
+                  </p>
+                  <Button onClick={onGit}>查看工作树、分支和 stash</Button>
+                  {report.snapshot.files.length ? (
+                    <ul className="grouped-list max-h-64 overflow-auto">
+                      {report.snapshot.files.slice(0, 100).map((file) => (
+                        <li
+                          key={file.path}
+                          className="flex items-baseline gap-3 border-b border-line-subtle px-3 py-2 text-sm last:border-0"
+                        >
+                          <span className="shrink-0 text-xs text-muted">
+                            {file.conflict
+                              ? "冲突"
+                              : file.untracked
+                                ? "未跟踪"
+                                : `${file.index !== " " ? "已暂存" : ""}${file.index !== " " && file.worktree !== " " ? " / " : ""}${file.worktree !== " " ? "未暂存" : ""}`}
+                          </span>
+                          <span className="min-w-0 break-all">{file.path}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted">
+                      {report.snapshot.error || "没有已读取的文件改动。"}
+                    </p>
+                  )}
+                  {report.snapshot.files.length > 100 && (
+                    <p className="text-xs text-muted">
+                      这里只列前 100 项，CLI 回执包含完整的已读取列表。
+                    </p>
+                  )}
+                </>
+              )}
+              {state.section === "checks" && (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs leading-5 text-muted">
+                      比较文件内容和命令配置；未覆盖被忽略的依赖或外部环境。提交变化后需确认检查是否依赖
+                      Git 状态。
+                    </p>
+                    <Button onClick={onCI}>前往 CI/CD</Button>
+                  </div>
+                  {report.checks.length ? (
+                    <div className="grouped-list">
+                      {report.checks.map((check) => (
+                        <div
+                          key={check.id}
+                          className="space-y-1 border-b border-line-subtle p-3 last:border-0"
+                        >
+                          <p className="break-words text-sm font-medium">
+                            {check.command} ·{" "}
+                            {status[check.status] || check.status}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {check.source === "pipeline"
+                              ? "应用执行"
+                              : "外部填报，未由应用执行"}{" "}
+                            · {date(check.createdAt)} · {status[check.current]}
+                          </p>
+                          <p className="break-words text-xs leading-5 text-muted">
+                            范围：{check.scope}；{check.reason}
+                          </p>
+                          <p className="break-words text-xs text-muted">
+                            {check.evidence}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted">尚无检查记录。</p>
+                  )}
+                  <details>
+                    <summary className="cursor-pointer text-sm">
+                      记录外部检查
+                    </summary>
+                    <ReviewForm
+                      pending={pending}
+                      onSubmit={(event) =>
+                        submit(
+                          event,
+                          (data) =>
+                            Service.recordReviewCheck(path, report.version, {
+                              command: value(data, "command"),
+                              scope: value(data, "scope"),
+                              status: value(data, "status"),
+                              evidence: value(data, "evidence"),
+                            }),
+                          "已记录外部检查说明",
+                        )
+                      }
+                    >
+                      <Field name="command" label="检查命令" required />
+                      <Field name="scope" label="覆盖范围" required />
+                      <ResultSelect />
+                      <Field
+                        name="evidence"
+                        label="结果说明或日志位置"
+                        multiline
+                        required
+                      />
+                      <Submit pending={pending}>记录检查</Submit>
+                    </ReviewForm>
+                  </details>
+                </>
+              )}
+              {state.section === "delivery" && (
+                <>
+                  <div className="grouped-list">
+                    {report.delivery.map((stage) => (
+                      <div
+                        key={stage.stage}
+                        className="space-y-1 border-b border-line-subtle p-3 last:border-0"
+                      >
+                        <p className="text-sm font-medium">
+                          {stage.name} · {status[stage.status] || stage.status}
+                        </p>
+                        <p className="break-words text-xs leading-5 text-muted">
+                          {stage.detail}
+                        </p>
+                        {stage.recordedAt && (
+                          <p className="text-xs text-muted">
+                            记录于 {date(stage.recordedAt)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <details>
+                    <summary className="cursor-pointer text-sm">
+                      记录阶段核验
+                    </summary>
+                    <ReviewForm
+                      pending={pending}
+                      onSubmit={(event) =>
+                        submit(
+                          event,
+                          (data) =>
+                            Service.recordReviewEvidence(path, report.version, {
+                              stage: value(data, "stage"),
+                              target: "",
+                              status: value(data, "status"),
+                              note: value(data, "note"),
+                            }),
+                          "已保存手工核验记录",
+                        )
+                      }
+                    >
+                      <label className="block space-y-1">
+                        <span className="text-xs text-muted">阶段</span>
+                        <Select name="stage">
+                          {report.delivery
+                            .filter(
+                              (s) => !["working", "commit"].includes(s.stage),
+                            )
+                            .map((s) => (
+                              <option key={s.stage} value={s.stage}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </Select>
+                      </label>
+                      <ResultSelect allowNA />
+                      <Field
+                        name="note"
+                        label="核验方式、提交或结果链接"
+                        multiline
+                        required
+                      />
+                      <p className="text-xs text-muted">
+                        保存为手工核验记录，不会执行推送、部署或验收命令。
+                      </p>
+                      <Submit pending={pending}>保存核验</Submit>
+                    </ReviewForm>
+                  </details>
+                </>
+              )}
+              {state.section === "resources" && (
+                <>
+                  {report.diagnosis.length > 0 && (
+                    <ul className="grouped-list">
+                      {report.diagnosis.map((d, i) => (
+                        <li
+                          key={i}
+                          className="border-b border-line-subtle p-3 text-sm last:border-0"
+                        >
+                          {d.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {report.resources.length ? (
+                    <div className="grouped-list">
+                      {report.resources.map((resource) => (
+                        <div
+                          key={resource.state.definition.id}
+                          className="space-y-2 border-b border-line-subtle p-3 last:border-0"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium">
+                              {resource.state.definition.name} ·{" "}
+                              {resource.status === "success"
+                                ? "已记录核验"
+                                : status[resource.status]}
+                            </p>
+                            <button
+                              className="rounded px-2 py-1 text-xs text-accent hover:bg-selection"
+                              onClick={() =>
+                                update({
+                                  resourceTarget: resource.state.definition.id,
+                                })
+                              }
+                            >
+                              记录核验
+                            </button>
+                          </div>
+                          <p className="break-all text-xs text-muted">
+                            {resource.state.definition.target || "手工确认"} ·{" "}
+                            {status[resource.state.observed]}
+                            {resource.state.tracking !== "not_applicable"
+                              ? ` · ${status[resource.state.tracking] || resource.state.tracking}`
+                              : ""}
+                          </p>
+                          {resource.state.error && (
+                            <p className="break-words text-xs text-removed">
+                              {resource.state.error}
+                            </p>
+                          )}
+                          <p className="break-words text-xs leading-5 text-muted">
+                            {resource.state.definition.guide ||
+                              "存在不代表已备份或可恢复，请记录核验方法。"}
+                          </p>
+                          {resource.note && (
+                            <p className="break-words text-xs text-muted">
+                              填报：{resource.note}
+                            </p>
+                          )}
+                          {resource.recordedAt && (
+                            <p className="text-xs text-muted">
+                              填报于 {date(resource.recordedAt)}
+                            </p>
+                          )}
+                          {state.resourceTarget ===
+                            resource.state.definition.id && (
+                            <ReviewForm
+                              pending={pending}
+                              onSubmit={(event) =>
+                                submit(
+                                  event,
+                                  (data) =>
+                                    Service.recordReviewEvidence(
+                                      path,
+                                      report.version,
+                                      {
+                                        stage: "resource",
+                                        target: resource.state.definition.id,
+                                        status: value(data, "status"),
+                                        note: value(data, "note"),
+                                      },
+                                    ),
+                                  "已保存数据与环境核验说明",
+                                )
+                              }
+                            >
+                              <ResultSelect allowNA />
+                              <Field
+                                name="note"
+                                label="备份、恢复演练或状态核验说明"
+                                multiline
+                                required
+                              />
+                              <Submit pending={pending}>保存核验</Submit>
+                            </ReviewForm>
+                          )}
+                          <button
+                            disabled={!native || pending}
+                            className="rounded px-2 py-1 text-xs text-muted hover:bg-sidebar disabled:opacity-45"
+                            onClick={() =>
+                              perform(
+                                () =>
+                                  Service.saveReviewResources(
+                                    path,
+                                    report.configVersion,
+                                    report.resources
+                                      .filter(
+                                        (r) =>
+                                          r.state.definition.id !==
+                                          resource.state.definition.id,
+                                      )
+                                      .map((r) => r.state.definition),
+                                  ),
+                                "已移除检查声明，未删除数据",
+                              )
+                            }
+                          >
+                            移除检查声明
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted">
+                      尚未声明需要核验的数据或环境对象。
+                    </p>
+                  )}
+                  <details>
+                    <summary className="cursor-pointer text-sm">
+                      添加检查对象
+                    </summary>
+                    <ReviewForm
+                      pending={pending}
+                      onSubmit={(event) =>
+                        submit(
+                          event,
+                          (data) => {
+                            const resource: ReviewResource = {
+                              id: crypto.randomUUID(),
+                              name: value(data, "name"),
+                              kind: value(data, "kind"),
+                              target: value(data, "target"),
+                              guide: value(data, "guide"),
+                            };
+                            return Service.saveReviewResources(
+                              path,
+                              report.configVersion,
+                              [
+                                ...report.resources.map(
+                                  (r) => r.state.definition,
+                                ),
+                                resource,
+                              ],
+                            );
+                          },
+                          "检查对象已保存，不执行项目命令",
+                        )
+                      }
+                    >
+                      <Field name="name" label="名称" required />
+                      <label className="block space-y-1">
+                        <span className="text-xs text-muted">类型</span>
+                        <Select name="kind">
+                          <option value="file">项目内文件</option>
+                          <option value="directory">项目内目录</option>
+                          <option value="environment">
+                            环境变量（仅检查是否定义）
+                          </option>
+                          <option value="manual">
+                            手工核验数据库、迁移或备份
+                          </option>
+                        </Select>
+                      </label>
+                      <Field
+                        name="target"
+                        label="项目内相对路径或环境变量名（手工核验可留空）"
+                      />
+                      <Field
+                        name="guide"
+                        label="核验方法或项目指南"
+                        multiline
+                      />
+                      <Submit pending={pending}>保存检查对象</Submit>
+                    </ReviewForm>
+                  </details>
+                </>
+              )}
+              {state.section === "handover" && (
+                <>
+                  <ReviewForm
+                    pending={pending}
+                    onSubmit={(event) =>
+                      submit(
+                        event,
+                        (data) =>
+                          Service.startReviewTask(
+                            path,
+                            report.version,
+                            value(data, "title"),
+                          ),
+                        "已记录任务开始状态",
+                      )
+                    }
+                  >
+                    <Field name="title" label="任务名称" required />
+                    <Submit pending={pending}>记录任务开始</Submit>
+                  </ReviewForm>
+                  <p className="text-xs leading-5 text-muted">
+                    开始和结束均手动记录；期间新增内容不推定由某个 AI 创建。
+                  </p>
+                  {report.tasks.map((task) => (
+                    <details
+                      key={task.id}
+                      className="border-t border-line pt-3"
+                    >
+                      <summary className="cursor-pointer break-words text-sm font-medium">
+                        {task.title} · {task.endedAt ? "已交接" : "尚未交接"}
+                      </summary>
+                      <p className="mt-2 break-all text-xs text-muted">
+                        {date(task.startedAt)} · {task.start.branch} ·{" "}
+                        {task.start.head.slice(0, 8)}
+                      </p>
+                      {task.endedAt ? (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs text-muted">
+                            期间新增 {task.newStashes.length} 条 stash /{" "}
+                            {task.newUntracked.length} 个未跟踪文件
+                          </p>
+                          <CopyHandover text={task.handover} />
+                        </div>
+                      ) : (
+                        <ReviewForm
+                          pending={pending}
+                          onSubmit={(event) =>
+                            submit(
+                              event,
+                              (data) =>
+                                Service.finishReviewTask(
+                                  path,
+                                  task.id,
+                                  report.version,
+                                  {
+                                    summary: value(data, "summary"),
+                                    checks: value(data, "checks"),
+                                    blockers: value(data, "blockers"),
+                                  },
+                                ),
+                              "任务交接已保存",
+                            )
+                          }
+                        >
+                          <Field
+                            name="summary"
+                            label="完成内容"
+                            multiline
+                            required
+                          />
+                          <Field
+                            name="checks"
+                            label="检查说明与结果位置"
+                            multiline
+                          />
+                          <Field
+                            name="blockers"
+                            label="遗留问题与下一步"
+                            multiline
+                          />
+                          <Submit pending={pending}>保存交接</Submit>
+                        </ReviewForm>
+                      )}
+                    </details>
+                  ))}
+                </>
+              )}
+            </div>
+          </details>
+        </>
+      )}
+    </section>
+  );
+}
+
+function Info({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="info-row">
+      <dt className="text-muted">{label}</dt>
+      <dd className="break-all">{children}</dd>
+    </div>
+  );
+}
+function ReviewForm({
+  children,
+  onSubmit,
+  pending,
+}: {
+  children: ReactNode;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  pending: boolean;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="mt-3">
+      <fieldset
+        disabled={!native || pending}
+        className="space-y-3 disabled:opacity-60"
+      >
+        {children}
+      </fieldset>
+    </form>
+  );
+}
+function Field({
+  name,
+  label,
+  multiline = false,
+  required = false,
+}: {
+  name: string;
+  label: string;
+  multiline?: boolean;
+  required?: boolean;
+}) {
+  return (
+    <label className="block space-y-1">
+      <span className="block text-xs text-muted">{label}</span>
+      {multiline ? (
+        <textarea
+          name={name}
+          required={required}
+          maxLength={8192}
+          rows={3}
+          className="w-full rounded-md border border-control px-3 py-2 text-sm"
+        />
+      ) : (
+        <input
+          name={name}
+          required={required}
+          maxLength={2000}
+          className="h-9 w-full rounded-md border border-control px-3 text-sm"
+        />
+      )}
+    </label>
+  );
+}
+function ResultSelect({ allowNA = false }: { allowNA?: boolean }) {
+  return (
+    <label className="block space-y-1">
+      <span className="block text-xs text-muted">结果</span>
+      <Select name="status">
+        <option value="success">核验通过</option>
+        <option value="failure">未通过</option>
+        {allowNA && <option value="not_applicable">不适用</option>}
+      </Select>
+    </label>
+  );
+}
+function Submit({
+  pending,
+  children,
+}: {
+  pending: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Button type="submit" disabled={!native || pending}>
+      {pending ? "保存中…" : children}
+    </Button>
+  );
+}
+function CopyHandover({ text }: { text: string }) {
+  const [notice, setNotice] = useReducer((_: string, n: string) => n, "");
+  return (
+    <>
+      <Button
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            setNotice("已复制交接");
+          } catch {
+            setNotice("无法写入剪贴板，请从下方选取文本复制。");
+          }
+        }}
+      >
+        复制交接
+      </Button>
+      {notice && (
+        <p role="status" className="text-xs text-muted">
+          {notice}
+        </p>
+      )}
+      <pre tabIndex={0} className="source-panel max-h-80">
+        {text}
+      </pre>
+    </>
+  );
+}

@@ -20,6 +20,7 @@ import (
 type Project struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
+	ID   string `json:"id,omitempty"`
 }
 
 type Inspection struct {
@@ -28,6 +29,8 @@ type Inspection struct {
 	Branch      string            `json:"branch"`
 	Status      string            `json:"status"`
 	StatusKnown bool              `json:"statusKnown"`
+	StashKnown  bool              `json:"stashKnown"`
+	StashCount  int               `json:"stashCount"`
 	Documents   []string          `json:"documents"`
 	Scripts     map[string]string `json:"scripts"`
 	Warnings    []string          `json:"warnings"`
@@ -35,10 +38,21 @@ type Inspection struct {
 
 // Service persists registrations separately from the repositories it inspects.
 type Service struct {
-	mu       sync.Mutex
-	path     string
-	syncMu   sync.Mutex
-	previews map[string]pendingUpdate
+	mu                  sync.Mutex
+	path                string
+	syncMu              sync.Mutex
+	previews            map[string]pendingUpdate
+	taskMu              sync.Mutex
+	serviceStartMu      sync.Mutex
+	activePipelines     map[string]*activePipeline
+	activeLocalServices map[string]map[string]*activeLocalService
+	activeClone         *activeClone
+	activePolicyChecks  map[string]context.CancelFunc
+	taskWG              sync.WaitGroup
+	closing             bool
+	gitMu               sync.Mutex
+	reviewMu            sync.Mutex
+	gitCleanupCancel    context.CancelFunc
 }
 
 func NewService(path string) *Service { return &Service{path: path} }
@@ -94,29 +108,91 @@ func (s *Service) Add(path string) (Project, error) {
 		return p, nil
 	}
 	projects = append(projects, p)
-	if err := os.MkdirAll(filepath.Dir(s.path), 0700); err != nil {
-		return Project{}, err
-	}
-	data, err := json.MarshalIndent(projects, "", "  ")
-	if err != nil {
-		return Project{}, err
-	}
-	f, err := os.CreateTemp(filepath.Dir(s.path), ".projects-*")
-	if err != nil {
-		return Project{}, err
-	}
-	defer os.Remove(f.Name())
-	if _, err = f.Write(data); err != nil {
-		_ = f.Close()
-		return Project{}, err
-	}
-	if err = f.Close(); err != nil {
-		return Project{}, err
-	}
-	if err = os.Rename(f.Name(), s.path); err != nil {
+	if err := saveJSON(s.path, projects); err != nil {
 		return Project{}, err
 	}
 	return p, nil
+}
+
+// RemoveProject unregisters a project without deleting its files, logs or backups.
+func (s *Service) RemoveProject(path string) error {
+	_, err := s.changeProject(path, "")
+	return err
+}
+
+// RelocateProject repairs a registration after a directory move; it does not move files.
+func (s *Service) RelocateProject(path, destination string) (Project, error) {
+	if !filepath.IsAbs(destination) {
+		return Project{}, errors.New("请输入新目录的绝对路径")
+	}
+	canonical, err := filepath.EvalSymlinks(filepath.Clean(destination))
+	if err != nil {
+		return Project{}, err
+	}
+	info, err := os.Stat(canonical)
+	if err != nil || !info.IsDir() {
+		return Project{}, errors.New("新路径必须是可访问的目录")
+	}
+	return s.changeProject(path, canonical)
+}
+
+func (s *Service) changeProject(path, destination string) (Project, error) {
+	// Match synchronization's lock order. Task ownership cannot change during registration edits.
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closing {
+		return Project{}, errors.New("应用正在退出")
+	}
+	projects, err := s.load()
+	if err != nil {
+		return Project{}, err
+	}
+	index := slices.IndexFunc(projects, func(p Project) bool { return p.Path == path })
+	if index < 0 {
+		return Project{}, errors.New("请先登记项目目录")
+	}
+	for _, active := range s.activeLocalServices[path] {
+		active.mu.Lock()
+		running := localServiceRunning(active.state.Status)
+		active.mu.Unlock()
+		if running {
+			return Project{}, errors.New("请先停止该项目的本地服务")
+		}
+	}
+	if active := s.activePipelines[path]; active != nil {
+		active.mu.Lock()
+		running := active.run.Status == "running"
+		active.mu.Unlock()
+		if running {
+			return Project{}, errors.New("请先停止该项目的流水线")
+		}
+	}
+	if s.activePolicyChecks[path] != nil {
+		return Project{}, errors.New("请等待该项目的规则检查结束")
+	}
+	updated := projects[index]
+	if destination == "" {
+		projects = slices.Delete(projects, index, index+1)
+	} else {
+		if destination != path && slices.ContainsFunc(projects, func(p Project) bool { return p.Path == destination }) {
+			return Project{}, errors.New("新目录已经登记")
+		}
+		updated = Project{Name: filepath.Base(destination), Path: destination}
+		projects[index] = updated
+	}
+	if err := saveJSON(s.path, projects); err != nil {
+		return Project{}, err
+	}
+	for token, preview := range s.previews {
+		if preview.Record.Project.Path == path {
+			delete(s.previews, token)
+		}
+	}
+	return updated, nil
 }
 
 func (s *Service) registeredProject(path string) (Project, error) {
@@ -165,6 +241,11 @@ func (s *Service) Inspect(path string) (Inspection, error) {
 			result.Warnings = append(result.Warnings, err.Error())
 		}
 		result.StatusKnown = err == nil
+		stashes, stashErr := readGitStashes(path)
+		result.StashKnown, result.StashCount = stashErr == nil, len(stashes.Entries)
+		if stashErr != nil {
+			result.Warnings = append(result.Warnings, stashErr.Error())
+		}
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {

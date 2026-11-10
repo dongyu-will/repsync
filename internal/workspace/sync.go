@@ -27,15 +27,19 @@ type SharedSource struct {
 }
 
 type UpdatePreview struct {
-	Token      string  `json:"token"`
-	Project    Project `json:"project"`
-	SourcePath string  `json:"sourcePath"`
-	Version    string  `json:"version"`
-	Diff       string  `json:"diff"`
-	Changed    bool    `json:"changed"`
+	Target         string  `json:"target,omitempty"`
+	Conflict       bool    `json:"conflict,omitempty"`
+	Token          string  `json:"token"`
+	Project        Project `json:"project"`
+	SourcePath     string  `json:"sourcePath"`
+	Version        string  `json:"version"`
+	Diff           string  `json:"diff"`
+	Changed        bool    `json:"changed"`
+	ProjectContent string  `json:"projectContent"`
 }
 
 type UpdateHistory struct {
+	Target     string  `json:"target,omitempty"`
 	ID         string  `json:"id"`
 	Project    Project `json:"project"`
 	SourcePath string  `json:"sourcePath"`
@@ -51,6 +55,10 @@ type fileSnapshot struct {
 }
 
 type updateRecord struct {
+	ResourceID    string `json:"resourceId,omitempty"`
+	ResourceMode  uint32 `json:"resourceMode,omitempty"`
+	Conflict      bool   `json:"conflict,omitempty"`
+	PolicyVersion string `json:"policyVersion,omitempty"`
 	UpdateHistory
 	Before fileSnapshot `json:"before"`
 	After  fileSnapshot `json:"after"`
@@ -90,8 +98,8 @@ func readSharedSource(path string) (SharedSource, error) {
 	if !utf8.ValidString(content) || strings.TrimSpace(content) == "" {
 		return SharedSource{}, errors.New("规范源必须是非空 UTF-8 文本")
 	}
-	if strings.Contains(content, sharedStart) || strings.Contains(content, sharedEnd) {
-		return SharedSource{}, errors.New("规范源不能包含 repsync 公共区块标记，请使用独立的公共规则文件")
+	if strings.Contains(content, sharedStart) || strings.Contains(content, sharedEnd) || strings.Contains(content, policyStart) || strings.Contains(content, policyEnd) {
+		return SharedSource{}, errors.New("规范源不能包含 repsync 受管理区块标记，请使用独立的公共规则文件")
 	}
 	return SharedSource{Path: canonical, Version: digest(content), Content: content}, nil
 }
@@ -137,13 +145,18 @@ func (s *Service) ConnectSharedSource(path string) (SharedSource, error) {
 	return source, nil
 }
 
-func readTarget(path string) (fileSnapshot, error) {
+func readTarget(path string) (fileSnapshot, error) { return readUpdateTarget(path, "AGENTS.md") }
+
+func readUpdateTarget(path, target string) (fileSnapshot, error) {
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return fileSnapshot{}, err
 	}
 	defer root.Close()
-	info, err := root.Lstat("AGENTS.md")
+	if err := validateUpdatePath(root, target); err != nil {
+		return fileSnapshot{}, err
+	}
+	info, err := root.Lstat(target)
 	if errors.Is(err, os.ErrNotExist) {
 		return fileSnapshot{Mode: 0644}, nil
 	}
@@ -151,9 +164,9 @@ func readTarget(path string) (fileSnapshot, error) {
 		return fileSnapshot{}, err
 	}
 	if !info.Mode().IsRegular() {
-		return fileSnapshot{}, errors.New("AGENTS.md 必须是普通文件，暂不更新符号链接")
+		return fileSnapshot{}, fmt.Errorf("%s 必须是普通文件，暂不更新符号链接", target)
 	}
-	file, err := root.Open("AGENTS.md")
+	file, err := root.Open(target)
 	if err != nil {
 		return fileSnapshot{}, err
 	}
@@ -163,7 +176,7 @@ func readTarget(path string) (fileSnapshot, error) {
 		return fileSnapshot{}, err
 	}
 	if !utf8.ValidString(content) {
-		return fileSnapshot{}, errors.New("AGENTS.md 不是 UTF-8 文本")
+		return fileSnapshot{}, fmt.Errorf("%s 不是 UTF-8 文本", target)
 	}
 	return fileSnapshot{Content: content, Exists: true, Mode: uint32(info.Mode().Perm())}, nil
 }
@@ -239,7 +252,8 @@ func (s *Service) PreviewUpdate(path string) (UpdatePreview, error) {
 	token := rand.Text()
 	record := updateRecord{UpdateHistory: UpdateHistory{ID: token, Project: project, SourcePath: source.Path, Version: source.Version, CreatedAt: now.UTC().Format("2006-01-02T15:04:05.000000000Z"), State: "prepared"}, Before: before, After: fileSnapshot{Content: after, Exists: true, Mode: before.Mode}}
 	s.previews[token] = pendingUpdate{Record: record, Expires: now.Add(15 * time.Minute)}
-	return UpdatePreview{Token: token, Project: project, SourcePath: source.Path, Version: source.Version, Diff: diff, Changed: !sameSnapshot(before, record.After)}, nil
+	_, projectContent, _ := sharedParts(before.Content)
+	return UpdatePreview{Token: token, Project: project, SourcePath: source.Path, Version: source.Version, Diff: diff, Changed: !sameSnapshot(before, record.After), ProjectContent: projectContent}, nil
 }
 
 func sameSnapshot(a, b fileSnapshot) bool {
@@ -258,14 +272,38 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 	if _, err := s.registeredProject(record.Project.Path); err != nil {
 		return UpdateHistory{}, err
 	}
-	source, err := s.sharedSource()
-	if err != nil {
-		return UpdateHistory{}, err
+	if record.Conflict {
+		return UpdateHistory{}, errors.New("共享文件有项目差异，未覆盖；请先处理差异或改用独立共享文件")
 	}
-	if source.Path != record.SourcePath || source.Version != record.Version {
-		return UpdateHistory{}, errors.New("公共规范已变化，请重新预览")
+	if record.ResourceID != "" {
+		if err := s.validateResourceAdoption(record.Project.Path); err != nil {
+			return UpdateHistory{}, err
+		}
+		source, err := s.projectResource(record.Project.Path, record.ResourceID)
+		if err != nil {
+			return UpdateHistory{}, err
+		}
+		if source.Path != record.SourcePath || source.Version != record.Version || source.Target != record.Target || source.Mode != record.ResourceMode {
+			return UpdateHistory{}, errors.New("共享资源或采用配置已变化，请重新预览")
+		}
+	} else if record.PolicyVersion != "" {
+		config, err := s.ProjectPolicies(record.Project.Path)
+		if err != nil {
+			return UpdateHistory{}, err
+		}
+		if config.Version != record.PolicyVersion {
+			return UpdateHistory{}, errors.New("项目规则已变化，请重新预览")
+		}
+	} else {
+		source, err := s.sharedSource()
+		if err != nil {
+			return UpdateHistory{}, err
+		}
+		if source.Path != record.SourcePath || source.Version != record.Version {
+			return UpdateHistory{}, errors.New("公共规范已变化，请重新预览")
+		}
 	}
-	current, err := readTarget(record.Project.Path)
+	current, err := readUpdateTarget(record.Project.Path, updateTarget(record))
 	if err != nil {
 		return UpdateHistory{}, err
 	}
@@ -279,7 +317,7 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 	if err := saveJSON(recordPath, record); err != nil {
 		return UpdateHistory{}, fmt.Errorf("保存更新备份：%w", err)
 	}
-	if err := replaceTarget(record.Project.Path, record.Before, record.After); err != nil {
+	if err := replaceUpdateTarget(record.Project.Path, updateTarget(record), record.Before, record.After); err != nil {
 		return UpdateHistory{}, err
 	}
 	delete(s.previews, token)
@@ -292,6 +330,12 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 
 // UpdateHistory derives each operation's recoverability from the current file.
 func (s *Service) UpdateHistory(path string) ([]UpdateHistory, error) {
+	return s.updateHistory(path, false)
+}
+func (s *Service) ResourceHistory(path string) ([]UpdateHistory, error) {
+	return s.updateHistory(path, true)
+}
+func (s *Service) updateHistory(path string, resources bool) ([]UpdateHistory, error) {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
 	if _, err := s.registeredProject(path); err != nil {
@@ -304,10 +348,6 @@ func (s *Service) UpdateHistory(path string) ([]UpdateHistory, error) {
 	if err != nil {
 		return nil, err
 	}
-	current, err := readTarget(path)
-	if err != nil {
-		return nil, err
-	}
 	history := []UpdateHistory{}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
@@ -317,7 +357,13 @@ func (s *Service) UpdateHistory(path string) ([]UpdateHistory, error) {
 		if err != nil {
 			return nil, err
 		}
-		if record.Project.Path != path {
+		if record.Project.Path != path || (record.ResourceID != "") != resources {
+			continue
+		}
+		current, err := readUpdateTarget(path, updateTarget(record))
+		if err != nil {
+			record.State = "unavailable"
+			history = append(history, record.UpdateHistory)
 			continue
 		}
 		if sameSnapshot(current, record.After) {
@@ -366,7 +412,7 @@ func (s *Service) RestoreUpdate(id string) (UpdateHistory, error) {
 	if _, err := s.registeredProject(record.Project.Path); err != nil {
 		return UpdateHistory{}, err
 	}
-	if err := replaceTarget(record.Project.Path, record.After, record.Before); err != nil {
+	if err := replaceUpdateTarget(record.Project.Path, updateTarget(record), record.After, record.Before); err != nil {
 		return UpdateHistory{}, err
 	}
 	record.State = "restored"
@@ -376,14 +422,17 @@ func (s *Service) RestoreUpdate(id string) (UpdateHistory, error) {
 	return record.UpdateHistory, nil
 }
 
-func replaceTarget(path string, expected, next fileSnapshot) error {
+func replaceUpdateTarget(path, target string, expected, next fileSnapshot) error {
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		return err
 	}
 	defer root.Close()
+	if err := validateUpdatePath(root, target); err != nil {
+		return err
+	}
 	// The final recheck narrows the window between preview validation and atomic replacement.
-	current, err := readTarget(path)
+	current, err := readUpdateTarget(path, target)
 	if err != nil {
 		return err
 	}
@@ -391,7 +440,7 @@ func replaceTarget(path string, expected, next fileSnapshot) error {
 		return errors.New("项目文件已有后续改动，操作已停止")
 	}
 	if !next.Exists {
-		return root.Remove("AGENTS.md")
+		return root.Remove(target)
 	}
 	temp := ".repsync-" + rand.Text()
 	file, err := root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -414,14 +463,14 @@ func replaceTarget(path string, expected, next fileSnapshot) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	current, err = readTarget(path)
+	current, err = readUpdateTarget(path, target)
 	if err != nil {
 		return err
 	}
 	if !sameSnapshot(current, expected) {
 		return errors.New("项目文件已有后续改动，操作已停止")
 	}
-	return root.Rename(temp, "AGENTS.md")
+	return root.Rename(temp, target)
 }
 
 func saveJSON(path string, value any) error {

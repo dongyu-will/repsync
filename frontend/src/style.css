@@ -49,7 +49,8 @@ button:not(:disabled) {
   cursor: pointer;
 }
 button,
-input {
+input,
+select {
   outline-offset: 3px;
 }
 :focus-visible {
@@ -86,6 +87,20 @@ code {
   width: clamp(176px, 14.5vw, 208px);
   overflow: hidden;
 }
+.window-toolbar {
+  --app-region: drag;
+  min-height: max(48px, var(--mygo-titlebar-height, 0px));
+  padding-right: max(12px, var(--mygo-titlebar-inset-right, 0px));
+}
+.sidebar-titlebar {
+  min-height: max(32px, var(--mygo-titlebar-height, 0px));
+  margin-bottom: 16px;
+  padding-left: calc(var(--mygo-titlebar-inset-left, 0px) + 12px);
+}
+.window-toolbar button,
+.project-path {
+  --app-region: no-drag;
+}
 .nav-item {
   @apply relative flex min-h-9 w-full shrink-0 items-center gap-2 rounded-md px-3 text-left text-sm hover:bg-nav-hover;
 }
@@ -116,9 +131,6 @@ code {
 }
 .workspace-gutter {
   @apply px-4;
-}
-.preview-badge {
-  @apply shrink-0 rounded bg-selection px-1.5 py-0.5 text-xs font-medium leading-4 text-accent;
 }
 .section-heading {
   @apply mb-4;
@@ -157,4 +169,87 @@ code {
 }
 .project-row:focus-visible {
   outline-offset: -3px;
+}
+
+.markdown-document {
+  @apply text-sm leading-6 text-ink;
+  overflow-wrap: anywhere;
+}
+.markdown-document > :first-child {
+  margin-top: 0;
+}
+.markdown-document > :last-child {
+  margin-bottom: 0;
+}
+.markdown-document h1 {
+  @apply mb-4 mt-6 text-2xl font-semibold leading-8;
+}
+.markdown-document h2 {
+  @apply mb-3 mt-6 text-xl font-semibold leading-7;
+}
+.markdown-document h3 {
+  @apply mb-2 mt-5 text-lg font-semibold;
+}
+.markdown-document h4,
+.markdown-document h5,
+.markdown-document h6 {
+  @apply mb-2 mt-4 font-semibold;
+}
+.markdown-document p,
+.markdown-document ul,
+.markdown-document ol,
+.markdown-document blockquote,
+.markdown-document pre,
+.markdown-document table {
+  @apply my-3;
+}
+.markdown-document ul {
+  @apply list-disc pl-5;
+}
+.markdown-document ol {
+  @apply list-decimal pl-5;
+}
+.markdown-document li {
+  @apply my-1;
+}
+.markdown-document li > p {
+  @apply my-1;
+}
+.markdown-document li > ul,
+.markdown-document li > ol {
+  @apply my-1;
+}
+.markdown-document .task-list-item {
+  @apply list-none;
+}
+.markdown-document input[type="checkbox"] {
+  @apply mr-2;
+}
+.markdown-document a {
+  @apply text-accent underline underline-offset-2;
+}
+.markdown-document blockquote {
+  @apply border-l border-control pl-3 text-muted;
+}
+.markdown-document pre {
+  @apply overflow-x-auto rounded-md bg-editor p-3 text-xs leading-5;
+}
+.markdown-document code {
+  @apply rounded bg-editor px-1 py-0.5 font-mono text-xs;
+}
+.markdown-document pre code {
+  @apply bg-transparent p-0;
+}
+.markdown-document table {
+  @apply w-full border-collapse text-left;
+}
+.markdown-document th,
+.markdown-document td {
+  @apply border border-line px-3 py-2;
+}
+.markdown-document th {
+  @apply bg-editor font-semibold;
+}
+.markdown-document hr {
+  @apply my-5 border-line;
 }

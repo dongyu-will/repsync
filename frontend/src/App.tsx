@@ -5,16 +5,42 @@ import { Brand, Button, Empty, Icon } from "./components";
 import ProjectContent, { type ProjectTab } from "./ProjectContent";
 import { previewInspections } from "./preview";
 import SharedRules from "./SharedRules";
+import AddProjectDialog from "./AddProjectDialog";
+import ManageProjectDialog from "./ManageProjectDialog";
+import type { GitSection } from "./ProjectGit";
 
 const native = isMyGo();
-type Page = "project" | "all" | "shared" | "updates" | "settings";
-const tabs: ProjectTab[] = ["概览", "命令", "文档"];
+type Page = "project" | "shared" | "settings";
+const tabs: ProjectTab[] = ["概览", "工作树", "CI/CD", "规范", "文档"];
+const lastProjectKey = native
+  ? "repsync:last-project"
+  : "repsync:preview:last-project";
+const previewProjects = previewInspections.map(({ project }) => project);
+
+function startupProject(projects: Project[]): Project | null {
+  try {
+    const saved = localStorage.getItem(lastProjectKey);
+    const path = native
+      ? saved
+      : saved?.replace(/^\/示例项目(?=\/)/, "/Projects");
+    return (
+      projects.find((project) => project.path === path) || projects[0] || null
+    );
+  } catch {
+    return projects[0] || null;
+  }
+}
+
 function savedTab(path: string): ProjectTab {
   try {
     const value = JSON.parse(
-      localStorage.getItem(`repsync:tab:${path}`) || '"概览"',
+      localStorage.getItem(`repsync:tab:${path}`) ||
+        (!native &&
+          localStorage.getItem(
+            `repsync:tab:${path.replace(/^\/Projects(?=\/)/, "/示例项目")}`,
+          )) ||
+        '"概览"',
     );
-    if (value === "规范") return "文档";
     return tabs.includes(value) ? value : "概览";
   } catch {
     return "概览";
@@ -22,74 +48,139 @@ function savedTab(path: string): ProjectTab {
 }
 
 export default function App() {
-  const [page, setPage] = useState<Page>("all");
-  const [project, setProject] = useState<Project | null>(null);
+  const [page, setPage] = useState<Page>("project");
+  const [project, setProject] = useState<Project | null>(() =>
+    native ? null : startupProject(previewProjects),
+  );
   const [projects, setProjects] = useState<Project[]>(
-    native ? [] : previewInspections.map(({ project }) => project),
+    native ? [] : previewProjects,
   );
   const [listing, setListing] = useState(native);
   const [listError, setListError] = useState("");
   const [listRefresh, setListRefresh] = useState(0);
-  const [tab, setTab] = useState<ProjectTab>("概览");
+  const [selectedTab, setTab] = useState<ProjectTab>(() =>
+    project ? savedTab(project.path) : "概览",
+  );
+  const tab = tabs.includes(selectedTab) ? selectedTab : "概览";
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
-  const [details, setDetails] = useState<Inspection | null>(null);
+  const [details, setDetails] = useState<Inspection | null>(() =>
+    native
+      ? null
+      : previewInspections.find(
+          (item) => item.project.path === project?.path,
+        ) || null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [adding, setAdding] = useState(false);
-  const [path, setPath] = useState("");
-  const [addError, setAddError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [gitSection, setGitSection] = useState<GitSection>("worktrees");
+  const restoredProjectRef = useRef(false);
+  const currentProjectRef = useRef(project);
+  useEffect(() => {
+    currentProjectRef.current = project;
+  }, [project]);
   const searchDialogRef = useRef<HTMLDialogElement>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const focusSearch = useCallback(() => {
-    if (dialogRef.current?.open) return;
+    if (adding || managing) return;
     setSearching(true);
     if (searchDialogRef.current?.open) {
       searchDialogRef.current.querySelector("input")?.focus();
     }
-  }, []);
+  }, [adding, managing]);
 
   useEffect(() => {
     if (!native) return;
     let active = true;
-    Service.list()
-      .then((items) => {
-        if (active) {
-          setProjects(items);
-          setListing(false);
-        }
-      })
-      .catch((e) => {
-        if (active) {
-          setListError(String(e));
-          setListing(false);
-        }
-      });
+    const load = () =>
+      Service.list()
+        .then((items) => {
+          if (active) {
+            setProjects((previous) =>
+              JSON.stringify(previous) === JSON.stringify(items)
+                ? previous
+                : items,
+            );
+            setListError("");
+            setListing(false);
+            if (!restoredProjectRef.current) {
+              restoredProjectRef.current = true;
+              const next = startupProject(items);
+              if (next) {
+                setProject(next);
+                setTab(savedTab(next.path));
+                setLoading(true);
+              }
+            } else {
+              const current = currentProjectRef.current;
+              const next =
+                items.find((item) => item.path === current?.path) ||
+                items[0] ||
+                null;
+              if (next?.path !== current?.path) {
+                currentProjectRef.current = next;
+                setProject(next);
+                setDetails(null);
+                setError("");
+                setLoading(!!next);
+                setManaging(false);
+                setTab(next ? savedTab(next.path) : "概览");
+                try {
+                  if (next) localStorage.setItem(lastProjectKey, next.path);
+                  else localStorage.removeItem(lastProjectKey);
+                } catch {
+                  /* Navigation works without storage. */
+                }
+              }
+            }
+          }
+        })
+        .catch((e) => {
+          if (active) {
+            setListError(String(e));
+            setListing(false);
+          }
+        });
+    void load();
+    const interval = window.setInterval(load, 3000);
+    window.addEventListener("focus", load);
     return () => {
       active = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", load);
     };
   }, [listRefresh]);
   useEffect(() => {
     if (!native || !project) return;
     let active = true;
-    Service.inspect(project.path)
-      .then((result) => {
-        if (active) {
-          setDetails(result);
-          setLoading(false);
-        }
-      })
-      .catch((e) => {
-        if (active) {
-          setError(String(e));
-          setLoading(false);
-        }
-      });
+    let request = 0;
+    const load = () => {
+      const current = ++request;
+      void Service.inspect(project.path)
+        .then((result) => {
+          if (active && current === request) {
+            setDetails(result);
+            setError("");
+            setLoading(false);
+          }
+        })
+        .catch((e) => {
+          if (active && current === request) {
+            setError(String(e));
+            setLoading(false);
+          }
+        });
+    };
+    load();
+    const timer = window.setInterval(load, 60000);
+    window.addEventListener("focus", load);
     return () => {
       active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", load);
     };
   }, [project, refresh]);
   useEffect(() => {
@@ -102,10 +193,6 @@ export default function App() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [focusSearch]);
-  useEffect(() => {
-    if (adding) dialogRef.current?.showModal();
-    else dialogRef.current?.close();
-  }, [adding]);
   useEffect(() => {
     if (searching) {
       searchDialogRef.current?.showModal();
@@ -134,6 +221,11 @@ export default function App() {
     setLoading(native);
     setTab(savedTab(next.path));
     setRefresh((value) => value + 1);
+    try {
+      localStorage.setItem(lastProjectKey, next.path);
+    } catch {
+      /* Project switching works without storage. */
+    }
   }
   function chooseTab(next: ProjectTab) {
     setTab(next);
@@ -149,7 +241,6 @@ export default function App() {
     }
   }
   function openAdd() {
-    setAddError("");
     setAdding(true);
   }
   function reloadProject() {
@@ -164,44 +255,57 @@ export default function App() {
     setListError("");
     setListRefresh((value) => value + 1);
   }
-  async function addProject(event: React.FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setAddError("");
+  function addedProject(added: Project) {
+    setProjects((previous) =>
+      previous.some((p) => p.path === added.path)
+        ? previous
+        : [...previous, added],
+    );
+    setAdding(false);
+    choose(added);
+  }
+  function changedProject(next: Project | null) {
+    if (!project) return;
+    const previous = project.path;
+    const items = next
+      ? projects.map((item) => (item.path === previous ? next : item))
+      : projects.filter((item) => item.path !== previous);
+    setProjects(items);
+    setManaging(false);
     try {
-      const added = await Service.add(path.trim());
-      setProjects((previous) =>
-        previous.some((p) => p.path === added.path)
-          ? previous
-          : [...previous, added],
-      );
-      setAdding(false);
-      setPath("");
-      choose(added);
-    } catch (e) {
-      setAddError(String(e));
-    } finally {
-      setSaving(false);
+      if (next && next.path !== previous)
+        localStorage.setItem(`repsync:tab:${next.path}`, JSON.stringify(tab));
+      localStorage.removeItem(`repsync:tab:${previous}`);
+      localStorage.removeItem(lastProjectKey);
+    } catch {
+      /* Registration works without storage. */
     }
+    const selected = next || items[0];
+    if (selected) choose(selected);
+    else {
+      setProject(null);
+      setDetails(null);
+      setError("");
+      setLoading(false);
+    }
+    reloadProjects();
   }
   const filtered = projects.filter((p) =>
     `${p.name} ${p.path}`.toLowerCase().includes(query.toLowerCase()),
   );
   const heading =
-    page === "all"
-      ? "所有项目"
-      : page === "shared"
-        ? "公共规范"
-        : page === "updates"
-          ? "更新"
-          : "设置";
+    page === "project" ? "项目" : page === "shared" ? "公共规范" : "设置";
 
   return (
     <div className="flex h-dvh min-h-0 bg-white text-ink">
       <aside className="sidebar flex shrink-0 flex-col border-r border-line bg-sidebar">
-        <div className="flex h-14 shrink-0 items-center gap-2 px-3">
-          <Brand />
-          <span className="text-xl font-bold tracking-tight">repsync</span>
+        <div className="sidebar-titlebar window-toolbar flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2 rounded-md">
+            <Brand />
+            <span className={native ? "sr-only" : "text-base font-semibold"}>
+              repsync
+            </span>
+          </div>
           <button
             className="icon-button ml-auto"
             aria-label="搜索项目"
@@ -279,7 +383,7 @@ export default function App() {
                 <button
                   className="px-3 py-3 text-left text-xs text-removed"
                   onClick={() => {
-                    setPage("all");
+                    setPage("project");
                     reloadProjects();
                   }}
                 >
@@ -288,7 +392,7 @@ export default function App() {
               ) : (
                 !projects.length && (
                   <p className="px-3 py-3 text-xs leading-6 text-muted">
-                    {native ? "尚未添加项目" : "请在桌面应用中添加项目"}
+                    尚未添加项目
                   </p>
                 )
               )}
@@ -305,14 +409,6 @@ export default function App() {
             公共规范
           </button>
           <button
-            className={`nav-item ${page === "updates" ? "selected" : ""}`}
-            aria-current={page === "updates" ? "page" : undefined}
-            onClick={() => setPage("updates")}
-          >
-            <Icon name="download" />
-            更新
-          </button>
-          <button
             className={`nav-item ${page === "settings" ? "selected" : ""}`}
             aria-current={page === "settings" ? "page" : undefined}
             onClick={() => setPage("settings")}
@@ -325,28 +421,29 @@ export default function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         {page === "project" && project ? (
           <>
-            <header className="workspace-gutter shrink-0 pt-2">
-              <div className="flex min-h-12 items-center gap-3">
-                <span className="text-muted">
-                  <Icon name="project" size={24} />
-                </span>
+            <header className="workspace-gutter shrink-0">
+              <div className="window-toolbar flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h1 className="truncate text-2xl font-semibold leading-7 tracking-tight">
+                    <h1 className="truncate text-base font-semibold">
                       {project.name}
                     </h1>
-                    {!native && <span className="preview-badge">示例</span>}
                   </div>
                   <p
-                    className="truncate text-sm leading-5 text-muted"
+                    className="project-path truncate text-xs text-muted"
                     title={project.path}
                   >
                     {project.path}
                   </p>
                 </div>
-                <div
-                  className="flex min-h-7 max-w-[30%] items-center gap-2 rounded-md bg-surface px-2 text-sm"
-                  title="当前分支（只读）"
+                <button
+                  className="flex min-h-7 max-w-[30%] items-center gap-2 rounded-md bg-surface px-2 text-sm hover:bg-nav-hover"
+                  title="查看工作树和分支"
+                  aria-label="查看工作树和分支"
+                  onClick={() => {
+                    setGitSection("worktrees");
+                    chooseTab("工作树");
+                  }}
                 >
                   <Icon name="branch" size={17} />
                   <span className="truncate">
@@ -356,18 +453,33 @@ export default function App() {
                         ? details.branch || "非 Git 项目"
                         : "未读取"}
                   </span>
-                </div>
+                </button>
                 {native && (
-                  <Button onClick={reloadProject} disabled={loading}>
+                  <button
+                    className="icon-button text-muted hover:text-ink"
+                    onClick={() => setManaging(true)}
+                    aria-label="管理项目"
+                    title="管理项目"
+                  >
+                    <Icon name="settings" size={16} />
+                  </button>
+                )}
+                {native && (
+                  <button
+                    className="icon-button text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+                    onClick={reloadProject}
+                    disabled={loading}
+                    aria-label="刷新项目"
+                    title="刷新项目"
+                  >
                     <Icon name="refresh" size={16} />
-                    刷新
-                  </Button>
+                  </button>
                 )}
               </div>
               <div
                 role="tablist"
                 aria-label="项目页面"
-                className="mt-1 flex gap-4 border-b border-line"
+                className="flex gap-4 border-b border-line"
               >
                 {tabs.map((name, index) => (
                   <button
@@ -410,7 +522,7 @@ export default function App() {
               id="project-panel"
               role="tabpanel"
               aria-labelledby={`tab-${tab}`}
-              className="workspace-gutter min-h-0 flex-1 overflow-auto py-5"
+              className="workspace-gutter min-h-0 flex-1 overflow-auto py-4"
               tabIndex={0}
             >
               {loading ? (
@@ -428,7 +540,18 @@ export default function App() {
                   </button>
                 </div>
               ) : details ? (
-                <ProjectContent details={details} tab={tab} />
+                <ProjectContent
+                  details={details}
+                  tab={tab}
+                  onOpenShared={() => setPage("shared")}
+                  onUpdated={() => setRefresh((value) => value + 1)}
+                  gitSection={gitSection}
+                  onOpenCI={() => chooseTab("CI/CD")}
+                  onOpenStashes={() => {
+                    setGitSection("stashes");
+                    chooseTab("工作树");
+                  }}
+                />
               ) : (
                 <Empty title="暂时没有项目内容">请刷新重试。</Empty>
               )}
@@ -436,103 +559,49 @@ export default function App() {
           </>
         ) : (
           <>
-            <header className="workspace-gutter flex min-h-14 shrink-0 items-center gap-3 border-b border-line">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {heading}
-              </h1>
-              {!native && <span className="preview-badge">示例预览</span>}
-              {page === "all" && native && (
-                <Button primary className="ml-auto" onClick={openAdd}>
-                  <Icon name="plus" size={17} />
-                  添加项目
-                </Button>
-              )}
+            <header className="window-toolbar workspace-gutter flex shrink-0 items-center gap-3 border-b border-line">
+              <h1 className="text-base font-semibold">{heading}</h1>
             </header>
             <section
-              className="workspace-gutter min-h-0 flex-1 overflow-auto py-5"
+              className="workspace-gutter min-h-0 flex-1 overflow-auto py-4"
               tabIndex={0}
               aria-label={heading}
             >
-              {page === "all" ? (
+              {page === "project" ? (
                 listing ? (
                   <p role="status" className="py-8 text-sm text-muted">
                     正在读取项目…
                   </p>
                 ) : listError ? (
-                  <div
-                    role="alert"
-                    className="rounded-md bg-red-50 p-4 text-sm leading-7 text-red-800"
-                  >
-                    {listError}
-                    <button className="ml-3 underline" onClick={reloadProjects}>
-                      重试
-                    </button>
+                  <div role="alert" className="space-y-3 text-sm text-red-800">
+                    <p>{listError}</p>
+                    <Button onClick={reloadProjects}>重试</Button>
                   </div>
-                ) : projects.length ? (
-                  <>
-                    <p className="mb-4 text-sm leading-5 text-muted">
-                      {native
-                        ? "已登记的本地目录"
-                        : "以下为示例数据，仅供界面预览，不读取或修改本地文件。"}
-                    </p>
-                    <div className="grouped-list">
-                      {projects.map((p) => (
-                        <button
-                          className="project-row"
-                          key={p.path}
-                          onClick={() => choose(p)}
-                          title={p.path}
-                        >
-                          <span className="text-muted">
-                            <Icon name="folder" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <strong className="block truncate text-sm font-medium">
-                              {p.name}
-                            </strong>
-                            <span className="mt-1 block truncate text-xs text-muted">
-                              {p.path}
-                            </span>
-                          </span>
-                          {!native && (
-                            <span className="preview-badge">示例</span>
-                          )}
-                          <span className="shrink-0 text-muted">
-                            <Icon name="arrow" size={18} />
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
                 ) : (
                   <Empty
-                    icon="inbox"
                     title={
-                      native ? "添加你的第一个项目" : "请在桌面应用中管理项目"
+                      projects.length ? "选择一个项目" : "添加你的第一个项目"
                     }
                   >
-                    {native ? (
+                    {projects.length ? (
+                      <Button onClick={focusSearch}>选择项目</Button>
+                    ) : native ? (
                       <>
-                        选择本地目录，查看项目状态、命令与文档。
-                        <div className="mt-5">
+                        添加本地目录，开始查看项目文档和管理公共规范。
+                        <div className="mt-4">
                           <Button primary onClick={openAdd}>
-                            <Icon name="plus" size={17} />
+                            <Icon name="plus" size={16} />
                             添加项目
                           </Button>
                         </div>
                       </>
                     ) : (
-                      "浏览器无法读取本地目录。打开 repsync 桌面应用后即可添加项目。"
+                      "请在桌面应用中添加本地项目。"
                     )}
                   </Empty>
                 )
-              ) : page === "shared" || page === "updates" ? (
-                <SharedRules
-                  key={page}
-                  mode={page}
-                  projects={projects}
-                  onNavigate={setPage}
-                />
+              ) : page === "shared" ? (
+                <SharedRules projects={projects} />
               ) : (
                 <>
                   <div className="section-heading">
@@ -540,12 +609,12 @@ export default function App() {
                   </div>
                   <dl className="grouped-list">
                     {[
-                      ["运行模式", native ? "桌面应用" : "浏览器示例预览"],
+                      ...(native ? [["运行模式", "桌面应用"]] : []),
                       [
-                        native ? "项目登记" : "示例数据",
+                        "项目登记",
                         native
                           ? "保存于系统用户配置目录 / repsync / projects.json"
-                          : "仅在浏览器内展示，不登记本地项目",
+                          : `${projects.length} 个项目`,
                       ],
                       ["当前版本", "0.1.0"],
                     ].map(([label, value]) => (
@@ -632,7 +701,6 @@ export default function App() {
                         {p.path}
                       </span>
                     </span>
-                    {!native && <span className="preview-badge">示例</span>}
                   </button>
                 ))}
               </div>
@@ -644,57 +712,20 @@ export default function App() {
           </div>
         </div>
       </dialog>
-      <dialog
-        aria-labelledby="add-project-title"
-        ref={dialogRef}
-        onCancel={() => setAdding(false)}
-        onClose={() => setAdding(false)}
-        className="m-auto max-h-[calc(100dvh-32px)] w-[400px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-xl bg-white p-0 text-ink shadow-xl backdrop:bg-black/20"
-      >
-        <form onSubmit={addProject} className="p-5">
-          <h2 id="add-project-title" className="text-xl font-semibold">
-            添加本地项目
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            登记目录后读取项目状态，项目文件保持原样。
-          </p>
-          <label
-            className="mb-2 mt-5 block text-sm font-medium"
-            htmlFor="project-path"
-          >
-            项目绝对路径
-          </label>
-          <input
-            id="project-path"
-            autoFocus
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            required
-            value={path}
-            onChange={(e) => setPath(e.target.value)}
-            placeholder="/Users/you/Projects/my-project"
-            className="h-9 w-full rounded-md border border-control px-3 text-sm leading-5"
-          />
-          {addError && (
-            <p role="alert" className="mt-3 text-sm leading-6 text-red-800">
-              {addError}
-            </p>
-          )}
-          <div className="mt-5 flex justify-end gap-2">
-            <Button
-              type="button"
-              disabled={saving}
-              onClick={() => setAdding(false)}
-            >
-              取消
-            </Button>
-            <Button primary type="submit" disabled={saving || !path.trim()}>
-              {saving ? "正在登记…" : "添加项目"}
-            </Button>
-          </div>
-        </form>
-      </dialog>
+      {adding && (
+        <AddProjectDialog
+          onClose={() => setAdding(false)}
+          onAdded={addedProject}
+        />
+      )}
+      {managing && project && (
+        <ManageProjectDialog
+          key={project.path}
+          project={project}
+          onClose={() => setManaging(false)}
+          onChanged={changedProject}
+        />
+      )}
     </div>
   );
 }
