@@ -7,8 +7,10 @@ import ProjectCommands from "./ProjectCommands";
 import ProjectRules from "./ProjectRules";
 import ProjectGit, { type GitSection } from "./ProjectGit";
 import ProjectReviewPanel from "./ProjectReview";
+import AIResources from "./AIResources";
 
-export type ProjectTab = "概览" | "工作树" | "CI/CD" | "规范" | "文档";
+export type ProjectTab =
+  "概览" | "工作树" | "CI/CD" | "规范" | "AI 资源" | "文档";
 
 export default function ProjectContent({
   details,
@@ -58,6 +60,8 @@ export default function ProjectContent({
           onOpenShared={onOpenShared}
           onUpdated={onUpdated}
         />
+      ) : tab === "AI 资源" ? (
+        <AIResources key={details.project.path} path={details.project.path} />
       ) : tab === "文档" ? (
         <ProjectDocuments
           key={details.project.path}

@@ -165,6 +165,10 @@ func writeResponse(w io.Writer, data any, err error) {
 
 func dispatch(service *workspace.Service, request Request) (any, error) {
 	switch request.Action {
+	case "ai-resources":
+		return service.AIResources(request.Path)
+	case "ai-usage":
+		return service.AIUsage(request.Path)
 	case "review":
 		return service.ReviewProject(request.Path)
 	case "review-check":

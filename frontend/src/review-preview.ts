@@ -8,6 +8,11 @@ export function reviewPreview(path: string): ProjectReview {
     checkedAt: "2026-11-10T05:30:00Z",
     configVersion: "preview",
     version: "preview",
+    profile: { kind: "", areas: [], requirements: [], stages: [] },
+    profileConfigured: false,
+    coverageOptions: [],
+    coverage: [],
+    acknowledged: [],
     snapshot: {
       head: git.stashes.head,
       branch: git.stashes.branch,

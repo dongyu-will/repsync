@@ -63,6 +63,32 @@
       "url": "http://127.0.0.1:5178"
     }
   ],
+  "aiResources": [
+    {
+      "kind": "skill",
+      "name": "golang-how-to",
+      "reason": "项目 AGENTS.md 要求 Go 工作加载该技能",
+      "tasks": "编写、检查或排查 Go 代码时使用"
+    },
+    {
+      "kind": "skill",
+      "name": "impeccable",
+      "reason": "沿用 DESIGN.md 的界面基线，复用界面实现与验收工作流",
+      "tasks": "新增或调整前端界面时按需使用"
+    },
+    {
+      "kind": "cli",
+      "name": "go",
+      "reason": "项目后端与 MyGo 工具链使用 Go",
+      "tasks": "Go 检查、测试、类型绑定生成与桌面构建"
+    },
+    {
+      "kind": "cli",
+      "name": "npm",
+      "reason": "README.md 指定前端使用 npm 入口",
+      "tasks": "安装前端依赖、启动预览及执行已有检查"
+    }
+  ],
   "reviewResources": [
     {
       "id": "user-state",

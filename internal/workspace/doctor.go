@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 )
 
@@ -34,6 +35,7 @@ type ProjectDiagnosis struct {
 	Pipelines     []Pipeline         `json:"pipelines"`
 	Resources     []ResourceAdoption `json:"resources"`
 	Issues        []DiagnosisIssue   `json:"issues"`
+	AIResources   []AIResource       `json:"aiResources"`
 }
 
 // DiagnoseProject inspects configuration and executable availability without executing project commands.
@@ -171,6 +173,32 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 	}
 	if len(report.Services) == 0 && len(report.Pipelines) == 0 {
 		issue("error", "commands_missing", "", "尚未接入启动或检查入口，请由 AI 读取项目指南补齐")
+	}
+	report.AIResources = []AIResource{}
+	declarationsIssues := []string{}
+	for _, declaration := range readAIIntent(path, &declarationsIssues) {
+		resource := AIResource{ID: aiID(declaration.Kind, declaration.Name+":"+declaration.Source), Kind: declaration.Kind, Name: declaration.Name, Source: ".repsync.json", Location: declaration.Source, Availability: "unknown", Applicability: "adopted", Reason: declaration.Reason, Tasks: declaration.Tasks, Projects: []string{path}, Detail: "已声明采用；会话可见性与使用情况未核验"}
+		if declaration.Kind == "cli" {
+			command, err := projectCommand(context.Background(), path, "", nil, []string{declaration.Name}, false)
+			if err != nil {
+				resource.Availability, resource.Detail = "missing", "RepSync 执行环境未找到此 CLI"
+				issue("warning", "ai_resource", declaration.Name, resource.Detail)
+			} else {
+				resource.Availability, resource.Location = "available", command.Path
+			}
+		}
+		if declaration.Kind == "skill" && declaration.Source != "" {
+			if info, err := os.Stat(declaration.Source); err != nil || !info.Mode().IsRegular() {
+				resource.Availability, resource.Detail = "missing", "声明的 Skill 来源不存在或不是普通文件"
+				issue("warning", "ai_resource", declaration.Name, resource.Detail)
+			} else {
+				resource.Availability = "discovered"
+			}
+		}
+		report.AIResources = append(report.AIResources, resource)
+	}
+	for _, message := range declarationsIssues {
+		issue("warning", "ai_configuration", "", message)
 	}
 	return report, nil
 }

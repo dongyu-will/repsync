@@ -4,6 +4,82 @@ import { call } from "mygo-runtime";
 
 // ---- Types ----
 
+/** AIResource describes discovery and project intent, never model compliance. */
+export interface AIResource {
+  id: string;
+  kind: string;
+  name: string;
+  description: string;
+  source: string;
+  location: string;
+  version: string;
+  availability: string;
+  detail: string;
+  applicability: string;
+  reason: string;
+  tasks: string;
+  projects: string[];
+}
+
+export interface AIResourceReport {
+  resources: AIResource[];
+  issues: string[];
+  checkedAt: string;
+  scope: string;
+}
+
+export interface AIUsageCoverage {
+  source: string;
+  status: string;
+  files: number;
+  sessions: number;
+  partialFiles: number;
+  versions: string[];
+  detail: string;
+}
+
+export interface AIUsageEvent {
+  id: string;
+  resourceId: string;
+  kind: string;
+  name: string;
+  action: string;
+  status: string;
+  purpose: string;
+  actor: string;
+  project: string;
+  session: string;
+  timestamp: string;
+  source: string;
+  line: number;
+  detail: string;
+}
+
+export interface AIUsageReport {
+  since: string;
+  until: string;
+  summaries: AIUsageSummary[];
+  events: AIUsageEvent[];
+  coverage: AIUsageCoverage[];
+  issues: string[];
+}
+
+export interface AIUsageSummary {
+  resourceId: string;
+  kind: string;
+  name: string;
+  sessions: number;
+  calls: number;
+  succeeded: number;
+  failed: number;
+  unknown: number;
+  declined: number;
+  cancelled: number;
+  probes: number;
+  appRuns: number;
+  lastUsed: string;
+}
+
 export interface ActionRun {
   databaseId: number;
   workflowName: string;
@@ -204,6 +280,9 @@ export interface Pipeline {
   timeoutSeconds: number;
   cwd: string;
   env: Record<string, string>;
+  coverage?: ReviewCoverage[];
+  reviewEnvironment?: string;
+  reviewTarget?: string;
 }
 
 export interface PipelineConfig {
@@ -234,6 +313,9 @@ export interface PipelineRun {
   endFingerprint?: string;
   fingerprintError?: string;
   configVersion?: string;
+  coverage?: ReviewCoverage[];
+  reviewEnvironment?: string;
+  reviewTarget?: string;
 }
 
 export interface PolicyDefaults {
@@ -276,6 +358,7 @@ export interface PolicyRule {
 export interface Project {
   name: string;
   path: string;
+  id?: string;
 }
 
 /** ProjectConfig contains editable definitions, with omitted sections discovered independently. */
@@ -296,6 +379,7 @@ export interface ProjectDiagnosis {
   pipelines: Pipeline[];
   resources: ResourceAdoption[];
   issues: DiagnosisIssue[];
+  aiResources: AIResource[];
 }
 
 export interface ProjectPolicies {
@@ -318,6 +402,11 @@ export interface ProjectReview {
   tasks: ReviewTask[];
   configVersion: string;
   version: string;
+  profile: ReviewProfile;
+  profileConfigured: boolean;
+  coverageOptions: ReviewRequirement[];
+  coverage: ReviewCoverageState[];
+  acknowledged: ReviewIssue[];
 }
 
 export interface ResourceAdoption {
@@ -328,6 +417,15 @@ export interface ResourceAdoption {
   version: string;
   adoptedVersion: string;
   error?: string;
+}
+
+export interface ReviewAcknowledgement {
+  id: string;
+  key: string;
+  kind: string;
+  state: string;
+  reason: string;
+  createdAt: string;
 }
 
 export interface ReviewCheck {
@@ -342,6 +440,9 @@ export interface ReviewCheck {
   fingerprint: string;
   current: string;
   reason: string;
+  coverage?: ReviewCoverage[];
+  environment?: string;
+  target?: string;
 }
 
 export interface ReviewCheckInput {
@@ -349,6 +450,26 @@ export interface ReviewCheckInput {
   status: string;
   scope: string;
   evidence: string;
+  coverage?: ReviewCoverage[];
+  environment?: string;
+  target?: string;
+}
+
+export interface ReviewCoverage {
+  area: string;
+  method: string;
+}
+
+export interface ReviewCoverageState {
+  requirement: ReviewRequirement;
+  status: string;
+  reason: string;
+  checkId: string;
+  source: string;
+  evidence: string;
+  environment: string;
+  target: string;
+  recordedAt: string;
 }
 
 export interface ReviewEvidence {
@@ -388,6 +509,22 @@ export interface ReviewIssue {
   kind: string;
   message: string;
   section: string;
+  key?: string;
+  acknowledgement?: ReviewAcknowledgement;
+}
+
+export interface ReviewProfile {
+  kind: string;
+  areas: string[];
+  requirements: string[];
+  stages: string[];
+}
+
+export interface ReviewRequirement {
+  id: string;
+  name: string;
+  area: string;
+  method: string;
 }
 
 export interface ReviewResource {
@@ -555,6 +692,20 @@ export interface UpdatePreview {
 
 /** Service persists registrations separately from the repositories it inspects. */
 export const Service = {
+  /**
+   * AIResources inventories files and executable paths. Only Codex's configuration-listing
+   * command is run; MCP servers and project commands are never started.
+   */
+  aiResources(path: string): Promise<AIResourceReport> {
+    return call("Service.AIResources", path);
+  },
+  /**
+   * AIUsage reads bounded local evidence on demand. No conversation body or tool
+   * arguments are returned or persisted; source file and line retain provenance.
+   */
+  aiUsage(path: string): Promise<AIUsageReport> {
+    return call("Service.AIUsage", path);
+  },
   /** Add registers a directory. It never writes into that directory. */
   add(path: string): Promise<Project> {
     return call("Service.Add", path);
@@ -727,6 +878,9 @@ export const Service = {
   saveProjectPolicies(path: string, version: string, rules: PolicyRule[]): Promise<void> {
     return call("Service.SaveProjectPolicies", path, version, rules);
   },
+  saveReviewProfile(path: string, version: string, profile: ReviewProfile): Promise<void> {
+    return call("Service.SaveReviewProfile", path, version, profile);
+  },
   /** SaveReviewResources preserves the project's services, pipelines and extension fields. */
   saveReviewResources(path: string, version: string, definitions: ReviewResource[]): Promise<void> {
     return call("Service.SaveReviewResources", path, version, definitions);
@@ -737,6 +891,10 @@ export const Service = {
   /** ServiceReadiness reports TCP readiness for exact run receipts; it never follows replacements. */
   serviceReadiness(runs: ServiceRunRef[]): Promise<ServiceBatch> {
     return call("Service.ServiceReadiness", runs);
+  },
+  /** SetReviewIssueState changes reminder handling, never the underlying Git or data state. */
+  setReviewIssueState(path: string, version: string, key: string, state: string, reason: string): Promise<ReviewAcknowledgement> {
+    return call("Service.SetReviewIssueState", path, version, key, state, reason);
   },
   /** SharedAdoptions reads actual managed blocks and backup evidence, without creating update previews. */
   sharedAdoptions(): Promise<SharedAdoption[]> {

@@ -22,6 +22,8 @@ const help = `repsync — AI 项目控制（JSON 输出；open 启动桌面控�
   repsync open                             打开桌面应用并等待控制入口
   repsync check-rules PATH                  检查项目规则，可独立运行
   repsync doctor PATH                       检查项目接入，不执行项目命令
+  repsync ai-resources [PATH]                盘点 Skill、MCP、CLI 与项目适配
+  repsync ai-usage [PATH]                    读取最近 30 天本地使用证据与覆盖范围
   repsync review PATH                       手动读取收尾状态及版本
   repsync review-check PATH VERSION FILE     从 JSON 文件记录外部检查
   repsync review-evidence PATH VERSION FILE  从 JSON 文件记录阶段或数据核验
@@ -144,6 +146,13 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		return usage("dry-run 不能与 wait 同用；timeout 必须大于 0 且不超过 2h")
 	}
 	switch request.Action {
+	case "ai-resources", "ai-usage":
+		if len(paths) > 1 {
+			return usage("用法: repsync " + request.Action + " [PATH]")
+		}
+		if len(paths) == 1 {
+			request.Path = paths[0]
+		}
 	case "projects", "sync-status", "open", "resources":
 		if len(paths) != 0 {
 			return usage(request.Action + " 不接受路径参数")

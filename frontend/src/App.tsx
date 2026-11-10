@@ -8,10 +8,18 @@ import SharedRules from "./SharedRules";
 import AddProjectDialog from "./AddProjectDialog";
 import ManageProjectDialog from "./ManageProjectDialog";
 import type { GitSection } from "./ProjectGit";
+import AIResources from "./AIResources";
 
 const native = isMyGo();
-type Page = "project" | "shared" | "settings";
-const tabs: ProjectTab[] = ["概览", "工作树", "CI/CD", "规范", "文档"];
+type Page = "project" | "shared" | "ai-resources" | "settings";
+const tabs: ProjectTab[] = [
+  "概览",
+  "工作树",
+  "CI/CD",
+  "规范",
+  "AI 资源",
+  "文档",
+];
 const lastProjectKey = native
   ? "repsync:last-project"
   : "repsync:preview:last-project";
@@ -294,7 +302,13 @@ export default function App() {
     `${p.name} ${p.path}`.toLowerCase().includes(query.toLowerCase()),
   );
   const heading =
-    page === "project" ? "项目" : page === "shared" ? "公共规范" : "设置";
+    page === "project"
+      ? "项目"
+      : page === "shared"
+        ? "公共规范"
+        : page === "ai-resources"
+          ? "AI 资源"
+          : "设置";
 
   return (
     <div className="flex h-dvh min-h-0 bg-white text-ink">
@@ -407,6 +421,14 @@ export default function App() {
           >
             <Icon name="layers" />
             公共规范
+          </button>
+          <button
+            className={`nav-item ${page === "ai-resources" ? "selected" : ""}`}
+            aria-current={page === "ai-resources" ? "page" : undefined}
+            onClick={() => setPage("ai-resources")}
+          >
+            <Icon name="file" />
+            AI 资源
           </button>
           <button
             className={`nav-item ${page === "settings" ? "selected" : ""}`}
@@ -602,6 +624,8 @@ export default function App() {
                 )
               ) : page === "shared" ? (
                 <SharedRules projects={projects} />
+              ) : page === "ai-resources" ? (
+                <AIResources />
               ) : (
                 <>
                   <div className="section-heading">
