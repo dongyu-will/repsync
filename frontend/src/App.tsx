@@ -9,25 +9,26 @@ import AddProjectDialog from "./AddProjectDialog";
 import ManageProjectDialog from "./ManageProjectDialog";
 import type { GitSection } from "./ProjectGit";
 import AIResources from "./AIResources";
+import Settings from "./Settings";
+import { usePreferences, type Preferences } from "./preferences";
+import { projectTabs } from "./project-tabs";
 
 const native = isMyGo();
 type Page = "project" | "shared" | "ai-resources" | "settings";
-const tabs: ProjectTab[] = [
-  "Overview",
-  "Worktrees",
-  "CI/CD",
-  "Rules",
-  "AI resources",
-  "Documents",
-];
+const tabs: readonly ProjectTab[] = projectTabs;
 const lastProjectKey = native
   ? "repsync:last-project"
   : "repsync:preview:last-project";
 const previewProjects = previewInspections.map(({ project }) => project);
 
-function startupProject(projects: Project[]): Project | null {
+function startupProject(
+  projects: Project[],
+  preferences: Preferences,
+): Project | null {
   try {
-    const saved = localStorage.getItem(lastProjectKey);
+    const saved = preferences.rememberProject
+      ? localStorage.getItem(lastProjectKey)
+      : null;
     const path = native
       ? saved
       : saved?.replace(/^\/示例项目(?=\/)/, "/Projects");
@@ -39,7 +40,8 @@ function startupProject(projects: Project[]): Project | null {
   }
 }
 
-function savedTab(path: string): ProjectTab {
+function savedTab(path: string, preferences: Preferences): ProjectTab {
+  if (!preferences.rememberTabs) return preferences.defaultTab;
   try {
     const value = JSON.parse(
       localStorage.getItem(`repsync:tab:${path}`) ||
@@ -47,7 +49,7 @@ function savedTab(path: string): ProjectTab {
           localStorage.getItem(
             `repsync:tab:${path.replace(/^\/Projects(?=\/)/, "/示例项目")}`,
           )) ||
-        '"Overview"',
+        JSON.stringify(preferences.defaultTab),
     );
     const legacyTabs: Record<string, ProjectTab> = {
       "\u6982\u89c8": "Overview",
@@ -56,16 +58,20 @@ function savedTab(path: string): ProjectTab {
       "AI \u8d44\u6e90": "AI resources",
       "\u6587\u6863": "Documents",
     };
-    return tabs.includes(value) ? value : legacyTabs[value] || "Overview";
+    return tabs.includes(value)
+      ? value
+      : legacyTabs[value] || preferences.defaultTab;
   } catch {
-    return "Overview";
+    return preferences.defaultTab;
   }
 }
 
 export default function App() {
+  const settings = usePreferences();
+  const preferences = settings.values;
   const [page, setPage] = useState<Page>("project");
   const [project, setProject] = useState<Project | null>(() =>
-    native ? null : startupProject(previewProjects),
+    native ? null : startupProject(previewProjects, preferences),
   );
   const [projects, setProjects] = useState<Project[]>(
     native ? [] : previewProjects,
@@ -74,7 +80,7 @@ export default function App() {
   const [listError, setListError] = useState("");
   const [listRefresh, setListRefresh] = useState(0);
   const [selectedTab, setTab] = useState<ProjectTab>(() =>
-    project ? savedTab(project.path) : "Overview",
+    project ? savedTab(project.path, preferences) : "Overview",
   );
   const tab = tabs.includes(selectedTab) ? selectedTab : "Overview";
   const [query, setQuery] = useState("");
@@ -123,10 +129,10 @@ export default function App() {
             setListing(false);
             if (!restoredProjectRef.current) {
               restoredProjectRef.current = true;
-              const next = startupProject(items);
+              const next = startupProject(items, preferences);
               if (next) {
                 setProject(next);
-                setTab(savedTab(next.path));
+                setTab(savedTab(next.path, preferences));
                 setLoading(true);
               }
             } else {
@@ -142,9 +148,14 @@ export default function App() {
                 setError("");
                 setLoading(!!next);
                 setManaging(false);
-                setTab(next ? savedTab(next.path) : "Overview");
+                setTab(
+                  next
+                    ? savedTab(next.path, preferences)
+                    : preferences.defaultTab,
+                );
                 try {
-                  if (next) localStorage.setItem(lastProjectKey, next.path);
+                  if (next && preferences.rememberProject)
+                    localStorage.setItem(lastProjectKey, next.path);
                   else localStorage.removeItem(lastProjectKey);
                 } catch {
                   /* Navigation works without storage. */
@@ -167,7 +178,7 @@ export default function App() {
       window.clearInterval(interval);
       window.removeEventListener("focus", load);
     };
-  }, [listRefresh]);
+  }, [listRefresh, preferences]);
   useEffect(() => {
     if (!native || !project) return;
     let active = true;
@@ -190,14 +201,16 @@ export default function App() {
         });
     };
     load();
-    const timer = window.setInterval(load, 60000);
+    const timer = preferences.refreshSeconds
+      ? window.setInterval(load, preferences.refreshSeconds * 1000)
+      : undefined;
     window.addEventListener("focus", load);
     return () => {
       active = false;
       window.clearInterval(timer);
       window.removeEventListener("focus", load);
     };
-  }, [project, refresh]);
+  }, [project, refresh, preferences.refreshSeconds]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
@@ -234,17 +247,18 @@ export default function App() {
     );
     setError("");
     setLoading(native);
-    setTab(savedTab(next.path));
+    setTab(savedTab(next.path, preferences));
     setRefresh((value) => value + 1);
     try {
-      localStorage.setItem(lastProjectKey, next.path);
+      if (preferences.rememberProject)
+        localStorage.setItem(lastProjectKey, next.path);
     } catch {
       /* Project switching works without storage. */
     }
   }
   function chooseTab(next: ProjectTab) {
     setTab(next);
-    if (project) {
+    if (project && preferences.rememberTabs) {
       try {
         localStorage.setItem(
           `repsync:tab:${project.path}`,
@@ -642,25 +656,14 @@ export default function App() {
               ) : page === "ai-resources" ? (
                 <AIResources />
               ) : (
-                <>
-                  <dl className="grouped-list" aria-label="Local workspace">
-                    {[
-                      ...(native ? [["Runtime", "Desktop app"]] : []),
-                      [
-                        "Project registry",
-                        native
-                          ? "Stored in your user configuration directory / repsync / projects.json"
-                          : `${projects.length}  projects`,
-                      ],
-                      ["Version", "0.1.0"],
-                    ].map(([label, value]) => (
-                      <div key={label} className="info-row">
-                        <dt className="text-muted">{label}</dt>
-                        <dd>{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
+                <Settings
+                  values={preferences}
+                  error={settings.error}
+                  notice={settings.notice}
+                  projectCount={projects.length}
+                  onChange={settings.change}
+                  onReset={settings.reset}
+                />
               )}
             </section>
           </>

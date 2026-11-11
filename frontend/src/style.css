@@ -348,3 +348,15 @@ code {
   background-color: #fbbf24;
   color: #422006;
 }
+
+html[data-text-size="larger"] {
+  font-size: 112.5%;
+}
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}

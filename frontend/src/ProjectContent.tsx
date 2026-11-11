@@ -10,8 +10,8 @@ import ProjectGit, { type GitSection } from "./ProjectGit";
 import ProjectReviewPanel from "./ProjectReview";
 import AIResources from "./AIResources";
 
-export type ProjectTab =
-  "Overview" | "Worktrees" | "CI/CD" | "Rules" | "AI resources" | "Documents";
+import type { ProjectTab } from "./project-tabs";
+export type { ProjectTab } from "./project-tabs";
 
 export default function ProjectContent({
   details,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-11-12
+
+- Added saved startup, default page, overview refresh, text size, and motion preferences.
+- Added version, documentation, issue, and release links to Settings.
+- Simplified the English and Chinese READMEs; moved detailed usage into guides.
+- Restored the original project commit history with private email addresses removed.
+
 ## 0.1.0 — 2026-11-12
 
 Initial public preview of repsync.

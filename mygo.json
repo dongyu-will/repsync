@@ -2,7 +2,7 @@
   "name": "repsync",
   "slug": "repsync",
   "identifier": "local.repsync.desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "icon": "resources/icon.png",
   "main": "./cmd/repsync",
   "devUrl": "http://127.0.0.1:5178",
