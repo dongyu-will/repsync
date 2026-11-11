@@ -10,6 +10,7 @@ import {
 } from "./mygo";
 import { Button, Select } from "./components";
 import { reviewPreview } from "./review-preview";
+import ProjectDocumentReview from "./ProjectDocumentReview";
 
 const native = isMyGo();
 const sections = [
@@ -963,6 +964,7 @@ export default function ProjectReviewPanel({
           </details>
         </>
       )}
+      <ProjectDocumentReview path={path} />
     </section>
   );
 }

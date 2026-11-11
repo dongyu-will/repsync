@@ -19,6 +19,7 @@ import (
 )
 
 type Request struct {
+	Memory          *workspace.ProjectMemoryInput    `json:"memory,omitempty"`
 	ResourceID      string                           `json:"resourceId,omitempty"`
 	Target          string                           `json:"target,omitempty"`
 	Action          string                           `json:"action"`
@@ -169,6 +170,13 @@ func writeResponse(w io.Writer, data any, err error) {
 
 func dispatch(service *workspace.Service, request Request) (any, error) {
 	switch request.Action {
+	case "project-memory":
+		return service.ConfirmedProjectMemories(request.Path)
+	case "project-memory-propose":
+		if request.Memory == nil {
+			return nil, errors.New("缺少待确认的项目记忆")
+		}
+		return service.ProposeProjectMemory(request.Path, *request.Memory)
 	case "codex-resources":
 		return service.ProjectCodexResources(request.Path)
 	case "codex-resource-preview", "codex-resource-apply":

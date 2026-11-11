@@ -16,6 +16,10 @@ func (s *Service) SaveDocument(path, name, expected, content string) error {
 	if filepath.Base(name) != name || !markdownFile(name) {
 		return errors.New("请选择项目根目录中的 Markdown 文件")
 	}
+	return s.saveDocument(path, name, expected, content)
+}
+
+func (s *Service) saveDocument(path, name, expected, content string) error {
 	if !utf8.ValidString(content) || len(content) > 256*1024 {
 		return errors.New("Markdown 需要是 UTF-8 文本，且不能超过 256 KiB")
 	}

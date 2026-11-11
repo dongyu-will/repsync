@@ -52,6 +52,8 @@ type Service struct {
 	closing             bool
 	gitMu               sync.Mutex
 	reviewMu            sync.Mutex
+	memoryMu            sync.Mutex
+	memoryExtractMu     sync.Mutex
 	gitCleanupCancel    context.CancelFunc
 }
 

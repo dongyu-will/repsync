@@ -108,6 +108,35 @@ export interface CloneState {
   project: Project;
 }
 
+export interface CodexMemoryCitation {
+  sessionId: string;
+  file: string;
+  line: number;
+  timestamp: string;
+  quote: string;
+}
+
+export interface CodexMemoryExtraction {
+  added: ProjectMemory[];
+  existing: number;
+  rejected: number;
+  messages: number;
+  partial: boolean;
+}
+
+export interface CodexMemorySession {
+  id: string;
+  file: string;
+  title: string;
+  started: string;
+  modified: string;
+}
+
+export interface CodexMemorySessions {
+  sessions: CodexMemorySession[];
+  partial: boolean;
+}
+
 export interface CodexResourceChange {
   kind: string;
   name: string;
@@ -144,6 +173,49 @@ export interface DiagnosisIssue {
   kind: string;
   serviceId?: string;
   message: string;
+}
+
+export interface DocumentFinding {
+  path: string;
+  startLine: number;
+  endLine: number;
+  version: string;
+  original: string;
+  terms: string[];
+  evidence: DocumentReviewEvidence[];
+  suggestion: string;
+}
+
+export interface DocumentReview {
+  basis: string;
+  files: number;
+  graph: string;
+  warnings: string[];
+  findings: DocumentFinding[];
+}
+
+export interface DocumentReviewEdit {
+  scope: string;
+  basis: string;
+  path: string;
+  startLine: number;
+  endLine: number;
+  version: string;
+  replacement: string;
+}
+
+export interface DocumentReviewEvidence {
+  source: string;
+  path: string;
+  line: number;
+  detail: string;
+  memoryId?: string;
+}
+
+export interface DocumentReviewPreview {
+  before: string;
+  after: string;
+  token: string;
 }
 
 export interface EffectivePolicy {
@@ -411,6 +483,29 @@ export interface ProjectDiagnosis {
   resources: ResourceAdoption[];
   issues: DiagnosisIssue[];
   aiResources: AIResource[];
+}
+
+export interface ProjectMemory {
+  statement: string;
+  source: string;
+  environment: string;
+  keywords: string[];
+  id: string;
+  origin: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  confirmedAt: string;
+  archivedFrom: string;
+  version: string;
+  session?: CodexMemoryCitation;
+}
+
+export interface ProjectMemoryInput {
+  statement: string;
+  source: string;
+  environment: string;
+  keywords: string[];
 }
 
 export interface ProjectPolicies {
@@ -761,6 +856,10 @@ export const Service = {
   applyCodexResource(path: string, change: CodexResourceChange, version: string): Promise<void> {
     return call("Service.ApplyCodexResource", path, change, version);
   },
+  /** ApplyDocumentReview writes exactly the previewed change, preserving concurrent edits. */
+  applyDocumentReview(path: string, edit: DocumentReviewEdit, token: string): Promise<void> {
+    return call("Service.ApplyDocumentReview", path, edit, token);
+  },
   /** ApplyGitStash restores to a clean registered worktree and always retains the stash. */
   applyGitStash(path: string, oid: string, version: string): Promise<GitStashApplyResult> {
     return call("Service.ApplyGitStash", path, oid, version);
@@ -784,6 +883,10 @@ export const Service = {
   cloneStatus(id: string): Promise<CloneState> {
     return call("Service.CloneStatus", id);
   },
+  /** ConfirmedProjectMemories returns the current records suitable for use as context. */
+  confirmedProjectMemories(path: string): Promise<ProjectMemory[]> {
+    return call("Service.ConfirmedProjectMemories", path);
+  },
   /** ConnectResource registers one text file; it never writes to a consuming project. */
   connectResource(id: string, path: string, target: string): Promise<SharedResource> {
     return call("Service.ConnectResource", id, path, target);
@@ -795,6 +898,10 @@ export const Service = {
   /** DiagnoseProject inspects configuration and executable availability without executing project commands. */
   diagnoseProject(path: string): Promise<ProjectDiagnosis> {
     return call("Service.DiagnoseProject", path);
+  },
+  /** ExtractCodexProjectMemories distills one selected local session into pending records. */
+  extractCodexProjectMemories(path: string, file: string, sessionID: string): Promise<CodexMemoryExtraction> {
+    return call("Service.ExtractCodexProjectMemories", path, file, sessionID);
   },
   finishReviewTask(path: string, id: string, version: string, input: ReviewFinishInput): Promise<ReviewTask> {
     return call("Service.FinishReviewTask", path, id, version, input);
@@ -825,6 +932,10 @@ export const Service = {
   list(): Promise<Project[]> {
     return call("Service.List");
   },
+  /** ListCodexMemorySessions reads metadata for recent sessions started within the project. */
+  listCodexMemorySessions(path: string): Promise<CodexMemorySessions> {
+    return call("Service.ListCodexMemorySessions", path);
+  },
   localServiceLog(path: string, id: string, runID: string): Promise<LocalServiceOutput> {
     return call("Service.LocalServiceLog", path, id, runID);
   },
@@ -849,6 +960,10 @@ export const Service = {
   previewCodexResource(path: string, change: CodexResourceChange): Promise<CodexResourcePreview> {
     return call("Service.PreviewCodexResource", path, change);
   },
+  /** PreviewDocumentReview checks the Git and document snapshots before preparing a single edit. */
+  previewDocumentReview(path: string, edit: DocumentReviewEdit): Promise<DocumentReviewPreview> {
+    return call("Service.PreviewDocumentReview", path, edit);
+  },
   previewPolicyGuidance(path: string): Promise<UpdatePreview> {
     return call("Service.PreviewPolicyGuidance", path);
   },
@@ -867,12 +982,24 @@ export const Service = {
   projectConfiguration(path: string): Promise<ProjectConfig> {
     return call("Service.ProjectConfiguration", path);
   },
+  /** ProjectMemories lists the registered project's records, including pending and archived ones. */
+  projectMemories(path: string): Promise<ProjectMemory[]> {
+    return call("Service.ProjectMemories", path);
+  },
   projectPolicies(path: string): Promise<ProjectPolicies> {
     return call("Service.ProjectPolicies", path);
+  },
+  /** ProposeProjectMemory records an AI inference for user review. */
+  proposeProjectMemory(path: string, input: ProjectMemoryInput): Promise<ProjectMemory> {
+    return call("Service.ProposeProjectMemory", path, input);
   },
   /** ReadDocument reads a root Markdown file within a registered project, on demand. */
   readDocument(path: string, name: string): Promise<string> {
     return call("Service.ReadDocument", path, name);
+  },
+  /** RecordProjectMemory saves a user-entered record as confirmed. */
+  recordProjectMemory(path: string, input: ProjectMemoryInput): Promise<ProjectMemory> {
+    return call("Service.RecordProjectMemory", path, input);
   },
   /** RecordReviewCheck records an external assertion, clearly separated from executed pipelines. */
   recordReviewCheck(path: string, version: string, input: ReviewCheckInput): Promise<ReviewCheck> {
@@ -947,9 +1074,17 @@ export const Service = {
   saveServices(path: string, version: string, automatic: boolean, definitions: LocalServiceDefinition[]): Promise<void> {
     return call("Service.SaveServices", path, version, automatic, definitions);
   },
+  /** ScanDocumentReview finds Markdown passages that refer to changed source terms. */
+  scanDocumentReview(path: string, scope: string, keywords: string): Promise<DocumentReview> {
+    return call("Service.ScanDocumentReview", path, scope, keywords);
+  },
   /** ServiceReadiness reports TCP readiness for exact run receipts; it never follows replacements. */
   serviceReadiness(runs: ServiceRunRef[]): Promise<ServiceBatch> {
     return call("Service.ServiceReadiness", runs);
+  },
+  /** SetProjectMemoryState confirms, archives or restores a reviewed version. */
+  setProjectMemoryState(path: string, id: string, version: string, action: string): Promise<ProjectMemory> {
+    return call("Service.SetProjectMemoryState", path, id, version, action);
   },
   /** SetReviewIssueState changes reminder handling, never the underlying Git or data state. */
   setReviewIssueState(path: string, version: string, key: string, state: string, reason: string): Promise<ReviewAcknowledgement> {

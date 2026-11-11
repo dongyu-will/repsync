@@ -12,6 +12,7 @@ import {
 } from "./mygo";
 import { previewAIResources, previewAIUsage } from "./ai-preview";
 import ResourceSettings from "./ProjectCodexResources";
+import ProjectMemories from "./ProjectMemories";
 
 const native = isMyGo();
 const kindNames: Record<string, string> = {
@@ -209,6 +210,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
         >
           {[
             ["resources", "资源"],
+            ...(path ? [["memory", "项目记忆"]] : []),
             ["usage", "使用记录"],
           ].map(([id, label]) => (
             <button
@@ -266,6 +268,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
           {state.placementIssue}
         </p>
       )}
+      {state.view === "memory" && <ProjectMemories path={path} />}
       {state.error && (
         <p
           role="alert"

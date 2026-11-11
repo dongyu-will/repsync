@@ -24,6 +24,8 @@ const help = `repsync — AI 项目控制（JSON 输出；open 启动桌面控�
   repsync doctor PATH                       检查项目接入，不执行项目命令
   repsync ai-resources [PATH]                盘点 Skill、MCP、CLI 与项目适配
   repsync ai-usage [PATH]                    读取最近 30 天本地使用证据与覆盖范围
+  repsync project-memory PATH               读取已确认的项目记忆及来源
+  repsync project-memory-propose PATH FILE  从 JSON 提交待确认的 AI 推断
   repsync codex-resources PATH              查看由 RepSync 接入的项目 Skill 和 MCP
   repsync codex-resource-preview PATH FILE  从 JSON 文件预览接入或撤回
   repsync codex-resource-apply PATH VERSION FILE
@@ -152,6 +154,15 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		return usage("dry-run 不能与 wait 同用；timeout 必须大于 0 且不超过 2h")
 	}
 	switch request.Action {
+	case "project-memory-propose":
+		if len(paths) != 2 {
+			return usage("用法: repsync project-memory-propose PATH JSON_FILE")
+		}
+		request.Path = paths[0]
+		request.Memory = &workspace.ProjectMemoryInput{}
+		if err := readInput(paths[1], request.Memory); err != nil {
+			return usage(err.Error())
+		}
 	case "codex-resource-preview", "codex-resource-apply":
 		expected := 2
 		if request.Action == "codex-resource-apply" {
@@ -182,7 +193,7 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		if len(paths) != 0 {
 			return usage(request.Action + " 不接受路径参数")
 		}
-	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources":
+	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources", "project-memory":
 		if len(paths) != 1 {
 			return usage("用法: repsync " + request.Action + " PATH")
 		}
