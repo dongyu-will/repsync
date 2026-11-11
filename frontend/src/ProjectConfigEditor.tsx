@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
   Service,
@@ -42,28 +42,26 @@ function stepsText(item: Pipeline | LocalServiceDefinition) {
 export default function ProjectConfigEditor({
   path,
   section,
-  id,
   onSaved,
 }: {
   path: string;
   section: Section;
-  id?: string;
   onSaved: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
-  const title = `${id ? "编辑" : "添加"}${section === "services" ? "服务" : "流水线"}`;
+  const title = `配置${section === "services" ? "服务" : "流水线"}`;
   return (
     <>
       <Button
         type="button"
-        aria-label={id ? `${title} ${id}` : title}
+        aria-label={title}
         onClick={() => {
           setNotice("");
           setOpen(true);
         }}
       >
-        {id ? "编辑" : title}
+        {title}
       </Button>
       {notice && (
         <span role="status" className="text-xs text-muted">
@@ -72,10 +70,9 @@ export default function ProjectConfigEditor({
       )}
       {open && (
         <CommandDialog
-          key={path + section + id}
+          key={path + section}
           path={path}
           section={section}
-          id={id}
           title={title}
           onClose={() => setOpen(false)}
           onSaved={() => {
@@ -92,19 +89,18 @@ export default function ProjectConfigEditor({
 function CommandDialog({
   path,
   section,
-  id,
   title,
   onClose,
   onSaved,
 }: {
   path: string;
   section: Section;
-  id?: string;
   title: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const [id, setID] = useState("");
   const [config, setConfig] = useState<ProjectConfig | null>(null);
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
@@ -116,6 +112,19 @@ function CommandDialog({
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const services = section === "services";
+  const selectItem = useCallback(
+    (nextID: string, current: ProjectConfig) => {
+      const item = current[section].find((entry) => entry.id === nextID);
+      setID(nextID);
+      setName(item?.name || "");
+      setCommand(item ? stepsText(item) : "");
+      setCwd(item?.cwd || "");
+      setUrl(item && "url" in item ? item.url : "");
+      setKind(item && "kind" in item ? item.kind : "ci");
+      setError("");
+    },
+    [section],
+  );
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -136,15 +145,8 @@ function CommandDialog({
     load
       .then((value) => {
         if (!active) return;
-        const item = value[section].find((item) => item.id === id);
-        if (id && !item) throw new Error("这条配置已被移除，请关闭后刷新。");
         setConfig(value);
-        setName(item?.name || "");
-        setCommand(item ? stepsText(item) : "");
-        setCwd(item?.cwd || "");
-        setUrl(item && "url" in item ? item.url : "");
-        setKind(item && "kind" in item ? item.kind : "ci");
-        setError("");
+        selectItem(value[section][0]?.id || "", value);
       })
       .catch((error) => {
         if (active) {
@@ -158,7 +160,7 @@ function CommandDialog({
     return () => {
       active = false;
     };
-  }, [path, section, id, revision]);
+  }, [path, section, revision, selectItem]);
   async function save(remove = false) {
     if (!native || !config) return;
     setBusy(true);
@@ -221,6 +223,7 @@ function CommandDialog({
         }
         await Service.savePipelines(path, config.version, false, entries);
       }
+      dialog.current?.close();
       onSaved();
     } catch (error) {
       setError(message(error));
@@ -233,8 +236,8 @@ function CommandDialog({
       ref={dialog}
       aria-labelledby="command-dialog-title"
       onCancel={(event) => {
-        if (busy) event.preventDefault();
-        else onClose();
+        event.preventDefault();
+        if (!busy) dialog.current?.close();
       }}
       onClose={onClose}
       className="m-auto max-h-[calc(100dvh-32px)] w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-xl bg-white p-0 text-ink shadow-xl backdrop:bg-black/20"
@@ -262,10 +265,44 @@ function CommandDialog({
           ) : (
             config && (
               <fieldset disabled={busy} className="min-w-0 space-y-4">
+                <p className="text-sm leading-5 text-muted">
+                  可直接让 AI 配置项目已有的{services ? "启动" : "检查或发布"}
+                  命令，也可在这里手动调整。
+                </p>
+                <label className="block space-y-1.5 text-sm font-medium">
+                  {services ? "服务" : "流水线"}
+                  <Select
+                    autoFocus
+                    className="w-full"
+                    value={id}
+                    onChange={(event) => {
+                      const item = config[section].find(
+                        (entry) => entry.id === id,
+                      );
+                      const changed =
+                        name !== (item?.name || "") ||
+                        command !== (item ? stepsText(item) : "") ||
+                        cwd !== (item?.cwd || "") ||
+                        url !== (item && "url" in item ? item.url : "") ||
+                        kind !== (item && "kind" in item ? item.kind : "ci");
+                      if (
+                        !changed ||
+                        window.confirm("当前修改尚未保存，放弃修改并切换？")
+                      )
+                        selectItem(event.target.value, config);
+                    }}
+                  >
+                    {config[section].map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                    <option value="">添加{services ? "服务" : "流水线"}</option>
+                  </Select>
+                </label>
                 <label className="block space-y-1.5 text-sm font-medium">
                   名称
                   <input
-                    autoFocus
                     required
                     className={inputClass}
                     placeholder={services ? "例如 前端开发" : "例如 项目检查"}
@@ -285,51 +322,46 @@ function CommandDialog({
                     onChange={(event) => setCommand(event.target.value)}
                   />
                 </label>
-                <details>
-                  <summary className="w-fit cursor-pointer text-sm text-muted">
-                    更多选项
-                  </summary>
-                  <div className="mt-3 space-y-3">
+                <div className="mt-3 space-y-3">
+                  <label className="block space-y-1.5 text-sm font-medium">
+                    工作目录
+                    <input
+                      className={inputClass}
+                      placeholder="留空使用项目根目录"
+                      value={cwd}
+                      onChange={(event) => setCwd(event.target.value)}
+                    />
+                  </label>
+                  {services ? (
                     <label className="block space-y-1.5 text-sm font-medium">
-                      工作目录
+                      页面地址
                       <input
+                        type={
+                          config?.services.find((entry) => entry.id === id)
+                            ?.autoPort
+                            ? "text"
+                            : "url"
+                        }
                         className={inputClass}
-                        placeholder="留空使用项目根目录"
-                        value={cwd}
-                        onChange={(event) => setCwd(event.target.value)}
+                        placeholder="可选，例如 http://localhost:5173"
+                        value={url}
+                        onChange={(event) => setUrl(event.target.value)}
                       />
                     </label>
-                    {services ? (
-                      <label className="block space-y-1.5 text-sm font-medium">
-                        页面地址
-                        <input
-                          type={
-                            config?.services.find((entry) => entry.id === id)
-                              ?.autoPort
-                              ? "text"
-                              : "url"
-                          }
-                          className={inputClass}
-                          placeholder="可选，例如 http://localhost:5173"
-                          value={url}
-                          onChange={(event) => setUrl(event.target.value)}
-                        />
-                      </label>
-                    ) : (
-                      <label className="block space-y-1.5 text-sm font-medium">
-                        用途
-                        <Select
-                          className="w-full"
-                          value={kind}
-                          onChange={(event) => setKind(event.target.value)}
-                        >
-                          <option value="ci">检查</option>
-                          <option value="cd">发布</option>
-                        </Select>
-                      </label>
-                    )}
-                  </div>
-                </details>
+                  ) : (
+                    <label className="block space-y-1.5 text-sm font-medium">
+                      用途
+                      <Select
+                        className="w-full"
+                        value={kind}
+                        onChange={(event) => setKind(event.target.value)}
+                      >
+                        <option value="ci">检查</option>
+                        <option value="cd">发布</option>
+                      </Select>
+                    </label>
+                  )}
+                </div>
               </fieldset>
             )
           )}
@@ -366,7 +398,11 @@ function CommandDialog({
             )}
           </div>
           <div className="flex gap-2">
-            <Button type="button" disabled={busy} onClick={onClose}>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() => dialog.current?.close()}
+            >
               取消
             </Button>
             <Button

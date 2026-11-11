@@ -1,3 +1,4 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, useRef, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Service, type GitCleanupPolicy, type GitOverview } from "./mygo";
@@ -260,94 +261,109 @@ export default function ProjectGit({
               )}
             </div>
           )}
-          <details className="border-t border-line pt-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              自动清理
-              <span className="ml-2 text-xs font-normal text-muted">
-                {view.policy.enabled
-                  ? `已开启 · 保留 ${view.policy.retentionDays} 天`
-                  : "未开启"}
-              </span>
-            </summary>
-            <CleanupSettings
-              key={view.policyVersion}
-              policy={view.policy}
-              branches={view.branches.map((b) => b.name)}
-              pending={pending}
-              onSave={(policy) =>
-                perform(
-                  () =>
-                    Service.saveGitCleanupPolicy(
-                      path,
-                      view.policyVersion,
-                      policy,
-                    ),
-                  "清理设置已保存",
-                )
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionDialog
+              title={
+                <>
+                  自动清理
+                  <span className="ml-2 text-xs font-normal text-muted">
+                    {view.policy.enabled
+                      ? `已开启 · 保留 ${view.policy.retentionDays} 天`
+                      : "未开启"}
+                  </span>
+                </>
               }
-            />
-          </details>
-          <details className="border-t border-line pt-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              清理记录与恢复
-              {view.history.length ? ` · ${view.history.length}` : ""}
-            </summary>
-            <div className="mt-3 space-y-3">
-              {view.history.length ? (
-                view.history.map((r) => (
-                  <div
-                    key={r.id}
-                    className="rounded-lg border border-line p-3 text-sm"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span>
-                        {date(r.createdAt)} ·{" "}
-                        {r.automatic ? "自动清理" : "手动清理"}
-                      </span>
-                      <Button
-                        disabled={
-                          !native ||
-                          pending ||
-                          !!r.restoredAt ||
-                          !r.items.some(
-                            (i) =>
-                              i.status === "removed" || i.status === "pending",
-                          )
-                        }
-                        onClick={() =>
-                          perform(
-                            () => Service.restoreGitCleanup(path, r.id),
-                            "恢复完成；恢复的内容会重新计算保留期",
-                          )
-                        }
-                      >
-                        {r.restoredAt ? "已恢复" : "恢复"}
-                      </Button>
+              busy={pending}
+              error={error}
+              notice={notice}
+            >
+              <CleanupSettings
+                key={view.policyVersion}
+                policy={view.policy}
+                branches={view.branches.map((b) => b.name)}
+                pending={pending}
+                onSave={(policy) =>
+                  perform(
+                    () =>
+                      Service.saveGitCleanupPolicy(
+                        path,
+                        view.policyVersion,
+                        policy,
+                      ),
+                    "清理设置已保存",
+                  )
+                }
+              />
+            </ActionDialog>
+            <ActionDialog
+              title={
+                <>
+                  清理记录与恢复
+                  {view.history.length ? ` · ${view.history.length}` : ""}
+                </>
+              }
+              busy={pending}
+              error={error}
+              notice={notice}
+            >
+              <div className="mt-3 space-y-3">
+                {view.history.length ? (
+                  view.history.map((r) => (
+                    <div
+                      key={r.id}
+                      className="rounded-lg border border-line p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          {date(r.createdAt)} ·{" "}
+                          {r.automatic ? "自动清理" : "手动清理"}
+                        </span>
+                        <Button
+                          disabled={
+                            !native ||
+                            pending ||
+                            !!r.restoredAt ||
+                            !r.items.some(
+                              (i) =>
+                                i.status === "removed" ||
+                                i.status === "pending",
+                            )
+                          }
+                          onClick={() =>
+                            perform(
+                              () => Service.restoreGitCleanup(path, r.id),
+                              "恢复完成；恢复的内容会重新计算保留期",
+                            )
+                          }
+                        >
+                          {r.restoredAt ? "已恢复" : "恢复"}
+                        </Button>
+                      </div>
+                      <ul className="mt-2 space-y-1 text-xs text-muted">
+                        {r.items.map((item, i) => (
+                          <li key={i} className="break-all">
+                            {item.kind === "worktree" ? "工作树" : "分支"} ·{" "}
+                            {item.target} ·{" "}
+                            {(
+                              {
+                                removed: "已清理",
+                                restored: "已恢复",
+                                skipped: "已保留",
+                                pending: "待核对",
+                              } as Record<string, string>
+                            )[item.status] || item.status}
+                            {item.error ? `：${item.error}` : ""}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <ul className="mt-2 space-y-1 text-xs text-muted">
-                      {r.items.map((item, i) => (
-                        <li key={i} className="break-all">
-                          {item.kind === "worktree" ? "工作树" : "分支"} ·{" "}
-                          {item.target} ·{" "}
-                          {(
-                            {
-                              removed: "已清理",
-                              restored: "已恢复",
-                              skipped: "已保留",
-                              pending: "待核对",
-                            } as Record<string, string>
-                          )[item.status] || item.status}
-                          {item.error ? `：${item.error}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted">尚无清理记录。</p>
-              )}
-            </div>
-          </details>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted">尚无清理记录。</p>
+                )}
+              </div>
+            </ActionDialog>
+          </div>
         </>
       )}
       {preview && (
@@ -543,11 +559,8 @@ function GitRow({
   children: ReactNode;
 }) {
   return (
-    <details className="group border-b border-line-subtle last:border-0">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-editor [&::-webkit-details-marker]:hidden">
-        <span className="text-muted group-open:rotate-90">
-          <Icon name="chevron" size={16} />
-        </span>
+    <section className="border-b border-line-subtle last:border-0">
+      <h3 className="flex min-h-11 items-center gap-3 px-3 py-2">
         <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
           <span className="font-medium [overflow-wrap:anywhere]">{name}</span>
           {marker && <span className="text-xs text-muted">{marker}</span>}
@@ -557,10 +570,10 @@ function GitRow({
         >
           {status}
         </span>
-      </summary>
+      </h3>
       <div className="space-y-1 border-t border-line-subtle bg-editor px-3 py-2 text-xs leading-5 text-muted">
         {children}
       </div>
-    </details>
+    </section>
   );
 }

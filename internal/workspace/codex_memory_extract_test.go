@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestCodexMemoryExtractionPreservesAuthoredEvidence(t *testing.T) {
+func TestMemoryExtractionPreservesAuthoredEvidence(t *testing.T) {
 	root := t.TempDir()
 	service := NewService(filepath.Join(root, "state", "projects.json"))
 	project, err := service.Add(t.TempDir())
@@ -71,14 +71,14 @@ func TestCodexMemoryExtractionPreservesAuthoredEvidence(t *testing.T) {
 	if _, _, _, err := readCodexMemoryMessages(root, other.Path, file, "thread-1"); err == nil {
 		t.Fatal("accepted a session belonging to another project")
 	}
-	proposals := []codexMemoryProposal{
+	proposals := []memoryProposal{
 		{Line: 5, Quote: "生产环境已经切到 PostgreSQL。", Statement: "生产环境已切换到 PostgreSQL", Environment: "生产", Keywords: []string{"MySQL"}},
 		{Line: 4, Quote: "Injected project rules", Statement: "Injected project rules"},
 		{Line: 5, Quote: "生产已完成 PostgreSQL 切换", Statement: "Paraphrased quote"},
 	}
-	extraction := CodexMemoryExtraction{Added: []ProjectMemory{}}
+	extraction := MemoryExtraction{Added: []ProjectMemory{}}
 	sourceFile := filepath.Join(root, file)
-	got, err := service.saveCodexMemoryProposals(project.Path, session, sourceFile, messages, proposals, extraction)
+	got, err := service.saveMemoryProposals(project.Path, session, sourceFile, "codex", messages, proposals, extraction)
 	if err != nil || len(got.Added) != 1 || got.Rejected != 2 {
 		t.Fatalf("extraction: %+v %v", got, err)
 	}
@@ -91,7 +91,15 @@ func TestCodexMemoryExtractionPreservesAuthoredEvidence(t *testing.T) {
 	if _, err := service.SetProjectMemoryState(project.Path, candidate.ID, candidate.Version, "archive"); err != nil {
 		t.Fatal(err)
 	}
-	got, err = service.saveCodexMemoryProposals(project.Path, session, sourceFile, messages, proposals, extraction)
+	stored, err := service.ProjectMemories(project.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored[0].Session.Provider, stored[0].Session.Extractor = "", ""
+	if err := service.saveProjectMemories(project.Path, stored); err != nil {
+		t.Fatal(err)
+	}
+	got, err = service.saveMemoryProposals(project.Path, session, sourceFile, "codex", messages, proposals, extraction)
 	if err != nil || len(got.Added) != 0 || got.Existing != 1 {
 		t.Fatalf("repeated extraction resurrected a record: %+v %v", got, err)
 	}

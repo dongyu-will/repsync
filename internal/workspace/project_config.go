@@ -165,7 +165,9 @@ func (s *Service) saveProjectSection(path, version, section string, automatic bo
 		if err != nil {
 			return err
 		}
-		if section == "reviewProfile" {
+		if section == "resources" {
+			file.fields[section] = data
+		} else if section == "reviewProfile" {
 			var previous, next map[string]json.RawMessage
 			_ = json.Unmarshal(file.fields[section], &previous)
 			if err := json.Unmarshal(data, &next); err != nil {

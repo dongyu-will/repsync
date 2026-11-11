@@ -1,3 +1,4 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useId, useReducer } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Icon, Select } from "./components";
@@ -254,14 +255,11 @@ export default function AIResources({ path = "" }: { path?: string }) {
       </div>
 
       {state.view === "resources" && path && (
-        <details className="border-b border-line-subtle pb-2">
-          <summary className="w-fit cursor-pointer py-1 text-sm text-accent">
-            添加项目 MCP
-          </summary>
+        <ActionDialog title="添加项目 MCP">
           <div className="mt-3 max-w-xl pb-2">
             <ResourceSettings path={path} onChanged={refreshResources} />
           </div>
-        </details>
+        </ActionDialog>
       )}
       {state.view === "resources" && state.placementIssue && (
         <p role="status" className="break-words text-xs text-removed">
@@ -285,8 +283,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
               按需读取最近 30 天的 Codex 会话和 RepSync 流水线回执。
             </p>
           ) : (
-            <details className="text-xs leading-5 text-muted">
-              <summary className="cursor-pointer">近 30 天 · 采集范围</summary>
+            <ActionDialog title="近 30 天 · 采集范围">
               <div className="mt-2 space-y-3 border-b border-line-subtle pb-3">
                 <p>
                   {date(state.usage.since)} — {date(state.usage.until)}
@@ -314,7 +311,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
                   </div>
                 ))}
               </div>
-            </details>
+            </ActionDialog>
           )}
         </>
       )}
@@ -480,10 +477,10 @@ export default function AIResources({ path = "" }: { path?: string }) {
         </div>
       )}
       {state.view === "resources" && state.report && (
-        <details className="text-xs leading-5 text-muted">
-          <summary className="cursor-pointer">
+        <section className="text-xs leading-5 text-muted">
+          <h3 className="break-words text-sm font-medium">
             {resources.length} 项资源 · 盘点详情
-          </summary>
+          </h3>
           <div className="mt-2 max-w-2xl space-y-2">
             <p>
               最近盘点：{date(state.report.checkedAt)}
@@ -491,7 +488,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
             </p>
             <p>让 AI 根据项目指南在 .repsync.json 中维护资源适配与任务条件。</p>
           </div>
-        </details>
+        </section>
       )}
     </div>
   );
@@ -535,28 +532,31 @@ function ResourceRow({
             : fitLabel;
 
   return (
-    <details className="group border-b border-line-subtle last:border-0">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-editor [&::-webkit-details-marker]:hidden">
-        <span className="text-muted group-open:rotate-90">
-          <Icon name="chevron" size={16} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-          <span className="font-medium [overflow-wrap:anywhere]">
-            {resource.name}
+    <ActionDialog
+      title={resource.name}
+      className="border-b border-line-subtle last:border-0"
+      triggerClassName="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-editor"
+      trigger={
+        <>
+          <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+            <span className="font-medium [overflow-wrap:anywhere]">
+              {resource.name}
+            </span>
+            <span className="text-xs text-muted">
+              {kindNames[resource.kind] || resource.kind}
+              {duplicates > 1 && " · 同名"}
+            </span>
           </span>
-          <span className="text-xs text-muted">
-            {kindNames[resource.kind] || resource.kind}
-            {duplicates > 1 && " · 同名"}
-          </span>
-        </span>
-        {rowStatus && (
-          <span
-            className={`shrink-0 text-xs ${needsAttention ? "text-removed" : "text-muted"}`}
-          >
-            {rowStatus}
-          </span>
-        )}
-      </summary>
+          {rowStatus && (
+            <span
+              className={`shrink-0 text-xs ${needsAttention ? "text-removed" : "text-muted"}`}
+            >
+              {rowStatus}
+            </span>
+          )}
+        </>
+      }
+    >
       {(placement ||
         (resource.kind === "mcp" && resource.source === "Codex CLI 当前配置") ||
         (path &&
@@ -627,7 +627,7 @@ function ResourceRow({
             </div>
           ))}
       </dl>
-    </details>
+    </ActionDialog>
   );
 }
 
@@ -652,24 +652,31 @@ function UsageRow({
         : `成功 ${summary.succeeded} · 失败 ${summary.failed} · 未知 ${summary.unknown} · 拒绝 ${summary.declined} · 取消 ${summary.cancelled}${summary.probes ? ` · 含探测 ${summary.probes}` : ""}`;
 
   return (
-    <details className="group border-b border-line-subtle last:border-0">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-editor [&::-webkit-details-marker]:hidden">
-        <span className="text-muted group-open:rotate-90">
-          <Icon name="chevron" size={16} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-          <span className="font-medium [overflow-wrap:anywhere]">
-            {summary.name}
+    <ActionDialog
+      title={summary.name}
+      className="border-b border-line-subtle last:border-0"
+      triggerClassName="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-editor"
+      trigger={
+        <>
+          <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+            <span className="font-medium [overflow-wrap:anywhere]">
+              {summary.name}
+            </span>
+            <span className="text-xs text-muted">
+              {kindNames[summary.kind]}
+            </span>
           </span>
-          <span className="text-xs text-muted">{kindNames[summary.kind]}</span>
-        </span>
-        <span className="shrink-0 text-right text-xs text-muted">{count}</span>
-      </summary>
+          <span className="shrink-0 text-right text-xs text-muted">
+            {count}
+          </span>
+        </>
+      }
+    >
       <p className="border-t border-line-subtle bg-editor px-3 pt-3 text-xs leading-5 text-muted">
         {breakdown} 最近记录 {date(summary.lastUsed)}
       </p>
       <UsageEvidence events={events} />
-    </details>
+    </ActionDialog>
   );
 }
 

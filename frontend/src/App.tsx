@@ -4,7 +4,7 @@ import { Service, type Project, type Inspection } from "./mygo";
 import { Brand, Button, Empty, Icon } from "./components";
 import ProjectContent, { type ProjectTab } from "./ProjectContent";
 import { previewInspections } from "./preview";
-import SharedRules from "./SharedRules";
+import SharedWorkspace from "./SharedWorkspace";
 import AddProjectDialog from "./AddProjectDialog";
 import ManageProjectDialog from "./ManageProjectDialog";
 import type { GitSection } from "./ProjectGit";
@@ -623,7 +623,7 @@ export default function App() {
                   </Empty>
                 )
               ) : page === "shared" ? (
-                <SharedRules projects={projects} />
+                <SharedWorkspace projects={projects} />
               ) : page === "ai-resources" ? (
                 <AIResources />
               ) : (

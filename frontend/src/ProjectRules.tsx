@@ -1,3 +1,4 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Icon, Select } from "./components";
@@ -343,10 +344,12 @@ export default function ProjectRules({
                     </Select>
                   </label>
                 </div>
-                <details>
-                  <summary className="w-fit cursor-pointer text-xs text-muted">
-                    适用范围与例外
-                  </summary>
+                <ActionDialog
+                  title="适用范围与例外"
+                  busy={!!state.busy}
+                  error={state.error}
+                  notice={state.notice}
+                >
                   <fieldset
                     disabled={!!state.busy || (path ? !override : false)}
                     className="mt-3 space-y-3"
@@ -434,7 +437,7 @@ export default function ProjectRules({
                       />
                     </label>
                   </fieldset>
-                </details>
+                </ActionDialog>
                 {rule.level !== "off" &&
                   rule.id === "no-unit-tests" &&
                   !(rule.include || []).length && (
@@ -480,14 +483,18 @@ export default function ProjectRules({
                 </p>
               ))}
               {state.report.skipped.length > 0 && (
-                <details className="text-xs text-muted">
-                  <summary className="cursor-pointer">
-                    {state.report.skipped.length} 个文件按 ESLint 配置跳过
-                  </summary>
+                <ActionDialog
+                  title={
+                    <>{state.report.skipped.length} 个文件按 ESLint 配置跳过</>
+                  }
+                  busy={!!state.busy}
+                  error={state.error}
+                  notice={state.notice}
+                >
                   <pre className="source-panel mt-2">
                     {state.report.skipped.join("\n")}
                   </pre>
-                </details>
+                </ActionDialog>
               )}
               {state.report.baseline === "unavailable" && (
                 <p className="text-xs text-muted">
@@ -540,10 +547,12 @@ export default function ProjectRules({
               ) && <p className="text-sm text-muted">此范围没有违规。</p>}
             </section>
           )}
-          <details className="space-y-3">
-            <summary className="w-fit cursor-pointer text-sm font-medium">
-              AI 规范说明
-            </summary>
+          <ActionDialog
+            title="AI 规范说明"
+            busy={!!state.busy}
+            error={state.error}
+            notice={state.notice}
+          >
             <Button
               disabled={!native || !!state.busy || !!dirty || !state.project}
               onClick={() => void preview()}
@@ -568,7 +577,7 @@ export default function ProjectRules({
                 </Button>
               </div>
             )}
-          </details>
+          </ActionDialog>
         </>
       )}
     </section>

@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	codexMemoryFileLimit = 32 * 1024 * 1024
-	codexMemoryTextLimit = 24 * 1024
+	memoryFileLimit = 32 * 1024 * 1024
+	memoryTextLimit = 24 * 1024
 )
 
-type CodexMemorySession struct {
+type MemorySession struct {
+	Provider string `json:"provider"`
 	ID       string `json:"id"`
 	File     string `json:"file"`
 	Title    string `json:"title"`
@@ -27,17 +28,19 @@ type CodexMemorySession struct {
 	Modified string `json:"modified"`
 }
 
-type CodexMemorySessions struct {
-	Sessions []CodexMemorySession `json:"sessions"`
-	Partial  bool                 `json:"partial"`
+type MemorySessions struct {
+	Sessions []MemorySession `json:"sessions"`
+	Partial  bool            `json:"partial"`
 }
 
-type CodexMemoryCitation struct {
+type MemoryCitation struct {
 	SessionID string `json:"sessionId"`
 	File      string `json:"file"`
 	Line      int    `json:"line"`
 	Timestamp string `json:"timestamp"`
 	Quote     string `json:"quote"`
+	Provider  string `json:"provider,omitempty"`
+	Extractor string `json:"extractor,omitempty"`
 }
 
 type codexMemoryLogEntry struct {
@@ -46,27 +49,41 @@ type codexMemoryLogEntry struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
-type codexMemoryMessage struct {
+type memoryMessage struct {
 	Line      int    `json:"line"`
 	Text      string `json:"text"`
 	Timestamp string `json:"-"`
 }
 
-func codexMemorySessionsDir() (string, error) {
+func memorySessionsDir(provider string) (string, error) {
 	paths, err := currentAIPaths()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(paths.codex, "sessions"), nil
+	switch provider {
+	case "codex":
+		return filepath.Join(paths.codex, "sessions"), nil
+	case "claude":
+		directory := os.Getenv("CLAUDE_CONFIG_DIR")
+		if directory == "" {
+			directory = filepath.Join(paths.home, ".claude")
+		}
+		if !filepath.IsAbs(directory) {
+			return "", errors.New("CLAUDE_CONFIG_DIR 必须是绝对路径")
+		}
+		return filepath.Join(directory, "projects"), nil
+	default:
+		return "", errors.New("请选择支持的会话来源")
+	}
 }
 
-// ListCodexMemorySessions reads metadata for recent sessions started within the project.
-func (s *Service) ListCodexMemorySessions(path string) (CodexMemorySessions, error) {
-	result := CodexMemorySessions{Sessions: []CodexMemorySession{}}
+// ListMemorySessions reads recent project session metadata from the selected tool.
+func (s *Service) ListMemorySessions(path, provider string) (MemorySessions, error) {
+	result := MemorySessions{Sessions: []MemorySession{}}
 	if _, err := s.registeredProject(path); err != nil {
 		return result, err
 	}
-	directory, err := codexMemorySessionsDir()
+	directory, err := memorySessionsDir(provider)
 	if err != nil {
 		return result, err
 	}
@@ -99,6 +116,9 @@ func (s *Service) ListCodexMemorySessions(path string) (CodexMemorySessions, err
 		if entry.Type()&fs.ModeSymlink != 0 || entry.IsDir() || filepath.Ext(name) != ".jsonl" {
 			return nil
 		}
+		if provider == "claude" && len(strings.Split(filepath.ToSlash(name), "/")) != 2 {
+			return nil // Claude subagent transcripts are not user sessions.
+		}
 		info, err := entry.Info()
 		if err != nil {
 			result.Partial = true
@@ -127,7 +147,7 @@ func (s *Service) ListCodexMemorySessions(path string) (CodexMemorySessions, err
 			result.Partial = true
 			break
 		}
-		session, cwd, n, err := codexMemorySessionMeta(root, file.name, min(budget, int64(2*1024*1024)))
+		session, cwd, n, err := memorySessionMeta(root, provider, file.name, min(budget, int64(2*1024*1024)))
 		budget -= n
 		if err != nil {
 			result.Partial = true
@@ -140,9 +160,11 @@ func (s *Service) ListCodexMemorySessions(path string) (CodexMemorySessions, err
 		session.Modified = file.modified.UTC().Format(time.RFC3339)
 		result.Sessions = append(result.Sessions, session)
 	}
-	titles := codexMemoryTitles(filepath.Join(filepath.Dir(directory), "session_index.jsonl"))
-	for i := range result.Sessions {
-		result.Sessions[i].Title = titles[result.Sessions[i].ID]
+	if provider == "codex" {
+		titles := codexMemoryTitles(filepath.Join(filepath.Dir(directory), "session_index.jsonl"))
+		for i := range result.Sessions {
+			result.Sessions[i].Title = titles[result.Sessions[i].ID]
+		}
 	}
 	return result, nil
 }
@@ -171,12 +193,12 @@ func codexMemoryTitles(path string) map[string]string {
 	return titles
 }
 
-func openCodexMemoryLog(root *os.Root, name string) (*os.File, error) {
+func openMemoryLog(root *os.Root, name string) (*os.File, error) {
 	if filepath.Ext(name) != ".jsonl" {
-		return nil, errors.New("请选择 Codex 会话")
+		return nil, errors.New("请选择 JSONL 会话")
 	}
 	if err := validateUpdatePath(root, name); err != nil {
-		return nil, errors.New("会话路径不在 Codex 会话目录中")
+		return nil, errors.New("会话路径不在所选工具的会话目录中")
 	}
 	info, err := root.Lstat(name)
 	if err != nil || !info.Mode().IsRegular() {
@@ -194,25 +216,31 @@ func openCodexMemoryLog(root *os.Root, name string) (*os.File, error) {
 	return file, nil
 }
 
-func codexMemorySessionMeta(root *os.Root, name string, limit int64) (CodexMemorySession, string, int64, error) {
-	file, err := openCodexMemoryLog(root, name)
+func memorySessionMeta(root *os.Root, provider, name string, limit int64) (MemorySession, string, int64, error) {
+	file, err := openMemoryLog(root, name)
 	if err != nil {
-		return CodexMemorySession{}, "", 0, err
+		return MemorySession{}, "", 0, err
 	}
 	defer file.Close()
 	reader := &io.LimitedReader{R: file, N: limit}
-	scanner := codexMemoryScanner(reader)
-	session, cwd, err := codexMemoryMetadata(scanner, name)
+	scanner := memoryScanner(reader)
+	var session MemorySession
+	var cwd string
+	if provider == "claude" {
+		session, cwd, err = claudeMemoryMetadata(scanner, name)
+	} else {
+		session, cwd, err = codexMemoryMetadata(scanner, name)
+	}
 	return session, cwd, limit - reader.N, err
 }
 
-func codexMemoryScanner(reader io.Reader) *bufio.Scanner {
+func memoryScanner(reader io.Reader) *bufio.Scanner {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 32*1024), 2*1024*1024)
 	return scanner
 }
 
-func codexMemoryMetadata(scanner *bufio.Scanner, name string) (CodexMemorySession, string, error) {
+func codexMemoryMetadata(scanner *bufio.Scanner, name string) (MemorySession, string, error) {
 	var entry codexMemoryLogEntry
 	var meta struct {
 		ID        string          `json:"id"`
@@ -223,33 +251,33 @@ func codexMemoryMetadata(scanner *bufio.Scanner, name string) (CodexMemorySessio
 	}
 	if !scanner.Scan() || json.Unmarshal(scanner.Bytes(), &entry) != nil || entry.Type != "session_meta" ||
 		json.Unmarshal(entry.Payload, &meta) != nil {
-		return CodexMemorySession{}, "", errors.New("无法读取会话元数据")
+		return MemorySession{}, "", errors.New("无法读取会话元数据")
 	}
 	if len(meta.Source) > 0 && meta.Source[0] == '{' {
-		return CodexMemorySession{}, "", nil // agent-generated sessions
+		return MemorySession{}, "", nil // agent-generated sessions
 	}
 	if meta.ID == "" {
 		meta.ID = meta.SessionID
 	}
 	if len(meta.ID) > 200 || strings.ContainsAny(meta.ID, "\x00\r\n") {
-		return CodexMemorySession{}, "", errors.New("会话编号无效")
+		return MemorySession{}, "", errors.New("会话编号无效")
 	}
-	return CodexMemorySession{ID: meta.ID, File: name, Started: meta.Timestamp}, evidencePath(meta.Cwd), nil
+	return MemorySession{Provider: "codex", ID: meta.ID, File: name, Started: meta.Timestamp}, evidencePath(meta.Cwd), nil
 }
 
-func readCodexMemoryMessages(directory, path, fileName, expectedID string) (CodexMemorySession, []codexMemoryMessage, bool, error) {
+func readCodexMemoryMessages(directory, path, fileName, expectedID string) (MemorySession, []memoryMessage, bool, error) {
 	root, err := os.OpenRoot(directory)
 	if err != nil {
-		return CodexMemorySession{}, nil, false, err
+		return MemorySession{}, nil, false, err
 	}
 	defer root.Close()
-	file, err := openCodexMemoryLog(root, fileName)
+	file, err := openMemoryLog(root, fileName)
 	if err != nil {
-		return CodexMemorySession{}, nil, false, err
+		return MemorySession{}, nil, false, err
 	}
 	defer file.Close()
-	reader := &io.LimitedReader{R: file, N: codexMemoryFileLimit}
-	scanner := codexMemoryScanner(reader)
+	reader := &io.LimitedReader{R: file, N: memoryFileLimit}
+	scanner := memoryScanner(reader)
 	session, cwd, err := codexMemoryMetadata(scanner, fileName)
 	if err != nil || session.ID == "" || session.ID != expectedID || cwd == "" || !withinAIScope(cwd, path) {
 		return session, nil, false, errors.New("该会话不属于当前项目或已变化，请重新选择")
@@ -258,18 +286,18 @@ func readCodexMemoryMessages(directory, path, fileName, expectedID string) (Code
 	line := 1
 	turn, turnPath := "", ""
 	completed := map[string]bool{}
-	messages := []codexMemoryMessage{}
-	current := []codexMemoryMessage{}
+	messages := []memoryMessage{}
+	current := []memoryMessage{}
 	add := func(text, timestamp string) {
-		if len(text) > codexMemoryTextLimit {
+		if len(text) > memoryTextLimit {
 			partial = true
 			return
 		}
 		if strings.TrimSpace(text) == "" || !utf8.ValidString(text) ||
-			slices.ContainsFunc(current, func(item codexMemoryMessage) bool { return item.Text == text }) {
+			slices.ContainsFunc(current, func(item memoryMessage) bool { return item.Text == text }) {
 			return
 		}
-		current = append(current, codexMemoryMessage{Line: line, Text: text, Timestamp: timestamp})
+		current = append(current, memoryMessage{Line: line, Text: text, Timestamp: timestamp})
 	}
 	deadline := time.Now().Add(5 * time.Second)
 	for scanner.Scan() {
@@ -327,16 +355,21 @@ func readCodexMemoryMessages(directory, path, fileName, expectedID string) (Code
 		}
 	}
 	partial = partial || scanner.Err() != nil || reader.N == 0
+	messages, truncated := recentMemoryMessages(messages)
+	return session, messages, partial || truncated, nil
+}
+
+func recentMemoryMessages(messages []memoryMessage) ([]memoryMessage, bool) {
 	bytes, start := 0, len(messages)
 	for start > 0 && len(messages)-start < 48 {
 		next := len(messages[start-1].Text)
-		if bytes+next > codexMemoryTextLimit {
+		if bytes+next > memoryTextLimit {
 			break
 		}
 		bytes += next
 		start--
 	}
-	return session, messages[start:], partial || start > 0, nil
+	return messages[start:], start > 0
 }
 
 func codexAuthoredText(raw json.RawMessage, turn string) []string {

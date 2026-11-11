@@ -24,15 +24,15 @@ type ProjectMemoryInput struct {
 
 type ProjectMemory struct {
 	ProjectMemoryInput
-	ID           string               `json:"id"`
-	Origin       string               `json:"origin"`
-	Status       string               `json:"status"`
-	CreatedAt    string               `json:"createdAt"`
-	UpdatedAt    string               `json:"updatedAt"`
-	ConfirmedAt  string               `json:"confirmedAt"`
-	ArchivedFrom string               `json:"archivedFrom"`
-	Version      string               `json:"version"`
-	Session      *CodexMemoryCitation `json:"session,omitempty"`
+	ID           string          `json:"id"`
+	Origin       string          `json:"origin"`
+	Status       string          `json:"status"`
+	CreatedAt    string          `json:"createdAt"`
+	UpdatedAt    string          `json:"updatedAt"`
+	ConfirmedAt  string          `json:"confirmedAt"`
+	ArchivedFrom string          `json:"archivedFrom"`
+	Version      string          `json:"version"`
+	Session      *MemoryCitation `json:"session,omitempty"`
 }
 
 func (s *Service) projectMemoryPath(path string) string {
@@ -160,7 +160,7 @@ func normalizeMemoryInput(input ProjectMemoryInput) (ProjectMemoryInput, error) 
 	return input, nil
 }
 
-func newProjectMemory(input ProjectMemoryInput, origin, status string, session *CodexMemoryCitation) ProjectMemory {
+func newProjectMemory(input ProjectMemoryInput, origin, status string, session *MemoryCitation) ProjectMemory {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	item := ProjectMemory{
 		ProjectMemoryInput: input, ID: rand.Text(), Origin: origin,

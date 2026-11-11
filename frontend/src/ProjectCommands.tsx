@@ -1,3 +1,4 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
@@ -252,12 +253,6 @@ export default function ProjectCommands({
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <ProjectConfigEditor
-                        path={path}
-                        section="services"
-                        id={d.id}
-                        onSaved={() => setRevision((value) => value + 1)}
-                      />
                       {active ? (
                         <>
                           <Button
@@ -332,10 +327,7 @@ export default function ProjectCommands({
                         查看端口占用
                       </button>
                     )}
-                    <details className="min-w-0 flex-1 text-muted">
-                      <summary className="w-fit cursor-pointer">
-                        启动命令
-                      </summary>
+                    <ActionDialog title="启动命令" className="min-w-0">
                       <pre tabIndex={0} className="source-panel mt-2">
                         {(d.command || [])
                           .map((arg) =>
@@ -349,7 +341,7 @@ export default function ProjectCommands({
                         {d.url ? `\n${d.url}` : ""}
                         {state.pid ? `\n进程 PID：${state.pid}` : ""}
                       </pre>
-                    </details>
+                    </ActionDialog>
                   </div>
                   {state.configChanged && (
                     <p className="mt-2 text-xs text-muted">
@@ -386,7 +378,7 @@ export default function ProjectCommands({
       ) : (
         !overview.error && (
           <Empty icon="file" title="还没有本地服务">
-            点击「添加服务」，填入项目的启动命令。
+            让 AI 接入项目已有的启动命令，或通过「配置服务」手动添加。
           </Empty>
         )
       )}
@@ -418,10 +410,10 @@ export default function ProjectCommands({
         </section>
       )}
       {!!Object.keys(scripts).length && (
-        <details className="text-sm">
-          <summary className="w-fit cursor-pointer text-muted">
-            package.json 脚本 · {Object.keys(scripts).length}
-          </summary>
+        <ActionDialog
+          title={<>package.json 脚本 · {Object.keys(scripts).length}</>}
+          className="min-w-0"
+        >
           <div className="grouped-list mt-3">
             {Object.entries(scripts).map(([name, command]) => (
               <div key={name} className="info-row">
@@ -430,7 +422,7 @@ export default function ProjectCommands({
               </div>
             ))}
           </div>
-        </details>
+        </ActionDialog>
       )}
     </div>
   );

@@ -171,6 +171,91 @@ code {
   outline-offset: -3px;
 }
 
+.pipeline-flow {
+  display: flex;
+  overflow-x: auto;
+  padding: 12px 3px 8px;
+}
+.pipeline-stage {
+  display: flex;
+  min-width: 0;
+  flex: 1 0 168px;
+  align-items: center;
+}
+.pipeline-stage:first-child {
+  flex-basis: 140px;
+}
+.pipeline-connector {
+  position: relative;
+  flex: 0 0 24px;
+  height: 1px;
+  margin-inline: 4px;
+  overflow: hidden;
+  background: var(--color-line);
+}
+.pipeline-node {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  text-align: left;
+}
+.pipeline-node:hover {
+  background: var(--color-sidebar);
+}
+.pipeline-step-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.pipeline-stage[data-state="success"] .pipeline-step-icon {
+  color: #15803d;
+}
+.pipeline-stage[data-state="success"] .pipeline-connector {
+  background: #15803d;
+  opacity: 0.4;
+}
+.pipeline-stage[data-state="running"] .pipeline-step-icon {
+  color: var(--color-accent);
+}
+.pipeline-stage[data-state="failure"] .pipeline-step-icon,
+.pipeline-stage[data-state="timed_out"] .pipeline-step-icon {
+  color: var(--color-removed);
+}
+.pipeline-stage[data-state="running"] .pipeline-step-icon svg {
+  animation: pipeline-running 900ms linear infinite;
+}
+.pipeline-stage[data-state="running"] .pipeline-connector::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 8px;
+  background: var(--color-accent);
+  animation: pipeline-flow 1200ms linear infinite;
+}
+@keyframes pipeline-running {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pipeline-flow {
+  from {
+    transform: translateX(-8px);
+  }
+  to {
+    transform: translateX(24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-stage[data-state="running"] .pipeline-step-icon svg,
+  .pipeline-stage[data-state="running"] .pipeline-connector::after {
+    animation: none;
+  }
+}
+
 .markdown-document {
   @apply text-sm leading-6 text-ink;
   overflow-wrap: anywhere;

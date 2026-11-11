@@ -7,6 +7,12 @@
       "timeoutSeconds": 1800,
       "steps": [
         [
+          "sh",
+          "tools/shared/check-go-format.sh",
+          "cmd",
+          "internal"
+        ],
+        [
           "npm",
           "--prefix",
           "frontend",
@@ -131,5 +137,8 @@
       "push",
       "ci"
     ]
-  }
+  },
+  "resources": [
+    "go-format-check"
+  ]
 }

@@ -108,35 +108,6 @@ export interface CloneState {
   project: Project;
 }
 
-export interface CodexMemoryCitation {
-  sessionId: string;
-  file: string;
-  line: number;
-  timestamp: string;
-  quote: string;
-}
-
-export interface CodexMemoryExtraction {
-  added: ProjectMemory[];
-  existing: number;
-  rejected: number;
-  messages: number;
-  partial: boolean;
-}
-
-export interface CodexMemorySession {
-  id: string;
-  file: string;
-  title: string;
-  started: string;
-  modified: string;
-}
-
-export interface CodexMemorySessions {
-  sessions: CodexMemorySession[];
-  partial: boolean;
-}
-
 export interface CodexResourceChange {
   kind: string;
   name: string;
@@ -375,6 +346,38 @@ export interface LocalServicesOverview {
   error: string;
 }
 
+export interface MemoryCitation {
+  sessionId: string;
+  file: string;
+  line: number;
+  timestamp: string;
+  quote: string;
+  provider?: string;
+  extractor?: string;
+}
+
+export interface MemoryExtraction {
+  added: ProjectMemory[];
+  existing: number;
+  rejected: number;
+  messages: number;
+  partial: boolean;
+}
+
+export interface MemorySession {
+  provider: string;
+  id: string;
+  file: string;
+  title: string;
+  started: string;
+  modified: string;
+}
+
+export interface MemorySessions {
+  sessions: MemorySession[];
+  partial: boolean;
+}
+
 export interface Pipeline {
   id: string;
   name: string;
@@ -498,7 +501,7 @@ export interface ProjectMemory {
   confirmedAt: string;
   archivedFrom: string;
   version: string;
-  session?: CodexMemoryCitation;
+  session?: MemoryCitation;
 }
 
 export interface ProjectMemoryInput {
@@ -544,6 +547,19 @@ export interface ResourceAdoption {
   version: string;
   adoptedVersion: string;
   error?: string;
+}
+
+export interface ResourceOverview {
+  version: string;
+  resources: SharedResourceInfo[];
+  projects: ResourceProject[];
+}
+
+export interface ResourceProject {
+  project: Project;
+  configVersion: string;
+  adoptions: ResourceAdoption[];
+  error: string;
 }
 
 export interface ReviewAcknowledgement {
@@ -802,6 +818,14 @@ export interface SharedResource {
   target: string;
 }
 
+export interface SharedResourceInfo {
+  id: string;
+  path: string;
+  target: string;
+  version: string;
+  error: string;
+}
+
 export interface SharedSource {
   path: string;
   version: string;
@@ -899,12 +923,15 @@ export const Service = {
   diagnoseProject(path: string): Promise<ProjectDiagnosis> {
     return call("Service.DiagnoseProject", path);
   },
-  /** ExtractCodexProjectMemories distills one selected local session into pending records. */
-  extractCodexProjectMemories(path: string, file: string, sessionID: string): Promise<CodexMemoryExtraction> {
-    return call("Service.ExtractCodexProjectMemories", path, file, sessionID);
+  /** ExtractProjectMemories distills a selected local session with the chosen CLI. */
+  extractProjectMemories(path: string, provider: string, file: string, sessionID: string, extractor: string): Promise<MemoryExtraction> {
+    return call("Service.ExtractProjectMemories", path, provider, file, sessionID, extractor);
   },
   finishReviewTask(path: string, id: string, version: string, input: ReviewFinishInput): Promise<ReviewTask> {
     return call("Service.FinishReviewTask", path, id, version, input);
+  },
+  forgetResource(version: string, id: string): Promise<void> {
+    return call("Service.ForgetResource", version, id);
   },
   /** GitHubActions uses the local gh login, including its access to private repos. */
   gitHubActions(path: string): Promise<ActionsOverview> {
@@ -932,9 +959,9 @@ export const Service = {
   list(): Promise<Project[]> {
     return call("Service.List");
   },
-  /** ListCodexMemorySessions reads metadata for recent sessions started within the project. */
-  listCodexMemorySessions(path: string): Promise<CodexMemorySessions> {
-    return call("Service.ListCodexMemorySessions", path);
+  /** ListMemorySessions reads recent project session metadata from the selected tool. */
+  listMemorySessions(path: string, provider: string): Promise<MemorySessions> {
+    return call("Service.ListMemorySessions", path, provider);
   },
   localServiceLog(path: string, id: string, runID: string): Promise<LocalServiceOutput> {
     return call("Service.LocalServiceLog", path, id, runID);
@@ -1064,6 +1091,10 @@ export const Service = {
   saveProjectPolicies(path: string, version: string, rules: PolicyRule[]): Promise<void> {
     return call("Service.SaveProjectPolicies", path, version, rules);
   },
+  /** SaveResource edits only the catalog; consuming files require a separate preview. */
+  saveResource(version: string, id: string, path: string, target: string): Promise<SharedResource> {
+    return call("Service.SaveResource", version, id, path, target);
+  },
   saveReviewProfile(path: string, version: string, profile: ReviewProfile): Promise<void> {
     return call("Service.SaveReviewProfile", path, version, profile);
   },
@@ -1086,6 +1117,10 @@ export const Service = {
   setProjectMemoryState(path: string, id: string, version: string, action: string): Promise<ProjectMemory> {
     return call("Service.SetProjectMemoryState", path, id, version, action);
   },
+  /** SetResourceAdoption changes the declaration, retaining project files and history. */
+  setResourceAdoption(path: string, configVersion: string, catalogVersion: string, id: string, adopt: boolean): Promise<void> {
+    return call("Service.SetResourceAdoption", path, configVersion, catalogVersion, id, adopt);
+  },
   /** SetReviewIssueState changes reminder handling, never the underlying Git or data state. */
   setReviewIssueState(path: string, version: string, key: string, state: string, reason: string): Promise<ReviewAcknowledgement> {
     return call("Service.SetReviewIssueState", path, version, key, state, reason);
@@ -1093,6 +1128,10 @@ export const Service = {
   /** SharedAdoptions reads actual managed blocks and backup evidence, without creating update previews. */
   sharedAdoptions(): Promise<SharedAdoption[]> {
     return call("Service.SharedAdoptions");
+  },
+  /** SharedResources reads sources and adoption states without creating update plans. */
+  sharedResources(path: string): Promise<ResourceOverview> {
+    return call("Service.SharedResources", path);
   },
   /** SharedSource returns the current source and its content fingerprint. */
   sharedSource(): Promise<SharedSource> {

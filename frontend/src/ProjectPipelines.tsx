@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
   Service,
@@ -12,6 +12,7 @@ import { Button, Empty, Icon } from "./components";
 import { pipelinePreview } from "./pipeline-preview";
 
 import ProjectConfigEditor from "./ProjectConfigEditor";
+import PipelineFlow from "./PipelineFlow";
 
 const native = isMyGo();
 const message = (error: unknown) =>
@@ -33,6 +34,7 @@ const labels: Record<string, string> = {
   action_required: "需要处理",
   stale: "已过期",
   startup_failure: "启动失败",
+  unknown: "待核对",
 };
 function Status({ status }: { status: string }) {
   const color =
@@ -102,51 +104,55 @@ function LocalPipelines({
   const [selected, setSelected] = useState("");
   const [output, setOutput] = useState<PipelineOutput | null>(null);
   const [error, setError] = useState("");
+  const [configError, setConfigError] = useState("");
+  const [runsError, setRunsError] = useState("");
+  const [runsKnown, setRunsKnown] = useState(!native);
   const [logError, setLogError] = useState("");
   const [configInvalid, setConfigInvalid] = useState(false);
   const [pending, setPending] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [logRevision, setLogRevision] = useState(0);
   const running = runs.find((run) => run.status === "running");
+  const logSection = useRef<HTMLElement>(null);
+  const revealLog = useRef(false);
 
   useEffect(() => {
     if (!native) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
+      let delay = 5000;
       try {
-        const next = await Service.pipelineRuns(path);
+        const [configuration, records] = await Promise.allSettled([
+          Service.pipelines(path),
+          Service.pipelineRuns(path),
+        ]);
         if (!active) return;
-        setRuns(next);
-        if (next.some((run) => run.status === "running"))
-          timer = setTimeout(poll, 1000);
-      } catch (error) {
-        if (active) setError(message(error));
+        if (configuration.status === "fulfilled") {
+          setConfig(configuration.value);
+          setConfigInvalid(false);
+          setConfigError("");
+        } else {
+          setConfigInvalid(true);
+          setConfigError(message(configuration.reason));
+        }
+        if (records.status === "fulfilled") {
+          setRuns(records.value);
+          setRunsKnown(true);
+          setRunsError("");
+          if (
+            configuration.status === "fulfilled" &&
+            records.value.some((run) => run.status === "running")
+          )
+            delay = 1000;
+        } else {
+          setRunsKnown(false);
+          setRunsError(message(records.reason));
+        }
+      } finally {
+        if (active) timer = setTimeout(poll, delay);
       }
     }
-    Service.pipelines(path)
-      .then((value) => {
-        if (active) {
-          setConfig(value);
-          setConfigInvalid(false);
-          setError("");
-        }
-      })
-      .catch(async (error) => {
-        if (!active) return;
-        setConfigInvalid(true);
-        setError(message(error));
-        try {
-          const editable = await Service.projectConfiguration(path);
-          if (active)
-            setConfig({
-              pipelines: editable.pipelines,
-              version: "",
-              source: ".repsync.json",
-            });
-        } catch {
-          if (active) setConfig(null);
-        }
-      });
     void poll();
     return () => {
       active = false;
@@ -157,23 +163,48 @@ function LocalPipelines({
   useEffect(() => {
     if (!selected) return;
     let active = true;
-    const load = native
-      ? Service.pipelineLog(path, selected)
-      : Promise.resolve({ run: runs[0], log: preview.log });
-    load
-      .then((value) => {
-        if (active) {
-          setOutput(value);
-          setLogError("");
+    let timer: ReturnType<typeof setTimeout>;
+    async function load() {
+      try {
+        const data = pipelinePreview(path);
+        const value = native
+          ? await Service.pipelineLog(path, selected)
+          : {
+              run: data.runs.find((run) => run.id === selected),
+              log: data.logs[selected] || "",
+            };
+        if (!active) return;
+        if (!value.run) throw new Error("未找到这次运行的记录，请重新选择。");
+        setOutput({ run: value.run, log: value.log });
+        setLogError("");
+        if (native && value.run.status === "running") {
+          timer = setTimeout(load, 1000);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         if (active) setLogError(message(error));
-      });
+      }
+    }
+    void load();
     return () => {
       active = false;
+      clearTimeout(timer);
     };
-  }, [path, selected, runs, preview.log]);
+  }, [path, selected, logRevision]);
+
+  useEffect(() => {
+    if (
+      !revealLog.current ||
+      !selected ||
+      (!logError && output?.run.id !== selected)
+    )
+      return;
+    const frame = requestAnimationFrame(() => {
+      revealLog.current = false;
+      logSection.current?.scrollIntoView({ block: "start" });
+      logSection.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected, output, logError]);
 
   async function run(pipeline: Pipeline) {
     if (!config) return;
@@ -198,6 +229,7 @@ function LocalPipelines({
   async function stop() {
     if (!running) return;
     setPending(true);
+    setError("");
     try {
       await Service.stopPipeline(path, running.id);
       setRevision((value) => value + 1);
@@ -233,8 +265,20 @@ function LocalPipelines({
           {error}
         </p>
       )}
+      {configError && (
+        <p role="alert" className="break-words text-sm text-removed">
+          配置读取失败：{configError}
+          。可通过「配置流水线」修正，页面会自动重试。
+        </p>
+      )}
+      {runsError && (
+        <p role="alert" className="break-words text-sm text-removed">
+          运行状态读取失败：{runsError}
+          。下方记录保留上次读取的内容，当前步骤待核对；页面会自动重试。
+        </p>
+      )}
       {!config ? (
-        !error && (
+        !configError && (
           <p role="status" className="text-sm text-muted">
             正在读取流水线…
           </p>
@@ -242,64 +286,66 @@ function LocalPipelines({
       ) : config.pipelines.length ? (
         <>
           <div className="grouped-list">
-            {config.pipelines.map((pipeline) => (
-              <div
-                key={pipeline.id}
-                className="border-b border-line px-3 py-2 last:border-b-0"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted">
-                    {pipeline.kind.toUpperCase()}
-                  </span>
-                  <h3 className="min-w-0 flex-1 break-words text-sm font-medium">
-                    {pipeline.name}
-                  </h3>
-                  <ProjectConfigEditor
-                    path={path}
-                    section="pipelines"
-                    id={pipeline.id}
-                    onSaved={() => setRevision((value) => value + 1)}
+            {config.pipelines.map((pipeline) => {
+              const latest = runs.find((run) => run.pipelineId === pipeline.id);
+              return (
+                <div
+                  key={pipeline.id}
+                  className="border-b border-line px-3 py-3 last:border-b-0"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted">
+                      {pipeline.kind.toUpperCase()}
+                    </span>
+                    <h3 className="min-w-0 flex-1 break-words text-sm font-medium">
+                      {pipeline.name}
+                    </h3>
+                    {latest && (
+                      <Status status={runsKnown ? latest.status : "unknown"} />
+                    )}
+                    <Button
+                      disabled={
+                        !native || pending || !!running || configInvalid
+                      }
+                      aria-label={`运行${pipeline.name}`}
+                      onClick={() => void run(pipeline)}
+                    >
+                      {running?.pipelineId === pipeline.id
+                        ? runsKnown
+                          ? "运行中…"
+                          : "运行待核对"
+                        : "运行"}
+                    </Button>
+                  </div>
+                  <PipelineFlow
+                    key={pipeline.id + config.version}
+                    pipeline={pipeline}
+                    run={latest}
+                    version={configInvalid ? "" : config.version}
+                    observed={runsKnown}
+                    onOpenLog={(id) => {
+                      revealLog.current = true;
+                      setSelected(id);
+                      setOutput(null);
+                      setLogError("");
+                      setLogRevision((value) => value + 1);
+                    }}
                   />
-                  <Button
-                    disabled={!native || pending || !!running || configInvalid}
-                    aria-label={`运行${pipeline.name}`}
-                    onClick={() => void run(pipeline)}
-                  >
-                    {running?.pipelineId === pipeline.id ? "运行中…" : "运行"}
-                  </Button>
                 </div>
-                <details className="mt-1 text-xs text-muted">
-                  <summary className="w-fit cursor-pointer">
-                    查看命令 · {(pipeline.steps || []).length} 个步骤
-                  </summary>
-                  <pre className="source-panel mt-2" tabIndex={0}>
-                    {(pipeline.steps || [])
-                      .map(
-                        (args, i) =>
-                          `${i + 1}. ${args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg)).join(" ")}`,
-                      )
-                      .join("\n")}
-                    {`\n工作目录：${pipeline.cwd || "项目根目录"}`}
-                    {`\n超时：${Math.ceil(pipeline.timeoutSeconds / 60)} 分钟`}
-                    {Object.keys(pipeline.env || {}).length
-                      ? `\n环境变量：${Object.keys(pipeline.env).join("、")}`
-                      : ""}
-                  </pre>
-                </details>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       ) : (
         <Empty icon="file" title="还没有本地流水线">
-          点击「添加流水线」，填入项目已有的检查或发布命令。
+          让 AI 接入项目已有的检查或发布命令，或通过「配置流水线」手动添加。
         </Empty>
       )}
       <section aria-label="本地运行记录">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">最近运行</h3>
           {running && (
-            <Button disabled={pending} onClick={() => void stop()}>
+            <Button disabled={!native || pending} onClick={() => void stop()}>
               停止运行
             </Button>
           )}
@@ -311,6 +357,7 @@ function LocalPipelines({
                 key={run.id}
                 aria-pressed={selected === run.id}
                 onClick={() => {
+                  revealLog.current = false;
                   setSelected(selected === run.id ? "" : run.id);
                   setOutput(null);
                   setLogError("");
@@ -331,13 +378,21 @@ function LocalPipelines({
                         : ""}{" "}
                     ·{" "}
                     {run.status === "running"
-                      ? `步骤 ${run.step || 1}`
+                      ? run.step > 0
+                        ? `步骤 ${run.step}`
+                        : "准备中"
                       : run.exitCode >= 0
                         ? `退出码 ${run.exitCode}`
                         : "无退出码"}
                   </span>
                 </span>
-                <Status status={run.status} />
+                <Status
+                  status={
+                    !runsKnown && run.status === "running"
+                      ? "unknown"
+                      : run.status
+                  }
+                />
                 <span
                   className={`text-muted ${selected === run.id ? "rotate-90" : ""}`}
                 >
@@ -348,17 +403,35 @@ function LocalPipelines({
           </div>
         ) : (
           <p className="text-sm text-muted">
-            尚未从 repsync 运行过此项目的流水线。
+            {runsKnown
+              ? "尚未从 repsync 运行过此项目的流水线。"
+              : runsError
+                ? "运行记录尚未读取，无法确认是否已有执行。"
+                : "正在读取运行记录…"}
           </p>
         )}
       </section>
       {selected && (
-        <section aria-label="流水线日志">
-          <h3 className="mb-3 text-sm font-semibold">运行日志</h3>
+        <section ref={logSection} tabIndex={-1} aria-label="流水线日志">
+          <h3 className="mb-3 text-sm font-semibold">
+            运行日志 ·{" "}
+            {runs.find((run) => run.id === selected)?.name || selected}
+          </h3>
           {logError ? (
-            <p role="alert" className="text-sm text-removed">
-              {logError}
-            </p>
+            <div className="space-y-2">
+              <p role="alert" className="text-sm text-removed">
+                {logError}
+              </p>
+              <Button
+                onClick={() => {
+                  revealLog.current = true;
+                  setLogError("");
+                  setLogRevision((value) => value + 1);
+                }}
+              >
+                重新读取日志
+              </Button>
+            </div>
           ) : output && output.run.id === selected ? (
             <>
               {output.run.error && (

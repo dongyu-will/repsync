@@ -1,3 +1,4 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Empty, Select } from "./components";
@@ -236,12 +237,11 @@ export default function SharedRules({
       >
         <div className="section-heading">
           {!project && <h2>项目规范更新</h2>}
-          <details className="mt-2 text-xs text-muted">
-            <summary className="w-fit cursor-pointer">了解更新规则</summary>
+          <div className="space-y-3">
             <p className="mt-2 leading-5">
               公共区块之外的项目内容保持原样。应用前重新核对源文件与项目文件，备份保存在本机。
             </p>
-          </details>
+          </div>
         </div>
         {!source?.path &&
           (project ? (
@@ -354,10 +354,12 @@ export default function SharedRules({
                     公共规则已是最新，无需更新。
                   </p>
                 )}
-                <details>
-                  <summary className="cursor-pointer text-sm font-medium">
-                    保留的项目内容
-                  </summary>
+                <ActionDialog
+                  title="保留的项目内容"
+                  busy={!!busy}
+                  error={error}
+                  notice={notice}
+                >
                   {preview.projectContent.trim() ? (
                     <pre
                       className="source-panel mt-3"
@@ -371,13 +373,15 @@ export default function SharedRules({
                       公共区块外没有项目内容。
                     </p>
                   )}
-                </details>
+                </ActionDialog>
               </section>
             )}
-            <details>
-              <summary className="cursor-pointer text-sm font-medium">
-                更新记录与恢复
-              </summary>
+            <ActionDialog
+              title="更新记录与恢复"
+              busy={!!busy}
+              error={error}
+              notice={notice}
+            >
               <div className="mt-3">
                 <History
                   key={`${path}:${historyRevision}`}
@@ -386,7 +390,7 @@ export default function SharedRules({
                   onRestore={restore}
                 />
               </div>
-            </details>
+            </ActionDialog>
           </>
         ) : (
           <Empty title="尚未添加项目">
@@ -443,10 +447,10 @@ function Adoptions({
     ? items?.filter((item) => item.project.path === project.path)
     : items;
   return (
-    <details>
-      <summary className="cursor-pointer text-sm font-medium">
+    <section>
+      <h3 className="break-words text-sm font-medium">
         {project ? "规范采用情况" : "各项目采用情况"}
-      </summary>
+      </h3>
       <div className="mt-3 space-y-3">
         <Button onClick={() => setRevision((value) => value + 1)}>
           刷新采用状态
@@ -503,16 +507,13 @@ function Adoptions({
           </div>
         )}
       </div>
-    </details>
+    </section>
   );
 }
 
 function RuleContent({ source }: { source: SharedSource }) {
   return (
-    <details>
-      <summary className="cursor-pointer text-sm font-medium">
-        查看公共规范原文
-      </summary>
+    <ActionDialog title="公共规范原文" trigger="查看公共规范原文">
       <pre
         className="source-panel mt-3"
         tabIndex={0}
@@ -521,7 +522,7 @@ function RuleContent({ source }: { source: SharedSource }) {
       >
         {source.content}
       </pre>
-    </details>
+    </ActionDialog>
   );
 }
 

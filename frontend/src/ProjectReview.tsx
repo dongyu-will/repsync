@@ -1,4 +1,5 @@
-import { useReducer, useRef, type FormEvent, type ReactNode } from "react";
+import ActionDialog from "./ActionDialog";
+import { useReducer, type FormEvent, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
   Service,
@@ -81,7 +82,6 @@ export default function ProjectReviewPanel({
     },
   );
   const { report, pending } = state;
-  const detailsRef = useRef<HTMLDetailsElement>(null);
   async function perform(action: () => Promise<unknown>, notice: string) {
     if (!native) return false;
     update({ pending: true, error: "", notice: "" });
@@ -120,14 +120,11 @@ export default function ProjectReviewPanel({
   const value = (data: FormData, name: string) => String(data.get(name) || "");
   const select = (section: string) => {
     update({ section: section as Section, expanded: true });
-    requestAnimationFrame(() =>
-      detailsRef.current?.scrollIntoView({ block: "start" }),
-    );
   };
   return (
     <section
       aria-label="项目待处理"
-      className="mb-5 space-y-3 border-b border-line pb-5"
+      className="mt-5 space-y-3 border-t border-line pt-5"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -163,7 +160,10 @@ export default function ProjectReviewPanel({
               <p>还有 {stashCount} 条 stash 待处理</p>
               <button
                 className="rounded px-2 py-1 underline underline-offset-2"
-                onClick={onGit}
+                onClick={() => {
+                  update({ expanded: false });
+                  onGit();
+                }}
               >
                 查看 stash
               </button>
@@ -198,16 +198,21 @@ export default function ProjectReviewPanel({
               未发现已声明范围内的待处理项。
             </p>
           )}
-          <details
-            ref={detailsRef}
+          <ActionDialog
+            title="项目检查与记录"
+            trigger={
+              <>
+                {report.issues.length > 3
+                  ? `查看全部 ${report.issues.length} 项与记录`
+                  : "查看详情与记录"}
+              </>
+            }
             open={state.expanded}
-            onToggle={(event) => update({ expanded: event.currentTarget.open })}
+            onOpenChange={(expanded) => update({ expanded })}
+            busy={pending}
+            error={state.error}
+            notice={state.notice}
           >
-            <summary className="cursor-pointer py-1 text-sm font-medium">
-              {report.issues.length > 3
-                ? `查看全部 ${report.issues.length} 项与记录`
-                : "查看详情与记录"}
-            </summary>
             <div className="mt-3 space-y-4">
               <p className="text-xs text-muted">
                 读取于 {date(report.checkedAt)} · 不代表提交、推送或发布已完成
@@ -229,14 +234,14 @@ export default function ProjectReviewPanel({
                 ))}
               </div>
               {report.issues.some((i) => i.section === state.section) && (
-                <details>
-                  <summary className="cursor-pointer text-sm">
+                <section>
+                  <h3 className="break-words text-sm font-medium">
                     核对与处理提醒 ·{" "}
                     {
                       report.issues.filter((i) => i.section === state.section)
                         .length
                     }
-                  </summary>
+                  </h3>
                   <div className="mt-3">
                     <IssueList
                       issues={report.issues.filter(
@@ -258,13 +263,13 @@ export default function ProjectReviewPanel({
                       }
                     />
                   </div>
-                </details>
+                </section>
               )}
               {report.acknowledged.some((i) => i.section === state.section) && (
-                <details>
-                  <summary className="cursor-pointer text-sm text-muted">
+                <section>
+                  <h3 className="break-words text-sm font-medium">
                     已核对保留 / 稍后处理
-                  </summary>
+                  </h3>
                   <IssueList
                     issues={report.acknowledged.filter(
                       (i) => i.section === state.section,
@@ -284,7 +289,7 @@ export default function ProjectReviewPanel({
                       )
                     }
                   />
-                </details>
+                </section>
               )}
               {state.section === "settings" && (
                 <ReviewForm
@@ -392,7 +397,14 @@ export default function ProjectReviewPanel({
                   <p className="text-xs leading-5 text-muted">
                     以上按本地 Git 引用计算，未联网确认远程现状。
                   </p>
-                  <Button onClick={onGit}>查看工作树、分支和 stash</Button>
+                  <Button
+                    onClick={() => {
+                      update({ expanded: false });
+                      onGit();
+                    }}
+                  >
+                    查看工作树、分支和 stash
+                  </Button>
                   {report.snapshot.files.length ? (
                     <ul className="grouped-list max-h-64 overflow-auto">
                       {report.snapshot.files.slice(0, 100).map((file) => (
@@ -430,7 +442,14 @@ export default function ProjectReviewPanel({
                       比较文件内容和命令配置；未覆盖被忽略的依赖或外部环境。提交变化后需确认检查是否依赖
                       Git 状态。
                     </p>
-                    <Button onClick={onCI}>前往 CI/CD</Button>
+                    <Button
+                      onClick={() => {
+                        update({ expanded: false });
+                        onCI();
+                      }}
+                    >
+                      前往 CI/CD
+                    </Button>
                   </div>
                   <div className="grouped-list">
                     {report.coverage.map((item) => (
@@ -501,10 +520,10 @@ export default function ProjectReviewPanel({
                   ) : (
                     <p className="text-sm text-muted">尚无检查记录。</p>
                   )}
-                  <details>
-                    <summary className="cursor-pointer text-sm">
+                  <section>
+                    <h3 className="break-words text-sm font-medium">
                       记录外部检查
-                    </summary>
+                    </h3>
                     <ReviewForm
                       pending={pending}
                       onSubmit={(event) =>
@@ -552,7 +571,7 @@ export default function ProjectReviewPanel({
                       />
                       <Submit pending={pending}>记录检查</Submit>
                     </ReviewForm>
-                  </details>
+                  </section>
                 </>
               )}
               {state.section === "delivery" && (
@@ -577,10 +596,10 @@ export default function ProjectReviewPanel({
                       </div>
                     ))}
                   </div>
-                  <details>
-                    <summary className="cursor-pointer text-sm">
+                  <section>
+                    <h3 className="break-words text-sm font-medium">
                       记录阶段核验
-                    </summary>
+                    </h3>
                     <ReviewForm
                       pending={pending}
                       onSubmit={(event) =>
@@ -623,7 +642,7 @@ export default function ProjectReviewPanel({
                       </p>
                       <Submit pending={pending}>保存核验</Submit>
                     </ReviewForm>
-                  </details>
+                  </section>
                 </>
               )}
               {state.section === "resources" && (
@@ -754,10 +773,10 @@ export default function ProjectReviewPanel({
                       尚未声明需要核验的数据或环境对象。
                     </p>
                   )}
-                  <details>
-                    <summary className="cursor-pointer text-sm">
+                  <section>
+                    <h3 className="break-words text-sm font-medium">
                       添加检查对象
-                    </summary>
+                    </h3>
                     <ReviewForm
                       pending={pending}
                       onSubmit={(event) =>
@@ -811,7 +830,7 @@ export default function ProjectReviewPanel({
                       />
                       <Submit pending={pending}>保存检查对象</Submit>
                     </ReviewForm>
-                  </details>
+                  </section>
                 </>
               )}
               {state.section === "handover" && (
@@ -842,10 +861,10 @@ export default function ProjectReviewPanel({
                     }
                   >
                     <Field name="title" label="任务名称" required />
-                    <details>
-                      <summary className="cursor-pointer text-sm">
+                    <section>
+                      <h3 className="break-words text-sm font-medium">
                         声明负责人和修改范围
-                      </summary>
+                      </h3>
                       <div className="mt-3 space-y-3">
                         <Field name="owner" label="负责人 / AI 会话别名" />
                         <fieldset className="space-y-2">
@@ -865,7 +884,7 @@ export default function ProjectReviewPanel({
                         />
                         <EnvironmentFields />
                       </div>
-                    </details>
+                    </section>
                     <Submit pending={pending}>记录任务开始</Submit>
                   </ReviewForm>
                   <p className="text-xs leading-5 text-muted">
@@ -881,13 +900,13 @@ export default function ProjectReviewPanel({
                     </p>
                   ))}
                   {report.tasks.map((task) => (
-                    <details
+                    <section
                       key={task.id}
                       className="border-t border-line pt-3"
                     >
-                      <summary className="cursor-pointer break-words text-sm font-medium">
+                      <h3 className="break-words text-sm font-medium">
                         {task.title} · {task.endedAt ? "已交接" : "尚未交接"}
-                      </summary>
+                      </h3>
                       <p className="mt-2 break-all text-xs text-muted">
                         {date(task.startedAt)} · {task.start.branch} ·{" "}
                         {task.start.head.slice(0, 8)}
@@ -956,12 +975,12 @@ export default function ProjectReviewPanel({
                           <Submit pending={pending}>保存交接</Submit>
                         </ReviewForm>
                       )}
-                    </details>
+                    </section>
                   ))}
                 </>
               )}
             </div>
-          </details>
+          </ActionDialog>
         </>
       )}
       <ProjectDocumentReview path={path} />
@@ -1156,13 +1175,11 @@ function IssueList({
   return (
     <div className="grouped-list">
       {issues.map((issue) => (
-        <details
+        <section
           key={issue.key || issue.kind}
           className="border-b border-line-subtle p-3 last:border-0"
         >
-          <summary className="cursor-pointer break-words text-sm">
-            {issue.message}
-          </summary>
+          <h3 className="break-words text-sm font-medium">{issue.message}</h3>
           {issue.acknowledgement ? (
             <div className="mt-2 space-y-2">
               <p className="break-words text-xs text-muted">
@@ -1206,7 +1223,7 @@ function IssueList({
               <Submit pending={pending}>保存处理状态</Submit>
             </ReviewForm>
           )}
-        </details>
+        </section>
       ))}
     </div>
   );

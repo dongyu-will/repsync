@@ -1,9 +1,16 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, type FormEvent } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Select } from "./components";
-import { Service, type CodexMemorySessions, type ProjectMemory } from "./mygo";
+import { Service, type MemorySessions, type ProjectMemory } from "./mygo";
 
 const native = isMyGo();
+const memoryTools = [
+  ["codex", "Codex"],
+  ["claude", "Claude Code"],
+] as const;
+const memoryToolName = (value: string) =>
+  memoryTools.find(([id]) => id === value)?.[1] || "Codex";
 const tabs = [
   ["confirmed", "已确认"],
   ["pending", "待确认"],
@@ -204,10 +211,12 @@ export default function ProjectMemories({ path }: { path: string }) {
           })
         }
       />
-      <details className="grouped-list">
-        <summary className="cursor-pointer px-3 py-2.5 font-medium">
-          添加记忆
-        </summary>
+      <ActionDialog
+        title="添加记忆"
+        busy={busy}
+        error={state.error}
+        notice={state.notice}
+      >
         <form
           className="space-y-3 border-t border-line-subtle p-3"
           onSubmit={record}
@@ -261,7 +270,7 @@ export default function ProjectMemories({ path }: { path: string }) {
             </Button>
           </div>
         </form>
-      </details>
+      </ActionDialog>
       {visible.length ? (
         <ul className="grouped-list">
           {visible.map((item) => (
@@ -291,17 +300,22 @@ export default function ProjectMemories({ path }: { path: string }) {
                 )}
               </dl>
               {item.session && (
-                <details className="space-y-2 text-xs">
-                  <summary className="cursor-pointer text-muted">
+                <section className="space-y-2 text-xs">
+                  <h3 className="break-words text-sm font-medium">
                     原会话与用户原话
-                  </summary>
+                  </h3>
                   <p className="break-all text-muted">
                     {item.session.file}:{item.session.line}
                   </p>
+                  {item.session.extractor && (
+                    <p className="text-muted">
+                      由 {memoryToolName(item.session.extractor)} 提炼
+                    </p>
+                  )}
                   <blockquote className="whitespace-pre-wrap break-words border-l-2 border-line pl-2">
                     {item.session.quote}
                   </blockquote>
-                </details>
+                </section>
               )}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted">
@@ -361,7 +375,9 @@ function ProjectMemoryExtract({
   onAdded: () => void;
 }) {
   type ExtractState = {
-    report: CodexMemorySessions | null;
+    report: MemorySessions | null;
+    provider: string;
+    extractor: string;
     selected: string;
     busy: "list" | "extract" | "";
     error: string;
@@ -372,20 +388,31 @@ function ProjectMemoryExtract({
       ...previous,
       ...next,
     }),
-    { report: null, selected: "", busy: "", error: "", notice: "" },
+    {
+      report: null,
+      provider: "codex",
+      extractor: "codex",
+      selected: "",
+      busy: "",
+      error: "",
+      notice: "",
+    },
   );
-  async function load() {
-    if (!native || state.busy) return;
+  async function load(provider = state.provider) {
+    if (state.busy) return;
     update({ busy: "list", error: "", notice: "" });
     try {
-      const report = await Service.listCodexMemorySessions(path);
+      const report: MemorySessions = native
+        ? await Service.listMemorySessions(path, provider)
+        : { sessions: [], partial: false };
       update({
+        provider,
         report,
-        selected: report.sessions.some(
-          (session) => session.file === state.selected,
-        )
-          ? state.selected
-          : "",
+        selected:
+          provider === state.provider &&
+          report.sessions.some((session) => session.file === state.selected)
+            ? state.selected
+            : "",
       });
     } catch (error) {
       update({ error: message(error) });
@@ -401,10 +428,12 @@ function ProjectMemoryExtract({
     if (!native || !session || state.busy) return;
     update({ busy: "extract", error: "", notice: "" });
     try {
-      const result = await Service.extractCodexProjectMemories(
+      const result = await Service.extractProjectMemories(
         path,
+        state.provider,
         session.file,
         session.id,
+        state.extractor,
       );
       const details = [
         result.added.length
@@ -425,24 +454,66 @@ function ProjectMemoryExtract({
   }
 
   return (
-    <details
-      className="grouped-list"
-      onToggle={(event) => {
-        if (event.currentTarget.open && !state.report && !state.error)
-          void load();
+    <ActionDialog
+      title="从 AI 会话提炼"
+      onOpen={() => {
+        if (!state.report && !state.error) void load();
       }}
+      busy={!!state.busy}
     >
-      <summary className="cursor-pointer px-3 py-2.5 font-medium">
-        从 Codex 会话提炼
-      </summary>
       <form
         className="space-y-3 border-t border-line-subtle p-3"
         onSubmit={extract}
       >
         <p className="text-xs leading-5 text-muted">
-          将所选会话中已结束轮次的用户文字发送给 Codex
-          默认模型。提炼结果进入待确认。
+          将所选会话中已结束轮次的用户文字发送给
+          {memoryToolName(state.extractor)}
+          的默认模型，提炼结果进入待确认。
         </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className={field}>
+            会话来源
+            <Select
+              className="w-full"
+              value={state.provider}
+              disabled={!!state.busy}
+              onChange={(event) => {
+                const provider = event.target.value;
+                update({
+                  provider,
+                  report: null,
+                  selected: "",
+                  error: "",
+                  notice: "",
+                });
+                void load(provider);
+              }}
+            >
+              {memoryTools.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className={field}>
+            提炼工具
+            <Select
+              className="w-full"
+              value={state.extractor}
+              disabled={!!state.busy}
+              onChange={(event) =>
+                update({ extractor: event.target.value, error: "", notice: "" })
+              }
+            >
+              {memoryTools.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
         <label className={field}>
           最近修改的项目会话
           <Select
@@ -467,7 +538,7 @@ function ProjectMemoryExtract({
         {state.report && (
           <p role="status" className="text-xs text-muted">
             {state.report.sessions.length === 0 &&
-              "最近 30 天未找到可选的本地会话。"}
+              `最近 30 天未找到当前项目的 ${memoryToolName(state.provider)} 会话。`}
             {state.report.partial && " 部分会话超出扫描范围或无法读取。"}
           </p>
         )}
@@ -498,6 +569,6 @@ function ProjectMemoryExtract({
           </Button>
         </div>
       </form>
-    </details>
+    </ActionDialog>
   );
 }

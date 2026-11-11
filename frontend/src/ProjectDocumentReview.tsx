@@ -1,3 +1,4 @@
+import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, useRef, type FormEvent } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Select } from "./components";
@@ -159,10 +160,14 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
   }
 
   return (
-    <details className="rounded-lg border border-line">
-      <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
-        文档核对{report?.findings.length ? ` · ${report.findings.length}` : ""}
-      </summary>
+    <ActionDialog
+      title={
+        <>
+          文档核对
+          {report?.findings.length ? ` · ${report.findings.length}` : ""}
+        </>
+      }
+    >
       <div className="space-y-3 border-t border-line-subtle p-3">
         <form className="flex flex-wrap items-end gap-2" onSubmit={scan}>
           <label className="grid gap-1 text-xs text-muted">
@@ -362,6 +367,6 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
           </>
         )}
       </div>
-    </details>
+    </ActionDialog>
   );
 }

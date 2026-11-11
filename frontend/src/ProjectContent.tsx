@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Inspection } from "./mygo";
 import ProjectDocuments from "./ProjectDocuments";
 import SharedRules from "./SharedRules";
+import SharedFiles from "./SharedFiles";
 import ProjectPipelines from "./ProjectPipelines";
 import ProjectCommands from "./ProjectCommands";
 import ProjectRules from "./ProjectRules";
@@ -70,6 +71,13 @@ export default function ProjectContent({
         />
       ) : (
         <>
+          <section aria-label="本地服务">
+            <ProjectCommands
+              key={details.project.path}
+              path={details.project.path}
+              scripts={details.scripts}
+            />
+          </section>
           <ProjectReviewPanel
             key={details.project.path}
             path={details.project.path}
@@ -86,13 +94,6 @@ export default function ProjectContent({
                     : "工作区干净"
             }
           />
-          <section aria-label="本地服务">
-            <ProjectCommands
-              key={details.project.path}
-              path={details.project.path}
-              scripts={details.scripts}
-            />
-          </section>
         </>
       )}
     </div>
@@ -119,6 +120,7 @@ function ProjectStandards({
         {[
           ["project", "项目规则"],
           ["shared", "公共规范"],
+          ["files", "共享文件"],
         ].map(([id, title]) => (
           <button
             key={id}
@@ -142,6 +144,14 @@ function ProjectStandards({
           showProjectRules={false}
           onOpenShared={onOpenShared}
           onUpdated={onUpdated}
+        />
+      </div>
+      <div id="standards-files" hidden={section !== "files"}>
+        <SharedFiles
+          projects={[details.project]}
+          project={details.project}
+          onUpdated={onUpdated}
+          active={section === "files"}
         />
       </div>
     </div>

@@ -115,6 +115,10 @@ func (s *Service) Resources() ([]SharedResource, error) {
 func (s *Service) ConnectResource(id, path, target string) (SharedResource, error) {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
+	return s.connectResource(id, path, target)
+}
+
+func (s *Service) connectResource(id, path, target string) (SharedResource, error) {
 	if id == "" || len(id) > 80 || strings.ContainsAny(id, "/\\\x00") {
 		return SharedResource{}, errors.New("资源需要有效 id")
 	}
@@ -298,6 +302,10 @@ func (s *Service) validateResourceAdoption(path string) error {
 func (s *Service) ResourceStatus(path string) ([]ResourceAdoption, error) {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
+	return s.resourceStatus(path)
+}
+
+func (s *Service) resourceStatus(path string) ([]ResourceAdoption, error) {
 	if _, err := s.registeredProject(path); err != nil {
 		return nil, err
 	}
@@ -367,6 +375,10 @@ func (s *Service) PreviewResource(path, id string) (UpdatePreview, error) {
 func (s *Service) RemoveResource(id string) error {
 	s.syncMu.Lock()
 	defer s.syncMu.Unlock()
+	return s.removeResource(id)
+}
+
+func (s *Service) removeResource(id string) error {
 	items, err := s.resourceCatalog()
 	if err != nil {
 		return err

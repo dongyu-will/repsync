@@ -4,7 +4,7 @@ import type { ActionsOverview, PipelineConfig, PipelineRun } from "./mygo";
 export function pipelinePreview(path: string): {
   config: PipelineConfig;
   runs: PipelineRun[];
-  log: string;
+  logs: Record<string, string>;
   actions: ActionsOverview;
 } {
   const atlas = path === "/Projects/atlas";
@@ -18,7 +18,12 @@ export function pipelinePreview(path: string): {
               id: "ci",
               name: "项目检查",
               kind: "ci",
-              steps: [["npm", "run", "check:ci"]],
+              steps: [
+                ["npm", "run", "lint"],
+                ["npm", "run", "typecheck"],
+                ["npm", "run", "test:integration"],
+                ["npm", "run", "build"],
+              ],
               timeoutSeconds: 1800,
               cwd: "",
               env: {},
@@ -27,7 +32,11 @@ export function pipelinePreview(path: string): {
               id: "deploy",
               name: "发布预览环境",
               kind: "cd",
-              steps: [["npm", "run", "deploy:preview"]],
+              steps: [
+                ["npm", "run", "build"],
+                ["npm", "run", "deploy:preview"],
+                ["npm", "run", "verify:preview"],
+              ],
               timeoutSeconds: 1800,
               cwd: "",
               env: {},
@@ -47,13 +56,34 @@ export function pipelinePreview(path: string): {
             endedAt: "2026-11-10T02:30:24Z",
             commit: "c31b8e27d41a",
             worktree: "dirty",
-            step: 1,
+            step: 3,
+            configVersion: "example",
             exitCode: 1,
             error: "检查未通过",
           },
+          {
+            id: "example-deploy",
+            pipelineId: "deploy",
+            name: "发布预览环境",
+            kind: "cd",
+            status: "running",
+            startedAt: "2026-11-11T02:30:00Z",
+            endedAt: "",
+            commit: "c31b8e27d41a",
+            worktree: "dirty",
+            step: 2,
+            exitCode: -1,
+            error: "",
+            configVersion: "example",
+          },
         ]
       : [],
-    log: "[1/1] npm run check:ci\n\nsrc/App.tsx:18:7\nerror: 'unused' is declared but never used.\n\nProcess exited with code 1.\n",
+    logs: {
+      "example-ci":
+        "[1/4] npm run lint\nPassed\n\n[2/4] npm run typecheck\nPassed\n\n[3/4] npm run test:integration\nAPI integration check failed: expected 200, received 503\n\nProcess exited with code 1.\n",
+      "example-deploy":
+        "[1/3] npm run build\nBuild complete\n\n[2/3] npm run deploy:preview\nUploading assets…\n",
+    },
     actions: {
       repository: "team/atlas",
       runs: atlas
