@@ -246,7 +246,6 @@ export default function ProjectCommands({
                       <p className="mt-1 break-all text-xs text-muted">
                         {d.port ? `端口 ${d.port} · ` : ""}
                         {portLabels[state.portState] || state.portState}
-                        {state.pid ? ` · PID ${state.pid}` : ""}
                         {!active && state.exitCode >= 0
                           ? ` · 上次退出码 ${state.exitCode}`
                           : ""}
@@ -312,7 +311,9 @@ export default function ProjectCommands({
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                     {d.url &&
-                      (native && active && state.portState === "listening" ? (
+                      native &&
+                      active &&
+                      state.portState === "listening" && (
                         <a
                           className="inline-flex min-h-7 items-center gap-1 text-accent"
                           href={d.url}
@@ -322,14 +323,7 @@ export default function ProjectCommands({
                           打开页面
                           <Icon name="arrow" size={13} />
                         </a>
-                      ) : (
-                        <span
-                          className="text-muted"
-                          title="服务运行且端口可连接后可打开页面"
-                        >
-                          打开页面
-                        </span>
-                      ))}
+                      )}
                     {state.portState === "occupied" && (
                       <button
                         className="min-h-7 text-accent"
@@ -353,6 +347,7 @@ export default function ProjectCommands({
                           ? `\n环境变量：${Object.keys(d.env).join("、")}`
                           : ""}
                         {d.url ? `\n${d.url}` : ""}
+                        {state.pid ? `\n进程 PID：${state.pid}` : ""}
                       </pre>
                     </details>
                   </div>

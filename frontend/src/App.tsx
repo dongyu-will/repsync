@@ -628,10 +628,7 @@ export default function App() {
                 <AIResources />
               ) : (
                 <>
-                  <div className="section-heading">
-                    <h2>本地工作区</h2>
-                  </div>
-                  <dl className="grouped-list">
+                  <dl className="grouped-list" aria-label="本地工作区">
                     {[
                       ...(native ? [["运行模式", "桌面应用"]] : []),
                       [

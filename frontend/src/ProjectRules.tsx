@@ -216,9 +216,11 @@ export default function ProjectRules({
       className="space-y-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">
-          {path ? "项目规则" : "公共项目规则"}
-        </h2>
+        {path ? (
+          <h2 className="sr-only">项目规则</h2>
+        ) : (
+          <h2 className="text-base font-semibold">公共项目规则</h2>
+        )}
         <div className="flex items-center gap-2">
           <button
             className="icon-button"
@@ -298,14 +300,9 @@ export default function ProjectRules({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <h3 className="text-sm font-medium">{titles[rule.id]}</h3>
-                    {path && (
+                    {path && !effective?.applies && rule.scope === "react" && (
                       <p className="mt-1 text-xs text-muted">
-                        {override
-                          ? "项目覆盖"
-                          : `公共默认 · ${levels.find(([value]) => value === inherited.level)?.[1]}`}
-                        {!effective?.applies && rule.scope === "react"
-                          ? " · 检查工作目录中未识别到 React 依赖"
-                          : ""}
+                        检查工作目录中未识别到 React 依赖
                       </p>
                     )}
                   </div>
@@ -328,7 +325,16 @@ export default function ProjectRules({
                         else change(rule.id, { level: event.target.value });
                       }}
                     >
-                      {path && <option value="inherit">继承公共默认</option>}
+                      {path && (
+                        <option value="inherit">
+                          继承 ·{" "}
+                          {
+                            levels.find(
+                              ([value]) => value === inherited.level,
+                            )?.[1]
+                          }
+                        </option>
+                      )}
                       {levels.map(([value, label]) => (
                         <option key={value} value={value}>
                           {label}

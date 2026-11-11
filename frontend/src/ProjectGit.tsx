@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Service, type GitCleanupPolicy, type GitOverview } from "./mygo";
 import { Button, Empty, Icon, Select } from "./components";
@@ -190,75 +190,68 @@ export default function ProjectGit({
             <div className="grouped-list">
               {section === "worktrees" ? (
                 view.worktrees.map((w) => (
-                  <div
+                  <GitRow
                     key={w.path}
-                    className="min-w-0 space-y-1 border-b border-line-subtle px-3 py-3 last:border-0"
+                    name={w.branch || "分离 HEAD"}
+                    marker={w.primary ? "主工作树" : w.locked ? "已锁定" : ""}
+                    status={
+                      w.eligible
+                        ? "可清理"
+                        : w.missing
+                          ? "目录缺失"
+                          : !w.statusKnown
+                            ? "状态未知"
+                            : w.dirty
+                              ? "有本地文件"
+                              : "干净"
+                    }
+                    eligible={w.eligible}
                   >
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                      <span className="inline-flex min-w-0 items-center gap-2 font-medium">
-                        <Icon name="branch" size={16} />
-                        <span className="break-all">
-                          {w.branch || "分离 HEAD"}
-                        </span>
-                      </span>
-                      {w.primary && (
-                        <span className="text-xs text-muted">主工作树</span>
-                      )}
-                      {w.locked && (
-                        <span className="text-xs text-muted">已锁定</span>
-                      )}
-                      <span
-                        className={`ml-auto text-xs ${w.eligible ? "text-green-700" : "text-muted"}`}
-                      >
-                        {w.eligible
-                          ? "可清理"
-                          : w.missing
-                            ? "目录缺失"
-                            : !w.statusKnown
-                              ? "状态未知"
-                              : w.dirty
-                                ? "有本地文件"
-                                : "干净"}
-                      </span>
-                    </div>
-                    <p className="break-all text-xs text-muted">{w.path}</p>
-                    <p className="text-xs leading-5 text-muted">
+                    <p className="break-all">{w.path}</p>
+                    {w.locked && w.primary && <p>已锁定</p>}
+                    <p>
                       {w.eligible
                         ? "已合并且达到保留期"
                         : w.primary
                           ? "主工作树始终保留"
                           : w.missing
                             ? "目录缺失，保留登记供修复"
-                            : w.reasons.join("；")}
+                            : w.reasons
+                                .filter(
+                                  (reason) => !view.warnings.includes(reason),
+                                )
+                                .join("；")}
                     </p>
-                  </div>
+                  </GitRow>
                 ))
               ) : view.branches.length ? (
                 view.branches.map((b) => (
-                  <div
+                  <GitRow
                     key={b.name}
-                    className="min-w-0 space-y-1 border-b border-line-subtle px-3 py-3 last:border-0"
+                    name={b.name}
+                    status={
+                      b.eligible ? "可清理" : b.merged ? "已合并" : "未合并"
+                    }
+                    eligible={b.eligible}
                   >
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="break-all font-medium">{b.name}</span>
-                      <span className="ml-auto text-xs text-muted">
-                        {b.eligible ? "可清理" : b.merged ? "已合并" : "未合并"}
-                      </span>
-                    </div>
-                    <p className="break-all text-xs text-muted">
+                    <p className="break-all">
                       {b.commit.slice(0, 8)}
                       {b.upstream ? ` · 跟踪 ${b.upstream}` : " · 无上游"}
                       {b.updatedAt ? ` · ${date(b.updatedAt)}` : ""}
                     </p>
                     {b.worktrees.length > 0 && (
-                      <p className="break-all text-xs text-muted">
+                      <p className="break-all">
                         检出于 {b.worktrees.join("、")}
                       </p>
                     )}
-                    <p className="text-xs leading-5 text-muted">
-                      {b.eligible ? "已合并且达到保留期" : b.reasons.join("；")}
+                    <p>
+                      {b.eligible
+                        ? "已合并且达到保留期"
+                        : b.reasons
+                            .filter((reason) => !view.warnings.includes(reason))
+                            .join("；")}
                     </p>
-                  </div>
+                  </GitRow>
                 ))
               ) : (
                 <p className="p-3 text-sm text-muted">
@@ -533,5 +526,41 @@ function CleanupPreview({
         </Button>
       </div>
     </dialog>
+  );
+}
+
+function GitRow({
+  name,
+  status,
+  marker,
+  eligible,
+  children,
+}: {
+  name: string;
+  status: string;
+  marker?: string;
+  eligible: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="group border-b border-line-subtle last:border-0">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-editor [&::-webkit-details-marker]:hidden">
+        <span className="text-muted group-open:rotate-90">
+          <Icon name="chevron" size={16} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+          <span className="font-medium [overflow-wrap:anywhere]">{name}</span>
+          {marker && <span className="text-xs text-muted">{marker}</span>}
+        </span>
+        <span
+          className={`shrink-0 text-xs ${eligible ? "text-green-700" : "text-muted"}`}
+        >
+          {status}
+        </span>
+      </summary>
+      <div className="space-y-1 border-t border-line-subtle bg-editor px-3 py-2 text-xs leading-5 text-muted">
+        {children}
+      </div>
+    </details>
   );
 }

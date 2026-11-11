@@ -138,7 +138,6 @@ export default function SharedRules({
           <ProjectRules path={project.path} onUpdated={onUpdated} />
         )}
         <section aria-label="公共规范" className="space-y-3">
-          <h2 className="text-xl font-semibold">公共规范</h2>
           <p className="text-sm text-muted">
             接入公共规范源后，可预览并应用项目更新。
           </p>
@@ -236,7 +235,7 @@ export default function SharedRules({
         className={`space-y-4 ${project ? "" : "border-t border-line pt-5"}`}
       >
         <div className="section-heading">
-          <h2>{project ? "公共规范" : "项目规范更新"}</h2>
+          {!project && <h2>项目规范更新</h2>}
           <details className="mt-2 text-xs text-muted">
             <summary className="w-fit cursor-pointer">了解更新规则</summary>
             <p className="mt-2 leading-5">

@@ -99,9 +99,7 @@ function LocalPipelines({
     native ? null : preview.config,
   );
   const [runs, setRuns] = useState<PipelineRun[]>(native ? [] : preview.runs);
-  const [selected, setSelected] = useState(
-    native ? "" : preview.runs[0]?.id || "",
-  );
+  const [selected, setSelected] = useState("");
   const [output, setOutput] = useState<PipelineOutput | null>(null);
   const [error, setError] = useState("");
   const [logError, setLogError] = useState("");
@@ -119,7 +117,6 @@ function LocalPipelines({
         const next = await Service.pipelineRuns(path);
         if (!active) return;
         setRuns(next);
-        setSelected((value) => value || next[0]?.id || "");
         if (next.some((run) => run.status === "running"))
           timer = setTimeout(poll, 1000);
       } catch (error) {
@@ -273,8 +270,7 @@ function LocalPipelines({
                 </div>
                 <details className="mt-1 text-xs text-muted">
                   <summary className="w-fit cursor-pointer">
-                    {(pipeline.steps || []).length} 个步骤 · 超时{" "}
-                    {Math.ceil(pipeline.timeoutSeconds / 60)} 分钟 · 查看命令
+                    查看命令 · {(pipeline.steps || []).length} 个步骤
                   </summary>
                   <pre className="source-panel mt-2" tabIndex={0}>
                     {(pipeline.steps || [])
@@ -284,6 +280,7 @@ function LocalPipelines({
                       )
                       .join("\n")}
                     {`\n工作目录：${pipeline.cwd || "项目根目录"}`}
+                    {`\n超时：${Math.ceil(pipeline.timeoutSeconds / 60)} 分钟`}
                     {Object.keys(pipeline.env || {}).length
                       ? `\n环境变量：${Object.keys(pipeline.env).join("、")}`
                       : ""}
@@ -314,8 +311,7 @@ function LocalPipelines({
                 key={run.id}
                 aria-pressed={selected === run.id}
                 onClick={() => {
-                  if (selected === run.id) return;
-                  setSelected(run.id);
+                  setSelected(selected === run.id ? "" : run.id);
                   setOutput(null);
                   setLogError("");
                 }}
@@ -342,6 +338,11 @@ function LocalPipelines({
                   </span>
                 </span>
                 <Status status={run.status} />
+                <span
+                  className={`text-muted ${selected === run.id ? "rotate-90" : ""}`}
+                >
+                  <Icon name="chevron" size={16} />
+                </span>
               </button>
             ))}
           </div>
