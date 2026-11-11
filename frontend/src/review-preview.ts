@@ -8,11 +8,74 @@ export function reviewPreview(path: string): ProjectReview {
     checkedAt: "2026-11-10T05:30:00Z",
     configVersion: "preview",
     version: "preview",
-    profile: { kind: "", areas: [], requirements: [], stages: [] },
-    profileConfigured: false,
-    coverageOptions: [],
+    profileConfigured: true,
+    profile: {
+      kind: "web",
+      areas: ["frontend", "backend", "database"],
+      requirements: [
+        "frontend-static",
+        "frontend-behavior",
+        "backend-api",
+        "database-integration",
+        "database-migrations",
+        "database-consistency",
+        "database-recovery",
+      ],
+      stages: ["push", "ci", "deploy", "acceptance"],
+    },
+    coverageOptions: [
+      {
+        id: "frontend-static",
+        name: "前端类型与静态检查",
+        area: "frontend",
+        method: "static",
+      },
+      {
+        id: "frontend-behavior",
+        name: "浏览器与交互验收",
+        area: "frontend",
+        method: "behavior",
+      },
+      {
+        id: "backend-static",
+        name: "后端静态检查",
+        area: "backend",
+        method: "static",
+      },
+      {
+        id: "backend-api",
+        name: "真实 HTTP / API 集成",
+        area: "backend",
+        method: "integration",
+      },
+      {
+        id: "database-integration",
+        name: "真实数据库集成",
+        area: "database",
+        method: "integration",
+      },
+      {
+        id: "database-migrations",
+        name: "迁移状态与兼容性",
+        area: "database",
+        method: "migration",
+      },
+      {
+        id: "database-consistency",
+        name: "数据一致性与关键业务约束",
+        area: "database",
+        method: "consistency",
+      },
+      {
+        id: "database-recovery",
+        name: "备份与恢复演练",
+        area: "database",
+        method: "recovery",
+      },
+    ],
     coverage: [],
     acknowledged: [],
+    taskWarnings: [],
     snapshot: {
       head: git.stashes.head,
       branch: git.stashes.branch,
@@ -79,6 +142,9 @@ export function reviewPreview(path: string): ProjectReview {
         command: "npm run check",
         status: "success",
         scope: "前端 TypeScript 与 ESLint",
+        coverage: [{ area: "frontend", method: "static" }],
+        environment: "local",
+        target: "atlas-web",
         evidence: "本地检查日志，已通过",
         source: "external",
         createdAt: "2026-11-10T04:30:00Z",
@@ -223,6 +289,8 @@ export function reviewPreview(path: string): ProjectReview {
       },
     ];
     report.checks = [];
+    report.profile = { kind: "notes", areas: [], requirements: [], stages: [] };
+    report.resources = [];
     report.tasks = [];
     report.snapshot.head = "";
     report.snapshot.branch = "";
@@ -240,6 +308,32 @@ export function reviewPreview(path: string): ProjectReview {
         stage.detail = "Git 状态不可用";
       }
     }
+  }
+  report.coverage = report.coverageOptions
+    .filter((r) => report.profile.requirements.includes(r.id))
+    .map((requirement) => ({
+      requirement,
+      status: requirement.id === "frontend-static" ? "stale" : "pending",
+      reason:
+        requirement.id === "frontend-static"
+          ? "检查之后文件内容发生变化"
+          : "尚无对应范围和方法的检查记录",
+      checkId: "",
+      source: "",
+      evidence: "",
+      environment: "",
+      target: "",
+      recordedAt: "",
+    }));
+  if (git.git) {
+    report.issues = report.issues.filter((i) => i.section !== "checks");
+    report.issues.push(
+      ...report.coverage.map((item) => ({
+        kind: `coverage_${item.requirement.id}`,
+        section: "checks",
+        message: `${item.requirement.name}需要核验：${item.reason}`,
+      })),
+    );
   }
   return report;
 }

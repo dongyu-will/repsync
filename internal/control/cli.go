@@ -28,6 +28,9 @@ const help = `repsync — AI 项目控制（JSON 输出；open 启动桌面控�
   repsync review-check PATH VERSION FILE     从 JSON 文件记录外部检查
   repsync review-evidence PATH VERSION FILE  从 JSON 文件记录阶段或数据核验
   repsync review-resources PATH VERSION FILE 保存检查对象数组，VERSION 来自 configVersion
+  repsync review-profile PATH VERSION FILE   保存项目适用项，VERSION 来自 configVersion
+  repsync review-issue PATH VERSION FILE     记录保留、稍后处理或重新提醒
+  repsync review-task-context PATH VERSION FILE 记录任务及修改范围
   repsync review-task-start PATH VERSION TITLE
   repsync review-task-finish PATH TASK_ID VERSION FILE
   repsync review-handover PATH TASK_ID        读取已保存的 Markdown 交接
@@ -162,7 +165,7 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 			return usage("用法: repsync " + request.Action + " PATH")
 		}
 		request.Path = paths[0]
-	case "review-check", "review-evidence", "review-resources":
+	case "review-check", "review-evidence", "review-resources", "review-profile", "review-task-context", "review-issue":
 		if len(paths) != 3 {
 			return usage("用法: repsync " + request.Action + " PATH VERSION JSON_FILE")
 		}
@@ -174,6 +177,15 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		} else if request.Action == "review-evidence" {
 			request.ReviewEvidence = &workspace.ReviewEvidenceInput{}
 			input = request.ReviewEvidence
+		} else if request.Action == "review-profile" {
+			request.ReviewProfile = &workspace.ReviewProfile{}
+			input = request.ReviewProfile
+		} else if request.Action == "review-task-context" {
+			request.ReviewTask = &workspace.ReviewTaskContext{}
+			input = request.ReviewTask
+		} else if request.Action == "review-issue" {
+			request.ReviewIssue = &workspace.ReviewAcknowledgement{}
+			input = request.ReviewIssue
 		} else {
 			values := []workspace.ReviewResource{}
 			request.ReviewResources = &values

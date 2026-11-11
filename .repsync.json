@@ -23,7 +23,8 @@
           "test",
           "-tags=integration",
           "-race",
-          "./internal/workspace"
+          "./internal/workspace",
+          "./internal/control"
         ],
         [
           "npm",
@@ -32,7 +33,23 @@
           "run",
           "build"
         ]
-      ]
+      ],
+      "coverage": [
+        {
+          "area": "frontend",
+          "method": "static"
+        },
+        {
+          "area": "backend",
+          "method": "static"
+        },
+        {
+          "area": "backend",
+          "method": "integration"
+        }
+      ],
+      "reviewEnvironment": "local",
+      "reviewTarget": "repsync-test-fixtures"
     },
     {
       "id": "package",
@@ -97,5 +114,22 @@
       "target": "",
       "guide": "核对系统用户配置目录 repsync 中的项目登记、规范备份、清理恢复引用及 review 交接记录是否有独立保留方式；本检查不自动复制或删除这些数据。"
     }
-  ]
+  ],
+  "reviewProfile": {
+    "kind": "desktop",
+    "areas": [
+      "frontend",
+      "backend"
+    ],
+    "requirements": [
+      "frontend-static",
+      "frontend-behavior",
+      "backend-static",
+      "backend-api"
+    ],
+    "stages": [
+      "push",
+      "ci"
+    ]
+  }
 }

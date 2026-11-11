@@ -98,7 +98,7 @@ func (s *Service) StartPipeline(path, pipelineID, version string) (PipelineRun, 
 		return PipelineRun{}, errors.New("最多同时运行 4 个项目的流水线")
 	}
 	pipeline := config.Pipelines[index]
-	run := PipelineRun{ID: fmt.Sprintf("%019d-%s", time.Now().UnixMilli(), rand.Text()), PipelineID: pipeline.ID, Name: pipeline.Name, Kind: pipeline.Kind, Status: "running", StartedAt: time.Now().UTC().Format(time.RFC3339), Commit: strings.TrimSpace(commit), Worktree: worktree, ExitCode: -1}
+	run := PipelineRun{ID: fmt.Sprintf("%019d-%s", time.Now().UnixMilli(), rand.Text()), PipelineID: pipeline.ID, Name: pipeline.Name, Kind: pipeline.Kind, Status: "running", StartedAt: time.Now().UTC().Format(time.RFC3339Nano), Commit: strings.TrimSpace(commit), Worktree: worktree, ExitCode: -1}
 	run.Fingerprint, run.ConfigVersion = fingerprint, config.Version
 	run.Coverage, run.ReviewEnvironment, run.ReviewTarget = pipeline.Coverage, pipeline.ReviewEnvironment, pipeline.ReviewTarget
 	if fingerprintErr != nil {

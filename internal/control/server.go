@@ -19,23 +19,26 @@ import (
 )
 
 type Request struct {
-	ResourceID      string                         `json:"resourceId,omitempty"`
-	Target          string                         `json:"target,omitempty"`
-	Action          string                         `json:"action"`
-	Paths           []string                       `json:"paths,omitempty"`
-	Path            string                         `json:"path,omitempty"`
-	Destination     string                         `json:"destination,omitempty"`
-	ServiceID       string                         `json:"serviceId,omitempty"`
-	Version         string                         `json:"version,omitempty"`
-	ObjectID        string                         `json:"objectId,omitempty"`
-	RunID           string                         `json:"runId,omitempty"`
-	Runs            []workspace.ServiceRunRef      `json:"runs,omitempty"`
-	DryRun          bool                           `json:"dryRun,omitempty"`
-	Title           string                         `json:"title,omitempty"`
-	ReviewCheck     *workspace.ReviewCheckInput    `json:"reviewCheck,omitempty"`
-	ReviewEvidence  *workspace.ReviewEvidenceInput `json:"reviewEvidence,omitempty"`
-	ReviewFinish    *workspace.ReviewFinishInput   `json:"reviewFinish,omitempty"`
-	ReviewResources *[]workspace.ReviewResource    `json:"reviewResources,omitempty"`
+	ResourceID      string                           `json:"resourceId,omitempty"`
+	Target          string                           `json:"target,omitempty"`
+	Action          string                           `json:"action"`
+	Paths           []string                         `json:"paths,omitempty"`
+	Path            string                           `json:"path,omitempty"`
+	Destination     string                           `json:"destination,omitempty"`
+	ServiceID       string                           `json:"serviceId,omitempty"`
+	Version         string                           `json:"version,omitempty"`
+	ObjectID        string                           `json:"objectId,omitempty"`
+	RunID           string                           `json:"runId,omitempty"`
+	Runs            []workspace.ServiceRunRef        `json:"runs,omitempty"`
+	DryRun          bool                             `json:"dryRun,omitempty"`
+	Title           string                           `json:"title,omitempty"`
+	ReviewCheck     *workspace.ReviewCheckInput      `json:"reviewCheck,omitempty"`
+	ReviewEvidence  *workspace.ReviewEvidenceInput   `json:"reviewEvidence,omitempty"`
+	ReviewFinish    *workspace.ReviewFinishInput     `json:"reviewFinish,omitempty"`
+	ReviewResources *[]workspace.ReviewResource      `json:"reviewResources,omitempty"`
+	ReviewProfile   *workspace.ReviewProfile         `json:"reviewProfile,omitempty"`
+	ReviewTask      *workspace.ReviewTaskContext     `json:"reviewTask,omitempty"`
+	ReviewIssue     *workspace.ReviewAcknowledgement `json:"reviewIssue,omitempty"`
 }
 
 type Response struct {
@@ -188,6 +191,22 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 		return nil, service.SaveReviewResources(request.Path, request.Version, *request.ReviewResources)
 	case "review-task-start":
 		return service.StartReviewTask(request.Path, request.Version, request.Title)
+	case "review-profile":
+		if request.ReviewProfile == nil {
+			return nil, errors.New("缺少项目适用项")
+		}
+		return nil, service.SaveReviewProfile(request.Path, request.Version, *request.ReviewProfile)
+	case "review-task-context":
+		if request.ReviewTask == nil {
+			return nil, errors.New("缺少任务范围")
+		}
+		return service.StartReviewTaskWithContext(request.Path, request.Version, *request.ReviewTask)
+	case "review-issue":
+		if request.ReviewIssue == nil {
+			return nil, errors.New("缺少提醒处理状态")
+		}
+		i := request.ReviewIssue
+		return service.SetReviewIssueState(request.Path, request.Version, i.Key, i.State, i.Reason)
 	case "review-task-finish":
 		if request.ReviewFinish == nil {
 			return nil, errors.New("缺少交接内容")

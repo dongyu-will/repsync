@@ -35,7 +35,7 @@ go tool mygo dev
 go tool mygo generate
 npm --prefix frontend run check
 go vet ./...
-go test -tags=integration -race ./internal/workspace
+go test -tags=integration -race ./internal/workspace ./internal/control
 npm --prefix frontend run build
 go tool mygo build
 ```
@@ -106,7 +106,7 @@ VERSION 取自本次 `git-stash-show` 回执。AI 在提交推送前后可通过
 
 ## 手动收尾检查与交接
 
-项目概览的「待处理」提供「检查当前状态」，按改动、检查、交付、数据与环境、交接查看。此入口只读取本地状态，不 fetch、不运行测试、不提交、推送、部署或清理，也不创建定时任务。
+项目概览的「待处理」提供「检查当前状态」，按改动、检查、交付、数据与环境、交接及适用项查看。此入口只读取本地状态，不 fetch、不运行测试、不提交、推送、部署或清理，也不创建定时任务。
 
 - **改动**：列出已暂存、未暂存、未跟踪和冲突文件、stash，以及相对本地上游引用的领先/落后提交数。显示 FETCH_HEAD 的最近时间；缺少上游或信息读取失败时显示未知，不用本地引用证明远程当前状态。界面列前 100 个改动，CLI 返回完整的已读取列表。
 - **检查**：本地 CI 流水线记录开始/结束文件内容摘要、命令配置版本、提交和结果。外部 AI/终端检查可手动填报命令、覆盖范围、结果和日志位置，明确标记未由应用执行。通过与内容一致性分别显示；文件或命令变化、运行期间文件变化、旧记录缺少内容依据时，提示变化或未知。提交相同文件内容不单独导致内容比较过期；依赖 Git 元数据的检查仍需另行判断。不自动要求或执行全量检查。
@@ -116,7 +116,57 @@ VERSION 取自本次 `git-stash-show` 回执。AI 在提交推送前后可通过
 
 文件内容比较覆盖 Git 工作树已跟踪及未忽略的未跟踪文件，不读取忽略的依赖、外部环境或其他服务数据。单次限制 5000 个文件、40 MiB 内容、约 10 秒文件读取；符号链接只比较链接目标，不读取项目外目标；子模块、权限失败或读取中内容变化报告未知。此比较不冻结文件系统，不能证明检查运行期间从未发生过并发改动。
 
-检查、核验、任务和交接记录保存在系统用户配置目录 `repsync/review/<登记路径哈希>/`，不写入目标源码。界面读取最近 20 条各类记录，记录不会自动删除。旧路径的记录保留，不自动转移到重新登记的新目录。
+检查、核验、任务和交接记录保存在系统用户配置目录 `repsync/review/<登记路径哈希>/`，不写入目标源码。界面显示最近 20 条检查及已完成任务，进行中任务全部保留；检查、核验、任务和提醒处理记录每类最多读取 1000 条用于判断，超过上限明确报错。记录不会自动删除。旧路径的记录保留，不自动转移到重新登记的新目录。
+
+### 前端、后端与数据库分别核验
+
+`.repsync.json` 的 `reviewProfile` 声明项目类型、适用范围、必需检查和交付阶段。优先由 AI 按项目指南配置；概览「待处理 → 适用项」提供兜底表单。未配置时提示缺少声明，不推定所有项目都需要部署或数据库。保存复用配置版本保护，只更新此字段、保留其他配置与文件权限，不执行任何检查。
+
+```json
+{
+  "reviewProfile": {
+    "kind": "web",
+    "areas": ["frontend", "backend", "database"],
+    "requirements": ["frontend-static", "frontend-behavior", "backend-static", "backend-api", "database-integration", "database-migrations", "database-consistency", "database-recovery"],
+    "stages": ["push", "ci", "deploy", "acceptance"]
+  }
+}
+```
+
+kind 支持 web/backend/desktop/library/notes/custom；areas 只声明实际存在的前端、后端和数据库，requirements 必须属于已声明范围。库、笔记或仅本地工具可省略不适用的交付阶段；空 stages 不要求远程交付。各必需检查分别显示状态，不用最近一条成功记录代表全部检查通过。
+
+| requirement | coverage 的 area / method | 需要记录的实际范围 |
+| --- | --- | --- |
+| frontend-static | frontend / static | 类型、lint 等静态检查 |
+| frontend-behavior | frontend / behavior | 浏览器、键盘和交互验收 |
+| backend-static | backend / static | 后端静态检查 |
+| backend-api | backend / integration | 真实 HTTP / API 的认证、权限、错误及受影响行为 |
+| database-integration | database / integration | 真实数据库中的读写、事务及回滚 |
+| database-migrations | database / migration | 当前迁移状态、新旧代码兼容及既有回滚方案 |
+| database-consistency | database / consistency | 关键约束、关联及受影响业务数据 |
+| database-recovery | database / recovery | 备份对象、恢复演练及恢复结果 |
+
+外部检查填报增加 `coverage`、`environment`、`target`；数据库类别必须填环境和目标别名，禁止在这两个字段放连接串或密码。数据库脚本可填 `database / static`，但不抵扣任何真实数据库检查。仅填旧版 scope 文本不能推断类别。每条记录展示来源、声明范围、环境、目标及结果依据；外部成功标为「已记录核验」，由应用执行的命令标为「命令通过」。应用不解析测试内部逻辑，仍须确认声明类别是否确实执行。
+
+```json
+{
+  "command": "项目指南规定的集成测试入口",
+  "scope": "真实测试数据库中的事务回滚；未覆盖生产库",
+  "status": "success",
+  "evidence": "已有日志位置、运行时间及结果",
+  "coverage": [{ "area": "database", "method": "integration" }],
+  "environment": "local",
+  "target": "test-db"
+}
+```
+
+显式 CI 流水线也可声明相同 `coverage`，环境和目标字段使用 `reviewEnvironment` / `reviewTarget`；运行回执保存当次配置。自动发现的命令不推断覆盖类别。后续同类失败覆盖旧成功，文件内容或命令配置变化显示过期；未读到对应记录时显示待核验。内容比较不观察外部数据库或环境变化，历史核验不能证明外部状态仍一致；本地目标记录不能作为生产库的核验依据。
+
+### 提醒处理与并行任务
+
+每项提醒可手动标为「已核对，保留」或「稍后处理」，必须记录理由，也可重新提醒。原事实和检查结果仍在：保留 stash 不删除 stash，也不解除工作树清理保护。相关内容变化后再次提示；stash 按对象 ID 识别，其他文件变化不会反复唤起同一条保留提醒。不按时间自动唤起或处理。
+
+任务可额外声明负责人/AI 会话别名、涉及范围、项目内路径以及环境和目标。已登记项目中同时进行的任务若声明相同数据库环境与目标，或修改路径重叠，展示协调提示；缺少路径时明确无法排除重叠。此提示仅依据手工声明，不是进程监控、归因或数据库锁。任务完成后保留声明、实际检查类别及保留理由到 Markdown 交接。
 
 ### 声明数据与环境对象
 
@@ -139,6 +189,9 @@ VERSION 取自本次 `git-stash-show` 回执。AI 在提交推送前后可通过
 
 ```sh
 repsync review /path/project
+repsync review-profile /path/project CONFIG_VERSION /absolute/profile.json
+repsync review-issue /path/project REVIEW_VERSION /absolute/issue.json
+repsync review-task-context /path/project REVIEW_VERSION /absolute/task.json
 repsync review-task-start /path/project REVIEW_VERSION "任务名称"
 repsync review-check /path/project REVIEW_VERSION /absolute/check.json
 repsync review-evidence /path/project REVIEW_VERSION /absolute/evidence.json
@@ -151,6 +204,9 @@ REVIEW_VERSION 来自刚读取的 review；CONFIG_VERSION 使用其中 configVer
 
 - check：`{"command":"npm run check","status":"success","scope":"frontend","evidence":"日志位置及结果说明"}`；status 支持 success/failure。
 - evidence：`{"stage":"deploy","target":"","status":"success","note":"核验提交、环境和结果链接"}`；stage 支持 push/ci/deploy/acceptance/resource；resource 的 target 为检查对象 id；status 还支持 not_applicable。
+- profile：与 reviewProfile 相同的对象；CONFIG_VERSION 使用 configVersion。
+- issue：`{"key":"review 中对应提醒的 key","state":"retained","reason":"保留理由"}`；state 支持 retained/later/reopened，重新提醒可以不填理由。
+- task：`{"title":"任务名称","owner":"AI 会话别名","areas":["backend","database"],"paths":["internal/api","migrations"],"environment":"staging","target":"test-db"}`；数据库范围必须声明环境与目标。旧版 review-task-start 仍支持仅记录名称。
 - resources：与 reviewResources 相同的数组，空数组表示移除全部声明。
 - handover：`{"summary":"完成内容","checks":"检查说明","blockers":"遗留问题与下一步"}`。
 
@@ -439,6 +495,7 @@ repsync ai-usage [PATH]
 ```
 
 专项验收：`go test -tags=integration -race ./internal/workspace ./internal/control -run 'TestAIResources|TestAIUsage|TestDoctor|TestControlAI'`，使用临时资源、项目与 JSONL，验证来源区分、符号链接去重、项目筛选、读取失败、探测/拒绝/取消、记录去重、隐私投影和大小限制。
+
 
 ## 共享文件资源
 

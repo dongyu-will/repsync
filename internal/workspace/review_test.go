@@ -46,7 +46,7 @@ func TestProjectReviewGitFactsChecksAndDelivery(t *testing.T) {
 		t.Fatalf("facts: %+v", r.Snapshot)
 	}
 	for _, stage := range r.Delivery {
-		if stage.Stage == "deploy" && stage.Status != "pending" {
+		if stage.Stage == "deploy" && stage.Status != "pending" && stage.Status != "unknown" {
 			t.Fatal("invented deployment")
 		}
 	}

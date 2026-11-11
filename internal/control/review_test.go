@@ -55,6 +55,41 @@ func TestControlManualReviewAndHandover(t *testing.T) {
 		return report
 	}
 	report := getReview()
+	profileFile := filepath.Join(root, "profile.json")
+	if err := os.WriteFile(profileFile, []byte(`{"kind":"backend","areas":["backend","database"],"requirements":["backend-api","database-integration","database-migrations","database-recovery"],"stages":["push","deploy"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if response, code := cli(t, socket, "review-profile", p.Path, report.ConfigVersion, profileFile); code != 0 || !response.OK {
+		t.Fatalf("profile CLI: %+v", response)
+	}
+	report = getReview()
+	if !report.ProfileConfigured || len(report.Coverage) != 4 {
+		t.Fatal("CLI profile missing")
+	}
+	issueFile := filepath.Join(root, "issue.json")
+	issue := report.Issues[0]
+	data, _ := json.Marshal(map[string]string{"key": issue.Key, "state": "retained", "reason": "intentional pending item"})
+	if err := os.WriteFile(issueFile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if response, code := cli(t, socket, "review-issue", p.Path, report.Version, issueFile); code != 0 || !response.OK {
+		t.Fatalf("issue CLI: %+v", response)
+	}
+	report = getReview()
+	if len(report.Acknowledged) != 1 {
+		t.Fatal("CLI acknowledgement missing")
+	}
+	contextFile := filepath.Join(root, "context.json")
+	if err := os.WriteFile(contextFile, []byte(`{"title":"Database review","owner":"CLI session","areas":["database"],"paths":["migrations"],"environment":"local","target":"fixture-db"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if response, code := cli(t, socket, "review-task-context", p.Path, report.Version, contextFile); code != 0 || !response.OK {
+		t.Fatalf("context CLI: %+v", response)
+	}
+	report = getReview()
+	if len(report.Tasks) != 1 || report.Tasks[0].Owner != "CLI session" || report.Tasks[0].Target != "fixture-db" {
+		t.Fatal("CLI task context missing")
+	}
 	response, code := cli(t, socket, "review-task-start", p.Path, report.Version, "CLI task")
 	var task workspace.ReviewTask
 	if err := json.Unmarshal(response.Data, &task); err != nil || code != 0 {

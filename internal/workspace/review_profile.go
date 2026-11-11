@@ -106,7 +106,7 @@ func (s *Service) SaveReviewProfile(path, version string, profile ReviewProfile)
 }
 
 func validateReviewCoverage(coverage []ReviewCoverage, environment, target string) error {
-	if len(coverage) > 8 || len(environment) > 200 || len(target) > 200 {
+	if len(coverage) > len(reviewRequirements)+1 || len(environment) > 200 || len(target) > 200 {
 		return errors.New("检查范围或环境说明超出限制")
 	}
 	seen := map[string]bool{}

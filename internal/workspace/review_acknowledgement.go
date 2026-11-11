@@ -35,6 +35,29 @@ func reviewIssueKey(report ProjectReview, issue ReviewIssue) string {
 		}{report.Snapshot.Head, report.Snapshot.Branch, report.Snapshot.Upstream, report.Snapshot.Ahead, report.Snapshot.Behind, report.Snapshot.UpstreamKnown}
 	case strings.HasPrefix(issue.Kind, "task_"):
 		context = issue.Message
+	case strings.HasPrefix(issue.Kind, "coverage_") && !strings.HasPrefix(issue.Kind, "coverage_unspecified_"):
+		id := strings.TrimPrefix(issue.Kind, "coverage_")
+		index := slices.IndexFunc(report.Coverage, func(c ReviewCoverageState) bool { return c.Requirement.ID == id })
+		if index >= 0 {
+			context = struct {
+				Content string
+				State   ReviewCoverageState
+			}{report.Snapshot.Fingerprint, report.Coverage[index]}
+		}
+	case strings.HasPrefix(issue.Kind, "resource_"):
+		id := strings.TrimPrefix(issue.Kind, "resource_")
+		index := slices.IndexFunc(report.Resources, func(r ReviewResourceResult) bool { return r.State.Definition.ID == id })
+		if index >= 0 {
+			context = struct {
+				Content string
+				State   ReviewResourceResult
+			}{report.Snapshot.Fingerprint, report.Resources[index]}
+		}
+	case strings.HasPrefix(issue.Kind, "delivery_"):
+		index := slices.IndexFunc(report.Delivery, func(s ReviewStage) bool { return s.Stage == strings.TrimPrefix(issue.Kind, "delivery_") })
+		if index >= 0 {
+			context = report.Delivery[index]
+		}
 	default:
 		context = struct {
 			Message, Content, Config string

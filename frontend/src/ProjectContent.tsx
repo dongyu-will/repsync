@@ -76,31 +76,17 @@ export default function ProjectContent({
             onGit={onOpenStashes}
             onCI={onOpenCI}
             stashCount={details.stashKnown ? details.stashCount : 0}
+            workspaceStatus={
+              !details.git
+                ? "Git 状态不可用"
+                : !details.statusKnown
+                  ? "工作区状态读取失败"
+                  : details.status
+                    ? "有未提交改动"
+                    : "工作区干净"
+            }
           />
-          <dl className="grouped-list">
-            {[
-              [
-                "工作区",
-                !details.git
-                  ? "不可用"
-                  : !details.statusKnown
-                    ? "状态读取失败"
-                    : details.status
-                      ? "有未提交改动"
-                      : "工作区干净",
-              ],
-              ["项目文档", `${details.documents.length} 个 Markdown 文件`],
-            ].map(([label, value]) => (
-              <div key={label} className="info-row">
-                <dt className="text-muted">{label}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <section
-            aria-label="本地服务"
-            className="mt-5 border-t border-line pt-5"
-          >
+          <section aria-label="本地服务">
             <ProjectCommands
               key={details.project.path}
               path={details.project.path}

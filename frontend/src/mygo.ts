@@ -391,6 +391,7 @@ export interface ProjectPolicies {
 }
 
 export interface ProjectReview {
+  taskWarnings: string[];
   project: Project;
   checkedAt: string;
   snapshot: ReviewSnapshot;
@@ -580,6 +581,12 @@ export interface ReviewStage {
 }
 
 export interface ReviewTask {
+  owner?: string;
+  areas?: string[];
+  paths?: string[];
+  environment?: string;
+  target?: string;
+  worktree?: string;
   id: string;
   title: string;
   startedAt: string;
@@ -592,6 +599,15 @@ export interface ReviewTask {
   newStashes: GitStash[];
   newUntracked: string[];
   handover: string;
+}
+
+export interface ReviewTaskContext {
+  title: string;
+  owner: string;
+  areas: string[];
+  paths: string[];
+  environment: string;
+  target: string;
 }
 
 export interface ReviewTaskPoint {
@@ -933,6 +949,9 @@ export const Service = {
   },
   startReviewTask(path: string, version: string, title: string): Promise<ReviewTask> {
     return call("Service.StartReviewTask", path, version, title);
+  },
+  startReviewTaskWithContext(path: string, version: string, input: ReviewTaskContext): Promise<ReviewTask> {
+    return call("Service.StartReviewTaskWithContext", path, version, input);
   },
   /** StopLocalService never accepts a PID and cannot terminate an external process. */
   stopLocalService(path: string, id: string, runID: string): Promise<void> {

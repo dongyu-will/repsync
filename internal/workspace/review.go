@@ -86,6 +86,12 @@ type ReviewTaskPoint struct {
 	Known       bool     `json:"known"`
 }
 type ReviewTask struct {
+	Owner        string          `json:"owner,omitempty"`
+	Areas        []string        `json:"areas,omitempty"`
+	Paths        []string        `json:"paths,omitempty"`
+	Environment  string          `json:"environment,omitempty"`
+	Target       string          `json:"target,omitempty"`
+	Worktree     string          `json:"worktree,omitempty"`
 	ID           string          `json:"id"`
 	Title        string          `json:"title"`
 	StartedAt    string          `json:"startedAt"`
@@ -105,6 +111,7 @@ type ReviewFinishInput struct {
 	Blockers string `json:"blockers"`
 }
 type ProjectReview struct {
+	TaskWarnings      []string               `json:"taskWarnings"`
 	Project           Project                `json:"project"`
 	CheckedAt         string                 `json:"checkedAt"`
 	Snapshot          ReviewSnapshot         `json:"snapshot"`
@@ -210,6 +217,9 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		report.Project.ID = gitDigest(path)
 	}
 	profile, configured, profileErr := s.reviewProfile(path)
+	if profileErr != nil {
+		profile, configured = ReviewProfile{Kind: "unconfigured"}, false
+	}
 	report.Profile, report.ProfileConfigured, report.CoverageOptions = profile, configured, slices.Clone(reviewRequirements)
 	report.Snapshot = reviewSnapshot(path)
 	issue := func(kind, section, message string) {
@@ -284,10 +294,17 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 			report.Checks = append(report.Checks, check)
 		}
 	}
-	slices.SortFunc(report.Checks, func(a, b ReviewCheck) int { return strings.Compare(b.CreatedAt, a.CreatedAt) })
-	if len(report.Checks) == 0 && (!configured || len(profile.Requirements) == 0) {
+	slices.SortFunc(report.Checks, func(a, b ReviewCheck) int {
+		at, _ := time.Parse(time.RFC3339Nano, a.CreatedAt)
+		bt, _ := time.Parse(time.RFC3339Nano, b.CreatedAt)
+		if order := bt.Compare(at); order != 0 {
+			return order
+		}
+		return strings.Compare(b.ID, a.ID)
+	})
+	if len(report.Checks) == 0 && !configured {
 		issue("no_checks", "checks", "没有可核对的检查记录")
-	} else if len(report.Checks) > 0 && (report.Checks[0].Status != "success" || report.Checks[0].Current != "current") && (!configured || len(profile.Requirements) == 0) {
+	} else if len(report.Checks) > 0 && (report.Checks[0].Status != "success" || report.Checks[0].Current != "current") && !configured {
 		issue("check_attention", "checks", "最近检查未通过、内容已变化或结果无法核对")
 	}
 	report.Coverage = reviewCoverageStates(profile, report.Checks)
@@ -304,7 +321,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 			issue("coverage_unspecified_"+area, "settings", "已启用 "+area+"，但尚未声明必需检查项")
 		}
 	}
-	evidence, err := readReviewRecords[ReviewEvidence](filepath.Join(s.reviewDirectory(path), "evidence"))
+	evidence, err := readReviewRecordsLimit[ReviewEvidence](filepath.Join(s.reviewDirectory(path), "evidence"), 1000)
 	if err != nil {
 		return report, err
 	}
@@ -314,7 +331,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		if !slices.Contains([]string{"working", "commit"}, stage.Stage) {
 			if configured && !slices.Contains(profile.Stages, stage.Stage) {
 				stage.Status, stage.Detail = "not_applicable", "按项目适用项设置，不要求此阶段"
-			} else if !configured {
+			} else if !configured && stage.RecordedAt == "" {
 				stage.Status, stage.Detail = "unknown", "尚未声明此阶段是否适用"
 			}
 		}
@@ -329,7 +346,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 	if err != nil {
 		issue("resources_unknown", "resources", err.Error())
 	} else {
-		if len(resources) == 0 {
+		if len(resources) == 0 && slices.Contains(profile.Areas, "database") {
 			issue("resources_missing", "resources", "尚未声明本地数据、备份和环境检查对象")
 		}
 		for _, state := range resources {
@@ -361,7 +378,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 			issue("environment_"+d.Kind, "resources", d.Message)
 		}
 	}
-	report.Tasks, err = readReviewRecords[ReviewTask](filepath.Join(s.reviewDirectory(path), "tasks"))
+	report.Tasks, err = s.reviewTaskHistory(path)
 	if err != nil {
 		return report, err
 	}
@@ -369,6 +386,10 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		if task.EndedAt == "" {
 			issue("task_"+task.ID, "handover", "任务尚未交接："+task.Title)
 		}
+	}
+	report.TaskWarnings = s.reviewTaskWarnings(path, report.Tasks)
+	for index, warning := range report.TaskWarnings {
+		issue(fmt.Sprintf("task_warning_%d", index), "handover", warning)
 	}
 	acknowledgements, ackErr := s.reviewAcknowledgements(&report)
 	if ackErr != nil {
@@ -383,7 +404,8 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		Tasks            []ReviewTask
 		Coverage         []ReviewCoverageState
 		Acknowledgements []ReviewAcknowledgement
-	}{x, version, report.Checks, evidence, resources, report.Tasks, report.Coverage, acknowledgements})
+		TaskWarnings     []string
+	}{x, version, report.Checks, evidence, resources, report.Tasks, report.Coverage, acknowledgements, report.TaskWarnings})
 	return report, nil
 }
 
@@ -464,7 +486,7 @@ func (s *Service) RecordReviewCheck(path, version string, input ReviewCheckInput
 	if err != nil {
 		return check, err
 	}
-	check = ReviewCheck{ID: reviewRecordID(), Command: input.Command, Status: input.Status, Scope: input.Scope, Evidence: input.Evidence, Source: "external", CreatedAt: time.Now().UTC().Format(time.RFC3339), Commit: report.Snapshot.Head, Fingerprint: report.Snapshot.Fingerprint}
+	check = ReviewCheck{ID: reviewRecordID(), Command: input.Command, Status: input.Status, Scope: input.Scope, Evidence: input.Evidence, Source: "external", CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), Commit: report.Snapshot.Head, Fingerprint: report.Snapshot.Fingerprint}
 	check.Coverage, check.Environment, check.Target = input.Coverage, input.Environment, input.Target
 	err = saveReviewRecord(filepath.Join(s.reviewDirectory(path), "checks", check.ID+".json"), check)
 	return check, err
@@ -511,17 +533,21 @@ func reviewTaskPoint(x ReviewSnapshot) ReviewTaskPoint {
 }
 
 func (s *Service) StartReviewTask(path, version, title string) (ReviewTask, error) {
+	return s.StartReviewTaskWithContext(path, version, ReviewTaskContext{Title: title})
+}
+
+func (s *Service) StartReviewTaskWithContext(path, version string, input ReviewTaskContext) (ReviewTask, error) {
 	s.reviewMu.Lock()
 	defer s.reviewMu.Unlock()
 	task := ReviewTask{}
-	if strings.TrimSpace(title) == "" || len(title) > 500 {
-		return task, errors.New("请填写任务名称，最多 500 字节")
+	if err := validateReviewTaskContext(input); err != nil {
+		return task, err
 	}
 	report, err := s.checkedReview(path, version)
 	if err != nil {
 		return task, err
 	}
-	task = ReviewTask{ID: reviewRecordID(), Title: title, StartedAt: time.Now().UTC().Format(time.RFC3339), Start: reviewTaskPoint(report.Snapshot), NewStashes: []GitStash{}, NewUntracked: []string{}}
+	task = ReviewTask{ID: reviewRecordID(), Title: input.Title, StartedAt: time.Now().UTC().Format(time.RFC3339Nano), Start: reviewTaskPoint(report.Snapshot), NewStashes: []GitStash{}, NewUntracked: []string{}, Owner: input.Owner, Areas: input.Areas, Paths: input.Paths, Environment: input.Environment, Target: input.Target, Worktree: path}
 	err = saveReviewRecord(filepath.Join(s.reviewDirectory(path), "tasks", task.ID+".json"), task)
 	return task, err
 }
@@ -571,6 +597,7 @@ func (s *Service) FinishReviewTask(path, id, version string, input ReviewFinishI
 func reviewHandover(report ProjectReview, task ReviewTask) string {
 	var text strings.Builder
 	fmt.Fprintf(&text, "# %s\n\n项目：%s\n工作树：%s\n任务：%s\n开始：%s\n交接：%s\n\n## 完成内容\n\n%s\n\n## Git 状态\n\n分支：%s\n起始提交：%s\n当前提交：%s\n已暂存 %d / 未暂存 %d / 未跟踪 %d / stash %d\n", task.Title, report.Project.Name, report.Project.Path, task.ID, task.StartedAt, task.EndedAt, task.Summary, task.End.Branch, task.Start.Head, task.End.Head, task.End.Staged, task.End.Unstaged, len(task.End.Untracked), len(task.End.Stashes))
+	fmt.Fprintf(&text, "\n任务填报人/会话：%s\n声明范围：%s\n路径：%s\n环境与目标：%s / %s\n", task.Owner, strings.Join(task.Areas, ", "), strings.Join(task.Paths, ", "), task.Environment, task.Target)
 	if !task.Start.Known || !task.End.Known {
 		text.WriteString("\n开始或结束状态不完整，无法可靠区分期间新增内容。\n")
 	} else {
@@ -583,7 +610,15 @@ func reviewHandover(report ProjectReview, task ReviewTask) string {
 			fmt.Fprintf(&text, "- %s\n", name)
 		}
 	}
-	fmt.Fprintf(&text, "\n## 检查说明（填报）\n\n%s\n\n## 交付状态\n\n", task.Checks)
+	fmt.Fprintf(&text, "\n## 检查说明（填报）\n\n%s\n\n", task.Checks)
+	for _, item := range report.Coverage {
+		fmt.Fprintf(&text, "- %s [%s]：%s；环境 %s / 目标 %s；%s\n", item.Requirement.Name, item.Status, item.Reason, item.Environment, item.Target, item.Evidence)
+	}
+	text.WriteString("\n## 已核对保留与稍后处理\n\n")
+	for _, item := range report.Acknowledged {
+		fmt.Fprintf(&text, "- %s [%s]：%s\n", item.Message, item.Acknowledgement.State, item.Acknowledgement.Reason)
+	}
+	text.WriteString("\n## 交付状态\n\n")
 	for _, stage := range report.Delivery {
 		fmt.Fprintf(&text, "- %s [%s]：%s\n", stage.Name, stage.Status, stage.Detail)
 	}
