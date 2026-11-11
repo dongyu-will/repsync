@@ -108,6 +108,37 @@ export interface CloneState {
   project: Project;
 }
 
+export interface CodexResourceChange {
+  kind: string;
+  name: string;
+  action: string;
+  source: string;
+  url: string;
+  tokenEnv: string;
+  command: string;
+  args: string[];
+}
+
+export interface CodexResourcePlacement {
+  kind: string;
+  name: string;
+  target: string;
+  source: string;
+  state: string;
+}
+
+export interface CodexResourcePlacements {
+  items: CodexResourcePlacement[];
+  issue: string;
+}
+
+export interface CodexResourcePreview {
+  version: string;
+  target: string;
+  before: string;
+  after: string;
+}
+
 export interface DiagnosisIssue {
   level: string;
   kind: string;
@@ -726,6 +757,10 @@ export const Service = {
   add(path: string): Promise<Project> {
     return call("Service.Add", path);
   },
+  /** ApplyCodexResource rechecks the preview before writing only its target. */
+  applyCodexResource(path: string, change: CodexResourceChange, version: string): Promise<void> {
+    return call("Service.ApplyCodexResource", path, change, version);
+  },
   /** ApplyGitStash restores to a clean registered worktree and always retains the stash. */
   applyGitStash(path: string, oid: string, version: string): Promise<GitStashApplyResult> {
     return call("Service.ApplyGitStash", path, oid, version);
@@ -810,6 +845,10 @@ export const Service = {
   policyDefaults(): Promise<PolicyDefaults> {
     return call("Service.PolicyDefaults");
   },
+  /** PreviewCodexResource plans one placement or removal without writing the project. */
+  previewCodexResource(path: string, change: CodexResourceChange): Promise<CodexResourcePreview> {
+    return call("Service.PreviewCodexResource", path, change);
+  },
   previewPolicyGuidance(path: string): Promise<UpdatePreview> {
     return call("Service.PreviewPolicyGuidance", path);
   },
@@ -819,6 +858,10 @@ export const Service = {
   /** PreviewUpdate creates a short-lived server-owned plan, without changing a project. */
   previewUpdate(path: string): Promise<UpdatePreview> {
     return call("Service.PreviewUpdate", path);
+  },
+  /** ProjectCodexResources lists placements owned by RepSync and their current state. */
+  projectCodexResources(path: string): Promise<CodexResourcePlacements> {
+    return call("Service.ProjectCodexResources", path);
   },
   /** ProjectConfiguration reads effective commands without executing them. */
   projectConfiguration(path: string): Promise<ProjectConfig> {

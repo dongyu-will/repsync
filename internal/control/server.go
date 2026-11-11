@@ -39,6 +39,7 @@ type Request struct {
 	ReviewProfile   *workspace.ReviewProfile         `json:"reviewProfile,omitempty"`
 	ReviewTask      *workspace.ReviewTaskContext     `json:"reviewTask,omitempty"`
 	ReviewIssue     *workspace.ReviewAcknowledgement `json:"reviewIssue,omitempty"`
+	CodexResource   *workspace.CodexResourceChange   `json:"codexResource,omitempty"`
 }
 
 type Response struct {
@@ -168,6 +169,16 @@ func writeResponse(w io.Writer, data any, err error) {
 
 func dispatch(service *workspace.Service, request Request) (any, error) {
 	switch request.Action {
+	case "codex-resources":
+		return service.ProjectCodexResources(request.Path)
+	case "codex-resource-preview", "codex-resource-apply":
+		if request.CodexResource == nil {
+			return nil, errors.New("缺少 Codex 接入变更")
+		}
+		if request.Action == "codex-resource-preview" {
+			return service.PreviewCodexResource(request.Path, *request.CodexResource)
+		}
+		return nil, service.ApplyCodexResource(request.Path, *request.CodexResource, request.Version)
 	case "ai-resources":
 		return service.AIResources(request.Path)
 	case "ai-usage":

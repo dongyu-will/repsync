@@ -452,7 +452,7 @@ go test -tags=integration -race ./internal/control ./internal/workspace -run 'Te
 
 ## AI 资源与使用证据
 
-全局侧栏与项目页签提供「AI 资源」，按「资源 / 使用记录」查看。资源可按类型、名称、来源及适配理由搜索，项目默认显示推荐与已采用的项，并提示其中的问题；全部资源中保留尚未关联及技术栈候选，不把无关 CLI 尚未安装当作项目故障。展开查看来源、当前位置的内容版本、任务条件、采用项目和可用性。资源多时分页，不把文件存在或配置启用显示成当前 AI 会话已加载。
+全局侧栏与项目页签提供「AI 资源」，按「资源 / 使用记录」查看。资源可按名称、来源及适配理由搜索。「筛选」可调整资源类型和项目适配范围。项目默认显示推荐与已采用的项，列表优先显示需要处理的状态；全部资源中保留尚未关联及技术栈候选，不把无关 CLI 尚未安装当作项目故障。展开查看来源、当前位置的内容版本、任务条件、采用项目和可用性。资源多时分页，不把文件存在或配置启用显示成当前 AI 会话已加载。
 
 项目采用主要由 AI 读取项目指南后维护 `.repsync.json` 的 `aiResources`，保留其他配置字段。类型为 `skill`、`mcp`、`cli`；`name` 对应 Skill 元数据名称、Codex MCP 服务器名称或不含参数的 CLI 名称。`reason` 解释适配依据，`tasks` 描述触发条件；同名 Skill 用可选的绝对 `source` 文件路径明确选择来源。最多 128 项，保存声明不启用、安装或调用任何资源。
 
@@ -496,6 +496,23 @@ repsync ai-usage [PATH]
 
 专项验收：`go test -tags=integration -race ./internal/workspace ./internal/control -run 'TestAIResources|TestAIUsage|TestDoctor|TestControlAI'`，使用临时资源、项目与 JSONL，验证来源区分、符号链接去重、项目筛选、读取失败、探测/拒绝/取消、记录去重、隐私投影和大小限制。
 
+### 调整 AI 资源
+
+在全局「AI 资源」展开已有 MCP，可预览并调整用户默认启停。项目内展开同一资源，可选择继承默认、启用或停用。项目例外只保存 `enabled`，沿用用户级连接参数。「添加项目 MCP」用于添加项目专用 HTTP 或 stdio 服务器。
+
+在项目资源列表展开已发现的 Skill，可预览并链接到 `.agents/skills/<name>`。链接跟随来源，撤回前核对链接身份，来源目录保留。当前 MCP 配置由 Codex 读取，预览显示配置目标。
+
+预览显示目标路径与新增或移除内容。应用前复核来源和目标，拒绝同名项目配置以及过期预览。MCP 使用 `.codex/config.toml` 的标记区块，撤回仅移除内容仍一致的区块，保留其他配置。HTTP 可填写令牌环境变量名称。配置由 Codex 在信任项目后读取，启停例外和新增配置可在新会话核验。
+
+`go-toml/v2` 由 repsync 维护，用于检查 Codex 配置及同名表，写入仅追加或移除所属区块。
+
+```sh
+repsync codex-resources PATH
+repsync codex-resource-preview PATH JSON_FILE
+repsync codex-resource-apply PATH VERSION JSON_FILE
+```
+
+输入文件示例为 `{"kind":"mcp","name":"docs","action":"add","url":"https://example.com/mcp"}`。stdio 使用 `command` 和 `args`，HTTP 可加 `tokenEnv`。Skill 使用 `{"kind":"skill","name":"doc-audit","action":"add","source":"/absolute/path/SKILL.md"}`。用户级 MCP 项目例外用 `enable` 或 `disable`，撤回用 `remove`。应用时传入预览返回的 `version` 和同一份输入文件。
 
 ## 共享文件资源
 

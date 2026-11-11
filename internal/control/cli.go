@@ -24,6 +24,9 @@ const help = `repsync — AI 项目控制（JSON 输出；open 启动桌面控�
   repsync doctor PATH                       检查项目接入，不执行项目命令
   repsync ai-resources [PATH]                盘点 Skill、MCP、CLI 与项目适配
   repsync ai-usage [PATH]                    读取最近 30 天本地使用证据与覆盖范围
+  repsync codex-resources PATH              查看由 RepSync 接入的项目 Skill 和 MCP
+  repsync codex-resource-preview PATH FILE  从 JSON 文件预览接入或撤回
+  repsync codex-resource-apply PATH VERSION FILE
   repsync review PATH                       手动读取收尾状态及版本
   repsync review-check PATH VERSION FILE     从 JSON 文件记录外部检查
   repsync review-evidence PATH VERSION FILE  从 JSON 文件记录阶段或数据核验
@@ -149,6 +152,25 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		return usage("dry-run 不能与 wait 同用；timeout 必须大于 0 且不超过 2h")
 	}
 	switch request.Action {
+	case "codex-resource-preview", "codex-resource-apply":
+		expected := 2
+		if request.Action == "codex-resource-apply" {
+			expected = 3
+		}
+		if len(paths) != expected {
+			if expected == 3 {
+				return usage("用法: repsync codex-resource-apply PATH VERSION JSON_FILE")
+			}
+			return usage("用法: repsync codex-resource-preview PATH JSON_FILE")
+		}
+		request.Path = paths[0]
+		if expected == 3 {
+			request.Version = paths[1]
+		}
+		request.CodexResource = &workspace.CodexResourceChange{}
+		if err := readInput(paths[expected-1], request.CodexResource); err != nil {
+			return usage(err.Error())
+		}
 	case "ai-resources", "ai-usage":
 		if len(paths) > 1 {
 			return usage("用法: repsync " + request.Action + " [PATH]")
@@ -160,7 +182,7 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		if len(paths) != 0 {
 			return usage(request.Action + " 不接受路径参数")
 		}
-	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review":
+	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources":
 		if len(paths) != 1 {
 			return usage("用法: repsync " + request.Action + " PATH")
 		}

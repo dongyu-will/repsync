@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useId, useReducer } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Icon, Select } from "./components";
 import {
@@ -8,8 +8,10 @@ import {
   type AIUsageEvent,
   type AIUsageReport,
   type AIUsageSummary,
+  type CodexResourcePlacement,
 } from "./mygo";
 import { previewAIResources, previewAIUsage } from "./ai-preview";
+import ResourceSettings from "./ProjectCodexResources";
 
 const native = isMyGo();
 const kindNames: Record<string, string> = {
@@ -60,9 +62,12 @@ type State = {
   view: string;
   kind: string;
   filter: string;
+  filtersOpen: boolean;
   query: string;
   page: number;
   revision: number;
+  placements: CodexResourcePlacement[];
+  placementIssue: string;
 };
 
 export default function AIResources({ path = "" }: { path?: string }) {
@@ -76,9 +81,12 @@ export default function AIResources({ path = "" }: { path?: string }) {
       view: "resources",
       kind: "all",
       filter: path ? "relevant" : "all",
+      filtersOpen: false,
       query: "",
       page: 0,
       revision: 0,
+      placements: [],
+      placementIssue: "",
     },
   );
   useEffect(() => {
@@ -93,6 +101,15 @@ export default function AIResources({ path = "" }: { path?: string }) {
       .catch((error: unknown) => {
         if (active) update({ busy: "", error: message(error) });
       });
+    if (native && path) {
+      void Service.projectCodexResources(path)
+        .then(({ items, issue }) => {
+          if (active) update({ placements: items, placementIssue: issue });
+        })
+        .catch((error: unknown) => {
+          if (active) update({ placementIssue: message(error) });
+        });
+    }
     return () => {
       active = false;
     };
@@ -107,11 +124,55 @@ export default function AIResources({ path = "" }: { path?: string }) {
       update({ busy: "", error: message(error) });
     }
   }
+  const filterPanelId = useId();
+  const filtersChanged =
+    state.kind !== "all" ||
+    (state.view === "resources" && !!path && state.filter !== "relevant");
   const query = state.query.trim().toLowerCase();
-  const resources = (state.report?.resources || []).filter(
-    (resource) =>
+  function refreshResources() {
+    update({ busy: "inventory", error: "", revision: state.revision + 1 });
+  }
+  const inventory = (state.report?.resources || []).map((resource) => ({
+    resource,
+    placement: state.placements.find(
+      (item) =>
+        item.name === resource.name &&
+        item.kind === resource.kind &&
+        (item.kind === "mcp" ||
+          resource.location === item.source + "/SKILL.md"),
+    ),
+  }));
+  for (const placement of state.placements) {
+    if (inventory.some((item) => item.placement === placement)) continue;
+    inventory.push({
+      placement,
+      resource: {
+        id: "project-setting:" + placement.kind + ":" + placement.name,
+        kind: placement.kind,
+        name: placement.name,
+        source: "项目配置",
+        location: placement.target,
+        availability:
+          placement.state === "applied"
+            ? "configured"
+            : placement.state === "disabled"
+              ? "disabled"
+              : "unknown",
+        applicability: "adopted",
+        detail: "",
+        description: "",
+        version: "",
+        reason: "",
+        tasks: "",
+        projects: [path],
+      },
+    });
+  }
+  const resources = inventory.filter(
+    ({ resource, placement }) =>
       (state.kind === "all" || state.kind === resource.kind) &&
       (state.filter === "all" ||
+        !!placement ||
         ["adopted", "recommended"].includes(resource.applicability)) &&
       `${resource.name} ${resource.description} ${resource.location} ${resource.reason}`
         .toLowerCase()
@@ -123,7 +184,11 @@ export default function AIResources({ path = "" }: { path?: string }) {
       `${summary.name} ${summary.kind}`.toLowerCase().includes(query),
   );
   const total =
-    state.view === "resources" ? resources.length : summaries.length;
+    state.view === "resources"
+      ? resources.length
+      : state.view === "usage"
+        ? summaries.length
+        : 0;
   const currentPage = Math.min(
     state.page,
     Math.max(0, Math.ceil(total / 20) - 1),
@@ -171,7 +236,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
             <Icon name="refresh" size={16} />
             {state.busy === "inventory" ? "正在盘点…" : "重新盘点"}
           </Button>
-        ) : (
+        ) : state.view === "usage" ? (
           <Button
             primary
             disabled={!!state.busy}
@@ -183,9 +248,24 @@ export default function AIResources({ path = "" }: { path?: string }) {
                 ? "重新读取记录"
                 : "读取使用记录"}
           </Button>
-        )}
+        ) : null}
       </div>
 
+      {state.view === "resources" && path && (
+        <details className="border-b border-line-subtle pb-2">
+          <summary className="w-fit cursor-pointer py-1 text-sm text-accent">
+            添加项目 MCP
+          </summary>
+          <div className="mt-3 max-w-xl pb-2">
+            <ResourceSettings path={path} onChanged={refreshResources} />
+          </div>
+        </details>
+      )}
+      {state.view === "resources" && state.placementIssue && (
+        <p role="status" className="break-words text-xs text-removed">
+          {state.placementIssue}
+        </p>
+      )}
       {state.error && (
         <p
           role="alert"
@@ -197,34 +277,28 @@ export default function AIResources({ path = "" }: { path?: string }) {
 
       {state.view === "usage" && (
         <>
-          <p className="leading-5 text-muted">
-            统计最近 30 天可读取的证据。Skill 读取、工具调用和要求落实分别判断。
-          </p>
           {!state.usage ? (
-            <div className="grouped-list p-4 leading-6">
-              <p className="font-medium">尚未读取使用记录</p>
-              <p className="text-muted">
-                按需读取 Codex 本地会话和 RepSync
-                流水线回执。未接入的数据源保持未知。
-              </p>
-            </div>
+            <p className="py-3 leading-5 text-muted">
+              按需读取最近 30 天的 Codex 会话和 RepSync 流水线回执。
+            </p>
           ) : (
-            <section aria-label="采集覆盖范围" className="grouped-list">
-              {state.usage.coverage.map((coverage) => (
-                <details
-                  key={coverage.source}
-                  className="border-b border-line-subtle last:border-0"
-                >
-                  <summary className="cursor-pointer px-3 py-2.5 leading-5">
-                    <span className="font-medium">{coverage.source}</span>
-                    <span className="ml-3 text-muted">
+            <details className="text-xs leading-5 text-muted">
+              <summary className="cursor-pointer">近 30 天 · 采集范围</summary>
+              <div className="mt-2 space-y-3 border-b border-line-subtle pb-3">
+                <p>
+                  {date(state.usage.since)} — {date(state.usage.until)}
+                </p>
+                <p>未接入的数据源保持未知。Skill 读取和要求落实分别判断。</p>
+                {state.usage.coverage.map((coverage) => (
+                  <div key={coverage.source} className="space-y-1">
+                    <p className="font-medium text-ink">
+                      {coverage.source} ·{" "}
                       {coverage.status === "unavailable"
                         ? "未接入"
-                        : "部分覆盖"}{" "}
-                      · {coverage.files} 个文件 · {coverage.sessions} 个关联会话
-                    </span>
-                  </summary>
-                  <div className="space-y-1 px-3 pb-3 text-xs leading-5 text-muted">
+                        : "部分覆盖"}
+                      {" · "}
+                      {coverage.files} 个文件 · {coverage.sessions} 个关联会话
+                    </p>
                     <p>{coverage.detail}</p>
                     {coverage.partialFiles > 0 && (
                       <p>{coverage.partialFiles} 个文件存在读取缺口。</p>
@@ -235,67 +309,77 @@ export default function AIResources({ path = "" }: { path?: string }) {
                       </p>
                     )}
                   </div>
-                </details>
-              ))}
-              <p className="border-t border-line-subtle px-3 py-2 text-xs text-muted">
-                {date(state.usage.since)} — {date(state.usage.until)}
-              </p>
-            </section>
+                ))}
+              </div>
+            </details>
           )}
         </>
       )}
 
-      {state.view === "resources" && state.report && (
-        <p className="text-xs leading-5 text-muted">
-          {state.report.resources.length} 项资源 ·{" "}
-          {date(state.report.checkedAt)} 盘点 · 当前会话可见性需另行核验
-        </p>
-      )}
-
-      {(state.view === "resources" || state.usage) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="relative min-w-36 flex-1">
-            <span className="sr-only">搜索 AI 资源</span>
-            <span className="pointer-events-none absolute left-2.5 top-2.5 text-muted">
-              <Icon name="search" size={16} />
-            </span>
-            <input
-              value={state.query}
-              onChange={(event) =>
-                update({ query: event.target.value, page: 0 })
-              }
-              placeholder="搜索名称、来源或适配理由"
-              className="h-9 w-full min-w-0 rounded-md border border-control bg-white pl-8 pr-3"
-            />
-          </label>
-          <Select
-            aria-label="资源类型"
-            value={state.kind}
-            onChange={(event) => update({ kind: event.target.value, page: 0 })}
-          >
-            <option value="all">全部类型</option>
-            <option value="skill">Skill</option>
-            <option value="mcp">MCP</option>
-            <option value="cli">CLI</option>
-          </Select>
-          {state.view === "resources" && path && (
-            <Select
-              aria-label="项目适配筛选"
-              value={state.filter}
-              onChange={(event) =>
-                update({ filter: event.target.value, page: 0 })
-              }
+      {(state.view === "resources" ||
+        (state.view === "usage" && state.usage)) && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">搜索 AI 资源</span>
+              <span className="pointer-events-none absolute left-2.5 top-2.5 text-muted">
+                <Icon name="search" size={16} />
+              </span>
+              <input
+                value={state.query}
+                onChange={(event) =>
+                  update({ query: event.target.value, page: 0 })
+                }
+                placeholder="搜索资源"
+                className="h-9 w-full min-w-0 rounded-md border border-control bg-white pl-8 pr-3"
+              />
+            </label>
+            <Button
+              type="button"
+              aria-expanded={state.filtersOpen}
+              aria-controls={filterPanelId}
+              onClick={() => update({ filtersOpen: !state.filtersOpen })}
             >
-              <option value="relevant">推荐与已采用</option>
-              <option value="all">全部资源</option>
-            </Select>
-          )}
+              <Icon name="settings" size={16} />
+              {filtersChanged ? "筛选 · 已调整" : "筛选"}
+            </Button>
+          </div>
+          <div id={filterPanelId} hidden={!state.filtersOpen}>
+            <div className="flex flex-wrap items-center gap-2 rounded-md bg-sidebar p-2">
+              <Select
+                aria-label="资源类型"
+                value={state.kind}
+                onChange={(event) =>
+                  update({ kind: event.target.value, page: 0 })
+                }
+              >
+                <option value="all">全部类型</option>
+                <option value="skill">Skill</option>
+                <option value="mcp">MCP</option>
+                <option value="cli">CLI</option>
+              </Select>
+              {state.view === "resources" && path && (
+                <Select
+                  aria-label="项目适配筛选"
+                  value={state.filter}
+                  onChange={(event) =>
+                    update({ filter: event.target.value, page: 0 })
+                  }
+                >
+                  <option value="relevant">推荐与已采用</option>
+                  <option value="all">全部资源</option>
+                </Select>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {(state.view === "resources"
         ? state.report?.issues
-        : state.usage?.issues
+        : state.view === "usage"
+          ? state.usage?.issues
+          : undefined
       )?.map((issue) => (
         <p key={issue} className="break-words text-xs leading-5 text-removed">
           {issue}
@@ -313,7 +397,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
           <div className="grouped-list">
             {resources
               .slice(currentPage * 20, currentPage * 20 + 20)
-              .map((resource) => (
+              .map(({ resource, placement }) => (
                 <ResourceRow
                   key={resource.id}
                   resource={resource}
@@ -324,6 +408,9 @@ export default function AIResources({ path = "" }: { path?: string }) {
                     (summary) => summary.resourceId === resource.id,
                   )}
                   usageRead={!!state.usage}
+                  path={path}
+                  placement={placement}
+                  onChanged={refreshResources}
                 />
               ))}
           </div>
@@ -344,6 +431,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
           </div>
         )
       ) : (
+        state.view === "usage" &&
         state.usage &&
         (summaries.length ? (
           <div className="grouped-list">
@@ -362,9 +450,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
         ) : (
           <div className="grouped-list p-4 leading-6">
             <p className="font-medium">本次记录未观察到匹配的使用证据</p>
-            <p className="text-muted">
-              请结合上方采集范围判断；不表示这些资源从未使用。
-            </p>
+            <p className="text-muted">采集范围列出了可读取的来源和缺口。</p>
           </div>
         ))
       )}
@@ -372,7 +458,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
       {total > 20 && (
         <div className="flex items-center justify-between gap-3 text-xs text-muted">
           <span>
-            第 {currentPage + 1} / {Math.ceil(total / 20)} 页 · {total} 项
+            第 {currentPage + 1} / {Math.ceil(total / 20)} 页
           </span>
           <div className="flex gap-2">
             <Button
@@ -390,14 +476,18 @@ export default function AIResources({ path = "" }: { path?: string }) {
           </div>
         </div>
       )}
-      {state.view === "resources" && (
+      {state.view === "resources" && state.report && (
         <details className="text-xs leading-5 text-muted">
-          <summary className="cursor-pointer">如何维护项目适配</summary>
-          <p className="mt-2">
-            让 AI 读取项目指南，在 .repsync.json 的 aiResources
-            中维护资源类型、名称、适配理由和任务条件。同名 Skill 用 source
-            指定绝对来源路径。保存声明不会启用工具或执行命令。
-          </p>
+          <summary className="cursor-pointer">
+            {resources.length} 项资源 · 盘点详情
+          </summary>
+          <div className="mt-2 max-w-2xl space-y-2">
+            <p>
+              最近盘点：{date(state.report.checkedAt)}
+              。当前会话可见性需另行核验。
+            </p>
+            <p>让 AI 根据项目指南在 .repsync.json 中维护资源适配与任务条件。</p>
+          </div>
         </details>
       )}
     </div>
@@ -409,60 +499,96 @@ function ResourceRow({
   duplicates,
   usage,
   usageRead,
+  path,
+  placement,
+  onChanged,
 }: {
   resource: AIResource;
   duplicates: number;
   usage?: AIUsageSummary;
   usageRead: boolean;
+  path: string;
+  placement?: CodexResourcePlacement;
+  onChanged: () => void;
 }) {
+  const availabilityLabel = availability[resource.availability] || "待核验";
+  const availabilityDetail = resource.detail.startsWith(availabilityLabel)
+    ? resource.detail
+    : [availabilityLabel, resource.detail].filter(Boolean).join(" · ");
+  const fitLabel = applicability[resource.applicability] || "待判断";
+  const hasIssue = ["missing", "error", "disabled", "unknown"].includes(
+    resource.availability,
+  );
+  const needsAttention = ["missing", "error"].includes(resource.availability);
+  const rowStatus =
+    placement?.state === "disabled"
+      ? "项目已停用"
+      : placement?.state === "applied"
+        ? "项目已启用"
+        : hasIssue
+          ? availabilityLabel
+          : resource.applicability === "unassigned"
+            ? ""
+            : fitLabel;
+
   return (
     <details className="group border-b border-line-subtle last:border-0">
-      <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3 hover:bg-editor [&::-webkit-details-marker]:hidden">
-        <span className="mt-0.5 text-muted group-open:rotate-90">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-editor [&::-webkit-details-marker]:hidden">
+        <span className="text-muted group-open:rotate-90">
           <Icon name="chevron" size={16} />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="break-all font-medium">{resource.name}</span>
-            <span className="text-xs text-muted">
-              {kindNames[resource.kind] || resource.kind}
-            </span>
-            {duplicates > 1 && (
-              <span className="text-xs text-muted">
-                {duplicates} 个同名来源
-              </span>
-            )}
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+          <span className="font-medium [overflow-wrap:anywhere]">
+            {resource.name}
           </span>
-          <span className="mt-1 block line-clamp-2 break-words text-xs leading-5 text-muted">
-            {resource.reason || resource.description || "适配理由待补充"}
+          <span className="text-xs text-muted">
+            {kindNames[resource.kind] || resource.kind}
+            {duplicates > 1 && " · 同名"}
           </span>
         </span>
-        <span className="max-w-[36%] shrink-0 text-right text-xs leading-5">
-          <span className="block">
-            {applicability[resource.applicability] || "待判断"}
-          </span>
+        {rowStatus && (
           <span
-            className={
-              resource.availability === "missing" ||
-              resource.availability === "error"
-                ? "text-removed"
-                : "text-muted"
-            }
+            className={`shrink-0 text-xs ${needsAttention ? "text-removed" : "text-muted"}`}
           >
-            {availability[resource.availability] || "待核验"}
+            {rowStatus}
           </span>
-        </span>
+        )}
       </summary>
+      {(placement ||
+        (resource.kind === "mcp" && resource.source === "Codex CLI 当前配置") ||
+        (path &&
+          resource.kind === "skill" &&
+          resource.availability === "discovered")) && (
+        <div className="border-t border-line-subtle bg-editor px-3 py-3">
+          <ResourceSettings
+            path={path}
+            resource={resource}
+            placement={placement}
+            onChanged={onChanged}
+          />
+        </div>
+      )}
       <dl className="space-y-2 border-t border-line-subtle bg-editor px-3 py-3 text-xs leading-5">
         {[
+          ["项目适配", [fitLabel, resource.reason].filter(Boolean).join(" · ")],
           [
             "适用条件",
             resource.tasks ||
               "遵循项目指南中的任务条件；未声明时由 AI 按任务判断",
           ],
-          ["用途", resource.description],
-          ["可用性", resource.detail],
-          ["来源", resource.source],
+          [
+            "用途",
+            resource.description === resource.reason
+              ? ""
+              : resource.description,
+          ],
+          ["可用性", availabilityDetail],
+          [
+            "来源",
+            [resource.source, duplicates > 1 ? `${duplicates} 个同名来源` : ""]
+              .filter(Boolean)
+              .join(" · "),
+          ],
           ["位置", resource.location || "未提供来源路径"],
           [
             "内容版本",
@@ -509,36 +635,36 @@ function UsageRow({
   summary: AIUsageSummary;
   events: AIUsageEvent[];
 }) {
+  const count =
+    summary.kind === "skill"
+      ? `${summary.sessions} 个会话`
+      : summary.appRuns
+        ? `${summary.appRuns} 次入口运行`
+        : `${summary.calls} 次${summary.kind === "mcp" ? "请求" : "执行记录"}`;
+  const breakdown =
+    summary.kind === "skill"
+      ? "成功读取命令证据。正文完整性与要求落实未核验。"
+      : summary.appRuns
+        ? "RepSync 入口回执，未归因于 AI。"
+        : `成功 ${summary.succeeded} · 失败 ${summary.failed} · 未知 ${summary.unknown} · 拒绝 ${summary.declined} · 取消 ${summary.cancelled}${summary.probes ? ` · 含探测 ${summary.probes}` : ""}`;
+
   return (
     <details className="group border-b border-line-subtle last:border-0">
-      <summary className="flex cursor-pointer list-none items-start gap-3 px-3 py-3 hover:bg-editor [&::-webkit-details-marker]:hidden">
-        <span className="mt-0.5 text-muted group-open:rotate-90">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-editor [&::-webkit-details-marker]:hidden">
+        <span className="text-muted group-open:rotate-90">
           <Icon name="chevron" size={16} />
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="break-all font-medium">{summary.name}</span>
-          <span className="ml-2 text-xs text-muted">
-            {kindNames[summary.kind]}
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+          <span className="font-medium [overflow-wrap:anywhere]">
+            {summary.name}
           </span>
-          <span className="mt-1 block text-xs leading-5 text-muted">
-            {summary.kind === "skill"
-              ? "成功读取命令证据；正文完整性与要求落实未核验"
-              : summary.appRuns
-                ? "RepSync 入口回执，未归因于 AI"
-                : `成功 ${summary.succeeded} · 失败 ${summary.failed} · 未知 ${summary.unknown} · 拒绝 ${summary.declined} · 取消 ${summary.cancelled}${summary.probes ? ` · 含探测 ${summary.probes}` : ""}`}
-          </span>
+          <span className="text-xs text-muted">{kindNames[summary.kind]}</span>
         </span>
-        <span className="shrink-0 text-right text-xs leading-5">
-          <span className="block">
-            {summary.kind === "skill"
-              ? `${summary.sessions} 个会话`
-              : summary.appRuns
-                ? `${summary.appRuns} 次入口运行`
-                : `${summary.calls} 次${summary.kind === "mcp" ? "请求" : "执行记录"}`}
-          </span>
-          <span className="text-muted">{date(summary.lastUsed)}</span>
-        </span>
+        <span className="shrink-0 text-right text-xs text-muted">{count}</span>
       </summary>
+      <p className="border-t border-line-subtle bg-editor px-3 pt-3 text-xs leading-5 text-muted">
+        {breakdown} 最近记录 {date(summary.lastUsed)}
+      </p>
       <UsageEvidence events={events} />
     </details>
   );
@@ -551,7 +677,7 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
     Math.max(0, Math.ceil(events.length / 10) - 1),
   );
   return (
-    <div className="border-t border-line-subtle bg-editor px-3 py-3">
+    <div className="bg-editor px-3 py-3">
       <ol className="space-y-4">
         {events.slice(currentPage * 10, currentPage * 10 + 10).map((event) => (
           <li key={event.id} className="space-y-1 text-xs leading-5">
