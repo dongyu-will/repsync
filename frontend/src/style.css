@@ -1,0 +1,350 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #17191f;
+  --color-muted: #6b707c;
+  --color-line: #e2e4e9;
+  --color-line-subtle: #ececf0;
+  --color-control: #cdd0d7;
+  --color-sidebar: #f6f6f8;
+  --color-surface: #f0f1f4;
+  --color-editor: #f9f9fb;
+  --color-selection: #eaf0ff;
+  --color-nav-hover: #e7e9ef;
+  --color-accent: #2468f5;
+  --color-accent-hover: #1857da;
+  --color-removed: #bb3549;
+  --text-xs: 0.6875rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.125rem;
+  --text-xl--line-height: 1.625rem;
+  --text-2xl: 1.25rem;
+  --text-2xl--line-height: 1.75rem;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC", "Noto Sans SC",
+    sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+html {
+  color-scheme: light;
+  overflow: hidden;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+button,
+input,
+select {
+  outline-offset: 3px;
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+}
+input {
+  caret-color: var(--color-accent);
+}
+input::placeholder {
+  color: var(--color-muted);
+}
+::selection {
+  background: #cbdcff;
+  color: #172749;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c7cbd3 transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c7cbd3;
+  border: 2px solid white;
+  border-radius: 8px;
+}
+pre,
+code {
+  tab-size: 2;
+}
+.sidebar {
+  width: clamp(176px, 14.5vw, 208px);
+  overflow: hidden;
+}
+.window-toolbar {
+  --app-region: drag;
+  min-height: max(48px, var(--mygo-titlebar-height, 0px));
+  padding-right: max(12px, var(--mygo-titlebar-inset-right, 0px));
+}
+.sidebar-titlebar {
+  min-height: max(32px, var(--mygo-titlebar-height, 0px));
+  margin-bottom: 16px;
+  padding-left: calc(var(--mygo-titlebar-inset-left, 0px) + 12px);
+}
+.window-toolbar button,
+.project-path {
+  --app-region: no-drag;
+}
+.nav-item {
+  @apply relative flex min-h-9 w-full shrink-0 items-center gap-2 rounded-md px-3 text-left text-sm hover:bg-nav-hover;
+}
+.nav-item.selected {
+  @apply bg-nav-hover font-medium;
+}
+.nav-item.selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+.project-subnav {
+  @apply ml-4 flex min-h-0 flex-col border-l border-line pl-2;
+}
+.project-subnav .nav-item {
+  @apply min-h-8;
+}
+.project-subnav .nav-item.selected::before {
+  content: none;
+}
+.icon-button {
+  @apply inline-flex size-7 shrink-0 items-center justify-center rounded-md hover:bg-nav-hover;
+}
+.workspace-gutter {
+  @apply px-4;
+}
+.section-heading {
+  @apply mb-4;
+}
+.section-heading h2 {
+  @apply text-xl font-semibold leading-6;
+}
+.section-heading p {
+  @apply mt-1.5 text-sm leading-5 text-muted;
+}
+.info-row {
+  @apply grid grid-cols-[96px_minmax(0,1fr)] items-baseline gap-3 py-3 text-sm leading-5;
+}
+.info-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.empty-state {
+  @apply mx-auto flex max-w-xl flex-col items-center justify-center px-5 text-center;
+  padding-block: clamp(24px, 6vh, 56px);
+}
+.source-panel {
+  @apply overflow-auto rounded-md border border-line-subtle bg-editor p-3 font-mono leading-5;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.grouped-list {
+  @apply divide-y divide-line-subtle overflow-hidden rounded-lg border border-line;
+}
+.grouped-list .info-row {
+  @apply px-3;
+}
+.project-row {
+  @apply flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left hover:bg-sidebar;
+}
+.project-row:focus-visible {
+  outline-offset: -3px;
+}
+
+.pipeline-flow {
+  display: flex;
+  overflow-x: auto;
+  padding: 12px 3px 8px;
+}
+.pipeline-stage {
+  display: flex;
+  min-width: 0;
+  flex: 1 0 168px;
+  align-items: center;
+}
+.pipeline-stage:first-child {
+  flex-basis: 140px;
+}
+.pipeline-connector {
+  position: relative;
+  flex: 0 0 24px;
+  height: 1px;
+  margin-inline: 4px;
+  overflow: hidden;
+  background: var(--color-line);
+}
+.pipeline-node {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  text-align: left;
+}
+.pipeline-node:hover {
+  background: var(--color-sidebar);
+}
+.pipeline-step-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-muted);
+}
+.pipeline-stage[data-state="success"] .pipeline-step-icon {
+  color: #15803d;
+}
+.pipeline-stage[data-state="success"] .pipeline-connector {
+  background: #15803d;
+  opacity: 0.4;
+}
+.pipeline-stage[data-state="running"] .pipeline-step-icon {
+  color: var(--color-accent);
+}
+.pipeline-stage[data-state="failure"] .pipeline-step-icon,
+.pipeline-stage[data-state="timed_out"] .pipeline-step-icon {
+  color: var(--color-removed);
+}
+.pipeline-stage[data-state="running"] .pipeline-step-icon svg {
+  animation: pipeline-running 900ms linear infinite;
+}
+.pipeline-stage[data-state="running"] .pipeline-connector::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 8px;
+  background: var(--color-accent);
+  animation: pipeline-flow 1200ms linear infinite;
+}
+@keyframes pipeline-running {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pipeline-flow {
+  from {
+    transform: translateX(-8px);
+  }
+  to {
+    transform: translateX(24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-stage[data-state="running"] .pipeline-step-icon svg,
+  .pipeline-stage[data-state="running"] .pipeline-connector::after {
+    animation: none;
+  }
+}
+
+.markdown-document {
+  @apply text-sm leading-6 text-ink;
+  overflow-wrap: anywhere;
+}
+.markdown-document > :first-child {
+  margin-top: 0;
+}
+.markdown-document > :last-child {
+  margin-bottom: 0;
+}
+.markdown-document h1 {
+  @apply mb-4 mt-6 text-2xl font-semibold leading-8;
+}
+.markdown-document h2 {
+  @apply mb-3 mt-6 text-xl font-semibold leading-7;
+}
+.markdown-document h3 {
+  @apply mb-2 mt-5 text-lg font-semibold;
+}
+.markdown-document h4,
+.markdown-document h5,
+.markdown-document h6 {
+  @apply mb-2 mt-4 font-semibold;
+}
+.markdown-document p,
+.markdown-document ul,
+.markdown-document ol,
+.markdown-document blockquote,
+.markdown-document pre,
+.markdown-document table {
+  @apply my-3;
+}
+.markdown-document ul {
+  @apply list-disc pl-5;
+}
+.markdown-document ol {
+  @apply list-decimal pl-5;
+}
+.markdown-document li {
+  @apply my-1;
+}
+.markdown-document li > p {
+  @apply my-1;
+}
+.markdown-document li > ul,
+.markdown-document li > ol {
+  @apply my-1;
+}
+.markdown-document .task-list-item {
+  @apply list-none;
+}
+.markdown-document input[type="checkbox"] {
+  @apply mr-2;
+}
+.markdown-document a {
+  @apply text-accent underline underline-offset-2;
+}
+.markdown-document blockquote {
+  @apply border-l border-control pl-3 text-muted;
+}
+.markdown-document pre {
+  @apply overflow-x-auto rounded-md bg-editor p-3 text-xs leading-5;
+}
+.markdown-document code {
+  @apply rounded bg-editor px-1 py-0.5 font-mono text-xs;
+}
+.markdown-document pre code {
+  @apply bg-transparent p-0;
+}
+.markdown-document table {
+  @apply w-full border-collapse text-left;
+}
+.markdown-document th,
+.markdown-document td {
+  @apply border border-line px-3 py-2;
+}
+.markdown-document th {
+  @apply bg-editor font-semibold;
+}
+.markdown-document hr {
+  @apply my-5 border-line;
+}
+
+::highlight(document-find-matches) {
+  background-color: #fef08a;
+  color: #422006;
+}
+
+::highlight(document-find-active) {
+  background-color: #fbbf24;
+  color: #422006;
+}

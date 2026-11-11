@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "frontend/src/style.css"
+        ],
+        "createdAt": "2026-11-11T03:27:49.482Z",
+        "reason": "Agent review: line 231 is the 8px moving segment inside a 1px horizontal CI/CD connector, not a card side border; motion indicates the running pipeline step."
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "repsync-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5178 --strictPort",
+    "build": "npm run icons && tsc -b && vite build",
+    "check": "tsc -b && eslint .",
+    "format": "prettier --write src index.html *.json *.ts *.js",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^1.70.0",
+    "mygo-runtime": "0.8.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@resvg/resvg-js": "^2.6.2",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "vite": "^7.2.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
+  }
+}

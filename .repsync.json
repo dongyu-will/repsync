@@ -1,0 +1,102 @@
+{
+  "pipelines": [
+    {
+      "id": "ci",
+      "name": "Local CI",
+      "kind": "ci",
+      "timeoutSeconds": 1800,
+      "steps": [
+        ["sh", "tools/shared/check-go-format.sh", "cmd", "internal"],
+        ["npm", "--prefix", "frontend", "run", "check"],
+        ["go", "vet", "./..."],
+        [
+          "go",
+          "test",
+          "-tags=integration",
+          "-race",
+          "./internal/workspace",
+          "./internal/control"
+        ],
+        ["npm", "--prefix", "frontend", "run", "build"]
+      ],
+      "coverage": [
+        {
+          "area": "frontend",
+          "method": "static"
+        },
+        {
+          "area": "backend",
+          "method": "static"
+        },
+        {
+          "area": "backend",
+          "method": "integration"
+        }
+      ],
+      "reviewEnvironment": "local",
+      "reviewTarget": "repsync-test-fixtures"
+    },
+    {
+      "id": "package",
+      "name": "Desktop package",
+      "kind": "cd",
+      "timeoutSeconds": 1800,
+      "steps": [["go", "tool", "mygo", "build"]]
+    }
+  ],
+  "services": [
+    {
+      "id": "frontend",
+      "name": "Frontend preview",
+      "command": ["npm", "--prefix", "frontend", "run", "dev"],
+      "url": "http://127.0.0.1:5178"
+    }
+  ],
+  "aiResources": [
+    {
+      "kind": "skill",
+      "name": "golang-how-to",
+      "reason": "Required by AGENTS.md for Go work",
+      "tasks": "Go implementation, review, and troubleshooting"
+    },
+    {
+      "kind": "skill",
+      "name": "impeccable",
+      "reason": "Follow the interface baseline in DESIGN.md",
+      "tasks": "Frontend interface changes and validation, as needed"
+    },
+    {
+      "kind": "cli",
+      "name": "go",
+      "reason": "Go backend and MyGo toolchain",
+      "tasks": "Go checks, integration tests, binding generation, and desktop packaging"
+    },
+    {
+      "kind": "cli",
+      "name": "npm",
+      "reason": "Frontend package manager specified in README.md",
+      "tasks": "Install frontend dependencies, start preview, and run checks"
+    }
+  ],
+  "reviewResources": [
+    {
+      "id": "user-state",
+      "name": "Project registry and local history backups",
+      "kind": "manual",
+      "target": "",
+      "guide": "Verify independent retention of the user configuration directory: project registry, rules backups, cleanup recovery refs, and review handoffs. This check does not copy or delete data."
+    }
+  ],
+  "reviewProfile": {
+    "kind": "desktop",
+    "areas": ["frontend", "backend"],
+    "requirements": [
+      "frontend-static",
+      "frontend-behavior",
+      "backend-static",
+      "backend-api"
+    ],
+    "stages": ["push", "ci"]
+  },
+  "resources": ["go-format-check"]
+}

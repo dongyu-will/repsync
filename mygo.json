@@ -1,0 +1,14 @@
+{
+  "name": "repsync",
+  "slug": "repsync",
+  "identifier": "local.repsync.desktop",
+  "version": "0.1.0",
+  "icon": "resources/icon.png",
+  "main": "./cmd/repsync",
+  "devUrl": "http://127.0.0.1:5178",
+  "devCommand": "npm --prefix frontend run dev",
+  "buildCommand": "npm --prefix frontend run build",
+  "frontendDist": "frontend/dist",
+  "bindings": "frontend/src/mygo.ts",
+  "out": "build"
+}
