@@ -14,7 +14,7 @@ const native = isMyGo();
 const sample: DocumentReview = {
   basis: "preview",
   files: 8,
-  graph: "CodeGraph 已核对可查符号",
+  graph: "CodeGraph Queryable symbols checked",
   warnings: [],
   findings: [
     {
@@ -22,30 +22,32 @@ const sample: DocumentReview = {
       startLine: 26,
       endLine: 26,
       version: "preview",
-      original: "本地启动前，先用 Docker 启动 MySQL。\n",
+      original: "Before starting locally, use Docker Start MySQL.\n",
       terms: ["mysql"],
       evidence: [
         {
           source: "Git diff",
           path: "src/db.ts",
           line: 12,
-          detail: "移除 openMysql",
+          detail: "Remove openMysql",
         },
         {
           source: "CodeGraph",
           path: "",
           line: 0,
-          detail: "索引未找到 openMysql",
+          detail: "Index not found openMysql",
         },
         {
-          source: "已确认项目记忆",
-          path: "部署记录 #42 · 数据库迁移验收",
+          source: "Confirmed project memories",
+          path: "Deployment record #42 · Database migration verification",
           line: 0,
-          detail: "生产 · 生产数据库已完成 PostgreSQL 切换。",
+          detail:
+            "Production · The production database has migrated to PostgreSQL.",
           memoryId: "example-db",
         },
       ],
-      suggestion: "核实 PostgreSQL 的实际配置后，改写本段的本地启动步骤。",
+      suggestion:
+        "Verify PostgreSQL  configuration, then rewrite the local startup steps in this paragraph.",
     },
   ],
 };
@@ -150,7 +152,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
             (item) => item.path !== preview.edit.path,
           ),
         },
-        notice: `已更新 ${preview.edit.path}。重新扫描可继续核对该文档。`,
+        notice: `Updated ${preview.edit.path}.Rescan to continue reviewing this document.`,
       });
     } catch (error) {
       update({ error: message(error) });
@@ -163,7 +165,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
     <ActionDialog
       title={
         <>
-          文档核对
+          Document review
           {report?.findings.length ? ` · ${report.findings.length}` : ""}
         </>
       }
@@ -171,7 +173,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
       <div className="space-y-3 border-t border-line-subtle p-3">
         <form className="flex flex-wrap items-end gap-2" onSubmit={scan}>
           <label className="grid gap-1 text-xs text-muted">
-            变更范围
+            Change scope
             <Select
               value={state.scope}
               disabled={!native || pending}
@@ -179,15 +181,15 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                 update({ ...clear, scope: event.target.value, report: null })
               }
             >
-              <option value="worktree">未提交改动</option>
-              <option value="commit">最近一次提交</option>
+              <option value="worktree">Uncommitted changes</option>
+              <option value="commit">Latest commit</option>
             </Select>
           </label>
           <label className="grid min-w-32 flex-1 gap-1 text-xs text-muted">
-            补充关键词
+            Additional keywords
             <input
               className="min-h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink"
-              placeholder="用逗号分隔旧名称"
+              placeholder="Separate old names with commas"
               value={state.keywords}
               maxLength={256}
               disabled={!native || pending}
@@ -197,7 +199,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
             />
           </label>
           <Button type="submit" disabled={!native || pending}>
-            {pending && !report ? "正在扫描…" : "扫描文档"}
+            {pending && !report ? "Scanning…" : "Scan documents"}
           </Button>
         </form>
         {state.notice && (
@@ -216,7 +218,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
         {report && (
           <>
             <p role="status" className="text-xs leading-5 text-muted">
-              已读取 {report.files} 份文档 · {report.graph}
+              Loaded {report.files} documents · {report.graph}
             </p>
             {report.warnings.length > 0 && (
               <ul className="space-y-1 text-xs text-muted">
@@ -226,7 +228,9 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
               </ul>
             )}
             {report.findings.length === 0 && !state.notice && (
-              <p className="text-sm text-muted">本次范围内没有匹配的段落。</p>
+              <p className="text-sm text-muted">
+                No matching paragraphs in this scope.
+              </p>
             )}
             <ul className="grouped-list">
               {report.findings.map((item) => (
@@ -252,13 +256,13 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                       {item.endLine !== item.startLine && `–${item.endLine}`}
                     </span>
                     <span className="min-w-0 break-all text-xs text-muted">
-                      {item.terms.join("、")}
+                      {item.terms.join(", ")}
                     </span>
                   </button>
                   {finding === item && (
                     <div className="space-y-3 px-3 pb-3">
                       <div className="space-y-1 text-xs leading-5">
-                        <p className="font-medium">依据</p>
+                        <p className="font-medium">Evidence</p>
                         <ul className="space-y-1 text-muted">
                           {item.evidence.map((e, index) => (
                             <li
@@ -266,7 +270,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                               className="break-all"
                               title={
                                 e.memoryId
-                                  ? `记忆编号 ${e.memoryId}`
+                                  ? `Memory ID ${e.memoryId}`
                                   : undefined
                               }
                             >
@@ -280,26 +284,29 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                       </div>
                       <p className="text-sm leading-6">{item.suggestion}</p>
                       <p className="text-xs text-muted">
-                        核对线上状态及保留用途后再改写。
+                        Verify production status and retention needs before
+                        rewriting.
                       </p>
                       {preview ? (
                         <div
                           ref={previewRef}
                           tabIndex={-1}
                           className="space-y-2"
-                          aria-label="修改预览"
+                          aria-label="Change preview"
                         >
-                          <p className="text-xs font-medium">修改前</p>
+                          <p className="text-xs font-medium">Before</p>
                           <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-md bg-red-50 p-2 font-mono text-xs text-red-900">
                             {preview.before}
                           </pre>
-                          <p className="text-xs font-medium">修改后</p>
+                          <p className="text-xs font-medium">After</p>
                           {preview.after ? (
                             <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-md bg-green-50 p-2 font-mono text-xs text-green-900">
                               {preview.after}
                             </pre>
                           ) : (
-                            <p className="text-xs text-muted">移除此段</p>
+                            <p className="text-xs text-muted">
+                              Remove paragraph
+                            </p>
                           )}
                           <div className="flex flex-wrap justify-end gap-2">
                             <Button
@@ -308,21 +315,21 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                                 update({ preview: null, error: "" })
                               }
                             >
-                              返回编辑
+                              Back to editor
                             </Button>
                             <Button
                               primary
                               disabled={!native || pending}
                               onClick={apply}
                             >
-                              应用修改
+                              Apply changes
                             </Button>
                           </div>
                         </div>
                       ) : (
                         <>
                           <label className="grid gap-1 text-xs text-muted">
-                            修改后的段落
+                            Revised paragraph
                             <textarea
                               value={replacement}
                               rows={Math.min(
@@ -344,7 +351,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                               disabled={pending}
                               onClick={() => showPreview("")}
                             >
-                              预览删除
+                              Preview deletion
                             </Button>
                             <Button
                               primary
@@ -354,7 +361,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                               }
                               onClick={() => showPreview(replacement)}
                             >
-                              预览修改
+                              Preview changes
                             </Button>
                           </div>
                         </>

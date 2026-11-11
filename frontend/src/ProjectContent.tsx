@@ -11,7 +11,7 @@ import ProjectReviewPanel from "./ProjectReview";
 import AIResources from "./AIResources";
 
 export type ProjectTab =
-  "概览" | "工作树" | "CI/CD" | "规范" | "AI 资源" | "文档";
+  "Overview" | "Worktrees" | "CI/CD" | "Rules" | "AI resources" | "Documents";
 
 export default function ProjectContent({
   details,
@@ -32,7 +32,9 @@ export default function ProjectContent({
 }) {
   return (
     <div
-      className={tab === "文档" ? "flex h-full min-h-0 flex-col" : "contents"}
+      className={
+        tab === "Documents" ? "flex h-full min-h-0 flex-col" : "contents"
+      }
     >
       {details.warnings.map((warning, i) => (
         <p
@@ -42,7 +44,7 @@ export default function ProjectContent({
           {warning}
         </p>
       ))}
-      {tab === "工作树" ? (
+      {tab === "Worktrees" ? (
         <ProjectGit
           key={details.project.path}
           path={details.project.path}
@@ -54,16 +56,16 @@ export default function ProjectContent({
           key={details.project.path}
           path={details.project.path}
         />
-      ) : tab === "规范" ? (
+      ) : tab === "Rules" ? (
         <ProjectStandards
           key={details.project.path}
           details={details}
           onOpenShared={onOpenShared}
           onUpdated={onUpdated}
         />
-      ) : tab === "AI 资源" ? (
+      ) : tab === "AI resources" ? (
         <AIResources key={details.project.path} path={details.project.path} />
-      ) : tab === "文档" ? (
+      ) : tab === "Documents" ? (
         <ProjectDocuments
           key={details.project.path}
           path={details.project.path}
@@ -71,7 +73,7 @@ export default function ProjectContent({
         />
       ) : (
         <>
-          <section aria-label="本地服务">
+          <section aria-label="Local services">
             <ProjectCommands
               key={details.project.path}
               path={details.project.path}
@@ -86,12 +88,12 @@ export default function ProjectContent({
             stashCount={details.stashKnown ? details.stashCount : 0}
             workspaceStatus={
               !details.git
-                ? "Git 状态不可用"
+                ? "Git status unavailable"
                 : !details.statusKnown
-                  ? "工作区状态读取失败"
+                  ? "Could not read workspace status"
                   : details.status
-                    ? "有未提交改动"
-                    : "工作区干净"
+                    ? "Uncommitted changes"
+                    : "Clean workspace"
             }
           />
         </>
@@ -114,13 +116,13 @@ function ProjectStandards({
     <div className="space-y-5">
       <div
         role="group"
-        aria-label="规范分区"
+        aria-label="Rules sections"
         className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
       >
         {[
-          ["project", "项目规则"],
-          ["shared", "公共规范"],
-          ["files", "共享文件"],
+          ["project", "Project rules"],
+          ["shared", "Shared rules"],
+          ["files", "Shared files"],
         ].map(([id, title]) => (
           <button
             key={id}

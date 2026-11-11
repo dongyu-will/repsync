@@ -65,7 +65,7 @@ type Server struct {
 func SocketPath() (string, error) {
 	if value := os.Getenv("REPSYNC_SOCKET"); value != "" {
 		if !filepath.IsAbs(value) {
-			return "", errors.New("REPSYNC_SOCKET 必须是绝对路径")
+			return "", errors.New("REPSYNC_SOCKET must be an absolute path")
 		}
 		return value, nil
 	}
@@ -83,7 +83,7 @@ func Listen(socket string, service *workspace.Service) (*Server, error) {
 	}
 	lockPath := socket + ".lock"
 	if info, err := os.Lstat(lockPath); err == nil && !info.Mode().IsRegular() {
-		return nil, errors.New("控制锁必须是普通文件")
+		return nil, errors.New("control lock must be a regular file")
 	}
 	lock, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
@@ -91,7 +91,7 @@ func Listen(socket string, service *workspace.Service) (*Server, error) {
 	}
 	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		lock.Close()
-		return nil, errors.New("已有 repsync 实例持有本地控制入口")
+		return nil, errors.New("another repsync instance owns the local control endpoint")
 	}
 	fail := func(err error) (*Server, error) {
 		syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
@@ -100,7 +100,7 @@ func Listen(socket string, service *workspace.Service) (*Server, error) {
 	}
 	if info, err := os.Lstat(socket); err == nil {
 		if info.Mode()&os.ModeSocket == 0 {
-			return fail(errors.New("控制入口路径已存在且不是 socket"))
+			return fail(errors.New("control path exists and is not a socket"))
 		}
 		if err := os.Remove(socket); err != nil {
 			return fail(err)
@@ -121,7 +121,7 @@ func Listen(socket string, service *workspace.Service) (*Server, error) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost || r.URL.Path != "/v1/control" || r.Header.Get("Origin") != "" {
 			w.WriteHeader(http.StatusBadRequest)
-			writeResponse(w, nil, errors.New("无效控制请求"))
+			writeResponse(w, nil, errors.New("invalid control request"))
 			return
 		}
 		var request Request
@@ -134,7 +134,7 @@ func Listen(socket string, service *workspace.Service) (*Server, error) {
 		}
 		if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
 			w.WriteHeader(http.StatusBadRequest)
-			writeResponse(w, nil, errors.New("请求只能包含一个 JSON 对象"))
+			writeResponse(w, nil, errors.New("request must contain exactly one JSON object"))
 			return
 		}
 		data, err := dispatch(service, request)
@@ -174,14 +174,14 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 		return service.ConfirmedProjectMemories(request.Path)
 	case "project-memory-propose":
 		if request.Memory == nil {
-			return nil, errors.New("缺少待确认的项目记忆")
+			return nil, errors.New("missing proposed project memory")
 		}
 		return service.ProposeProjectMemory(request.Path, *request.Memory)
 	case "codex-resources":
 		return service.ProjectCodexResources(request.Path)
 	case "codex-resource-preview", "codex-resource-apply":
 		if request.CodexResource == nil {
-			return nil, errors.New("缺少 Codex 接入变更")
+			return nil, errors.New("missing Codex setup change")
 		}
 		if request.Action == "codex-resource-preview" {
 			return service.PreviewCodexResource(request.Path, *request.CodexResource)
@@ -195,40 +195,40 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 		return service.ReviewProject(request.Path)
 	case "review-check":
 		if request.ReviewCheck == nil {
-			return nil, errors.New("缺少检查记录")
+			return nil, errors.New("missing check record")
 		}
 		return service.RecordReviewCheck(request.Path, request.Version, *request.ReviewCheck)
 	case "review-evidence":
 		if request.ReviewEvidence == nil {
-			return nil, errors.New("缺少核验记录")
+			return nil, errors.New("missing verification record")
 		}
 		return service.RecordReviewEvidence(request.Path, request.Version, *request.ReviewEvidence)
 	case "review-resources":
 		if request.ReviewResources == nil {
-			return nil, errors.New("缺少检查对象列表")
+			return nil, errors.New("missing verification resource list")
 		}
 		return nil, service.SaveReviewResources(request.Path, request.Version, *request.ReviewResources)
 	case "review-task-start":
 		return service.StartReviewTask(request.Path, request.Version, request.Title)
 	case "review-profile":
 		if request.ReviewProfile == nil {
-			return nil, errors.New("缺少项目适用项")
+			return nil, errors.New("missing project applicability")
 		}
 		return nil, service.SaveReviewProfile(request.Path, request.Version, *request.ReviewProfile)
 	case "review-task-context":
 		if request.ReviewTask == nil {
-			return nil, errors.New("缺少任务范围")
+			return nil, errors.New("missing task scope")
 		}
 		return service.StartReviewTaskWithContext(request.Path, request.Version, *request.ReviewTask)
 	case "review-issue":
 		if request.ReviewIssue == nil {
-			return nil, errors.New("缺少提醒处理状态")
+			return nil, errors.New("missing reminder status")
 		}
 		i := request.ReviewIssue
 		return service.SetReviewIssueState(request.Path, request.Version, i.Key, i.State, i.Reason)
 	case "review-task-finish":
 		if request.ReviewFinish == nil {
-			return nil, errors.New("缺少交接内容")
+			return nil, errors.New("missing handoff content")
 		}
 		return service.FinishReviewTask(request.Path, request.RunID, request.Version, *request.ReviewFinish)
 	case "review-handover":
@@ -252,7 +252,7 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 	case "doctor":
 		report, err := service.DiagnoseProject(request.Path)
 		if err == nil && !report.Ready {
-			err = errors.New("项目接入检查发现阻塞项")
+			err = errors.New("project setup checks found blockers")
 		}
 		return report, err
 	case "resources":
@@ -303,7 +303,7 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 			delete(requested, project.Path)
 		}
 		if len(requested) > 0 {
-			return results, errors.New("部分目录未登记，请先执行 add")
+			return results, errors.New("some folders are not registered; run add first")
 		}
 		return results, nil
 	case "start":
@@ -344,6 +344,6 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 	case "sync-restore":
 		return service.RestoreUpdate(request.RunID)
 	default:
-		return nil, fmt.Errorf("未知操作 %q", request.Action)
+		return nil, fmt.Errorf("unknown action %q", request.Action)
 	}
 }

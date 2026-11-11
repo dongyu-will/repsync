@@ -47,7 +47,7 @@ type PolicyReport struct {
 
 func policyPattern(pattern string) (*regexp.Regexp, error) {
 	if pattern == "" || strings.HasPrefix(pattern, "/") || strings.Contains(pattern, "\\") || strings.Contains(pattern, "..") || len(pattern) > 256 || strings.ContainsAny(pattern, "\x00\r\n") {
-		return nil, errors.New("规则路径需要项目内的相对模式，支持 *、** 和 ?")
+		return nil, errors.New("rule paths must be project-relative patterns; supports *, **, and ?")
 	}
 	var out strings.Builder
 	out.WriteString("^")
@@ -110,10 +110,10 @@ func policyGit(ctx context.Context, path string, args ...string) (string, error)
 	var output, diagnostics limitedBuffer
 	cmd.Stdout, cmd.Stderr = &output, &diagnostics
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("Git 基线读取失败: %w %s", err, diagnostics.String())
+		return "", fmt.Errorf("failed to read Git baseline: %w %s", err, diagnostics.String())
 	}
 	if output.overflow {
-		return "", errors.New("Git 文件列表或基线超过 1 MiB")
+		return "", errors.New("Git file list or baseline exceeds 1 MiB")
 	}
 	return output.String(), nil
 }
@@ -162,7 +162,7 @@ func policyFiles(ctx context.Context, path string) ([]string, map[string]bool, b
 		slices.Sort(names)
 		names = slices.Compact(names)
 		if len(names) > 5000 {
-			return errors.New("项目文件超过 5000 个，请缩小检查范围")
+			return errors.New("project exceeds 5000 files; narrow the check scope")
 		}
 		return nil
 	})
@@ -210,7 +210,7 @@ func (s *Service) CheckPolicies(path string) (PolicyReport, error) {
 	if s.closing {
 		s.taskMu.Unlock()
 		cancel()
-		return PolicyReport{}, errors.New("应用正在退出")
+		return PolicyReport{}, errors.New("the app is shutting down")
 	}
 	if _, err := s.registeredProject(path); err != nil {
 		s.taskMu.Unlock()
@@ -220,7 +220,7 @@ func (s *Service) CheckPolicies(path string) (PolicyReport, error) {
 	if s.activePolicyChecks[path] != nil {
 		s.taskMu.Unlock()
 		cancel()
-		return PolicyReport{}, errors.New("当前项目的规则检查正在运行")
+		return PolicyReport{}, errors.New("rule checks are already running for this project")
 	}
 	if s.activePolicyChecks == nil {
 		s.activePolicyChecks = map[string]context.CancelFunc{}
@@ -248,7 +248,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 		return PolicyReport{}, err
 	}
 	if !info.IsDir() {
-		return PolicyReport{}, errors.New("规则检查需要项目目录")
+		return PolicyReport{}, errors.New("rule checks require a project folder")
 	}
 	path = canonical
 	config, err := projectPolicies(path, registry)
@@ -277,7 +277,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 		report.Baseline = "HEAD"
 	}
 	if len(names) > 5000 {
-		return report, errors.New("项目文件超过 5000 个，请缩小检查范围")
+		return report, errors.New("project exceeds 5000 files; narrow the check scope")
 	}
 	root, err := os.OpenRoot(path)
 	if err != nil {
@@ -294,7 +294,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 			reactRule = &copy
 		}
 		if r.ID == "no-unit-tests" && len(r.Include) == 0 {
-			report.Errors = append(report.Errors, "禁止单元测试：尚未配置单元测试路径及例外，未推测测试语义")
+			report.Errors = append(report.Errors, "Unit test restriction: paths and exceptions not configured; test semantics were not inferred")
 			blockingIncomplete = blockingIncomplete || r.Level == "error"
 		}
 	}
@@ -337,7 +337,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 			continue
 		}
 		if err != nil || !info.Mode().IsRegular() {
-			report.Errors = append(report.Errors, "无法检查普通源文件："+name)
+			report.Errors = append(report.Errors, "Cannot check regular source file: "+name)
 			blockingIncomplete = blockingIncomplete || neededError
 			continue
 		}
@@ -356,7 +356,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 		}
 		total += len(content)
 		if total > 40*1024*1024 {
-			return report, errors.New("规则检查源码超过 40 MiB")
+			return report, errors.New("rule check source exceeds 40 MiB")
 		}
 		file := policyFile{Path: name, Content: content, Known: known, Added: known && !tracked[name]}
 		if known && tracked[name] {
@@ -417,7 +417,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 					line, kind = first, "new"
 				}
 			}
-			report.Findings = append(report.Findings, PolicyFinding{RuleID: r.ID, Path: file.Path, Line: line, Column: 1, Level: r.Level, Kind: kind, Message: "匹配项目声明的单元测试路径；新增文件及新增行受此规则限制"})
+			report.Findings = append(report.Findings, PolicyFinding{RuleID: r.ID, Path: file.Path, Line: line, Column: 1, Level: r.Level, Kind: kind, Message: "Matches declared unit test paths; this rule restricts new files and lines"})
 		}
 	}
 	if reactRule != nil && len(jsFiles) > 0 {
@@ -448,9 +448,9 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 		var output, diagnostics limitedBuffer
 		cmd.Stdout, cmd.Stderr = &output, &diagnostics
 		if err := cmd.Run(); err != nil {
-			report.Errors = append(report.Errors, "React 规则需要项目已有的 Node.js、ESLint 9+ 与 flat config："+diagnostics.String()+" "+err.Error())
+			report.Errors = append(report.Errors, "React rules require the project's existing Node.js, ESLint 9+, and flat config: "+diagnostics.String()+" "+err.Error())
 		} else if output.overflow {
-			report.Errors = append(report.Errors, "React 检查输出超过 1 MiB")
+			report.Errors = append(report.Errors, "React check output exceeds 1 MiB")
 		} else {
 			var result struct {
 				Findings []PolicyFinding `json:"findings"`
@@ -458,7 +458,7 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 				Skipped  []string        `json:"skipped"`
 			}
 			if err := json.Unmarshal(output.Bytes(), &result); err != nil {
-				report.Errors = append(report.Errors, "无法解析 ESLint 检查结果："+err.Error())
+				report.Errors = append(report.Errors, "Cannot parse ESLint results: "+err.Error())
 			} else {
 				report.Errors = append(report.Errors, result.Errors...)
 				report.Skipped = append(report.Skipped, result.Skipped...)
@@ -495,11 +495,11 @@ func checkPolicies(ctx context.Context, path, registry string) (PolicyReport, er
 // RunPolicyCheckCLI permits existing project scripts to use the same gate without a running app.
 func RunPolicyCheckCLI(args []string, out, diagnostics io.Writer) int {
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		fmt.Fprintln(out, "用法：repsync check-rules PATH")
+		fmt.Fprintln(out, "Usage: repsync check-rules PATH")
 		return 0
 	}
 	if len(args) != 1 {
-		fmt.Fprintln(diagnostics, "用法：repsync check-rules PATH")
+		fmt.Fprintln(diagnostics, "Usage: repsync check-rules PATH")
 		return 2
 	}
 	path, err := filepath.Abs(args[0])

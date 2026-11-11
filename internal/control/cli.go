@@ -17,67 +17,67 @@ import (
 	"repsync/internal/workspace"
 )
 
-const help = `repsync — AI 项目控制（JSON 输出；open 启动桌面控制端）
+const help = `repsync — local project control (JSON output; open starts the desktop app)
 
-  repsync open                             打开桌面应用并等待控制入口
-  repsync check-rules PATH                  检查项目规则，可独立运行
-  repsync doctor PATH                       检查项目接入，不执行项目命令
-  repsync ai-resources [PATH]                盘点 Skill、MCP、CLI 与项目适配
-  repsync ai-usage [PATH]                    读取最近 30 天本地使用证据与覆盖范围
-  repsync project-memory PATH               读取已确认的项目记忆及来源
-  repsync project-memory-propose PATH FILE  从 JSON 提交待确认的 AI 推断
-  repsync codex-resources PATH              查看由 RepSync 接入的项目 Skill 和 MCP
-  repsync codex-resource-preview PATH FILE  从 JSON 文件预览接入或撤回
+  repsync open                             Open desktop app and wait for the control endpoint
+  repsync check-rules PATH                  Check project rules; runs independently
+  repsync doctor PATH                       Check project setup without running project commands
+  repsync ai-resources [PATH]                Inventory Skills, MCPs, CLIs, and project fit
+  repsync ai-usage [PATH]                    Read 30 days of local usage evidence and coverage
+  repsync project-memory PATH               Read confirmed project memories and sources
+  repsync project-memory-propose PATH FILE  Propose AI-inferred memories from JSON
+  repsync codex-resources PATH              List project Skills and MCPs added by repsync
+  repsync codex-resource-preview PATH FILE  Preview setup or removal from JSON
   repsync codex-resource-apply PATH VERSION FILE
-  repsync review PATH                       手动读取收尾状态及版本
-  repsync review-check PATH VERSION FILE     从 JSON 文件记录外部检查
-  repsync review-evidence PATH VERSION FILE  从 JSON 文件记录阶段或数据核验
-  repsync review-resources PATH VERSION FILE 保存检查对象数组，VERSION 来自 configVersion
-  repsync review-profile PATH VERSION FILE   保存项目适用项，VERSION 来自 configVersion
-  repsync review-issue PATH VERSION FILE     记录保留、稍后处理或重新提醒
-  repsync review-task-context PATH VERSION FILE 记录任务及修改范围
+  repsync review PATH                       Read current review state and version
+  repsync review-check PATH VERSION FILE     Record an external check from JSON
+  repsync review-evidence PATH VERSION FILE  Record stage or data verification from JSON
+  repsync review-resources PATH VERSION FILE Save resources; VERSION is configVersion
+  repsync review-profile PATH VERSION FILE   Save applicability; VERSION is configVersion
+  repsync review-issue PATH VERSION FILE     Record keep, defer, or reopen decisions
+  repsync review-task-context PATH VERSION FILE Record task and change scope
   repsync review-task-start PATH VERSION TITLE
   repsync review-task-finish PATH TASK_ID VERSION FILE
-  repsync review-handover PATH TASK_ID        读取已保存的 Markdown 交接
-  repsync resources                         列出共享文件资源
-  repsync resource-add ID SOURCE TARGET     登记来源及项目内目标相对路径
-  repsync resource-remove ID                移除资源登记，保留项目文件和历史
-  repsync resource-status PATH              查看项目采用的共享文件状态
-  repsync resource-preview PATH ID          预览共享文件更新，用 sync-apply 应用
-  repsync resource-history PATH             查看共享文件历史，用 sync-restore 恢复
-  repsync projects                          列出已登记项目
-  repsync add PATH                          登记目录，不执行项目命令
-  repsync remove PATH                       移除登记，保留目录和历史
-  repsync relocate OLD_PATH NEW_PATH        更换登记路径，不搬动文件
-  repsync git-workspace PATH                查看工作树、分支和清理候选及版本
-  repsync git-cleanup PATH VERSION          清理已审查的候选，保留恢复记录
-  repsync git-restore PATH RECORD_ID         恢复清理的本地分支及工作树
-  repsync git-stashes PATH                  查看仓库共享的 stash
-  repsync git-stash-show PATH OID            查看 stash 改动及恢复版本
-  repsync git-stash-apply PATH OID VERSION    恢复到当前干净工作树，保留 stash
-  repsync status [PATH ...]                 查看服务、端口及运行编号
+  repsync review-handover PATH TASK_ID        Read saved Markdown handoff
+  repsync resources                         List shared file resources
+  repsync resource-add ID SOURCE TARGET     Register a source and project-relative destination
+  repsync resource-remove ID                Remove registration; preserve project files and history
+  repsync resource-status PATH              Read adopted shared file status
+  repsync resource-preview PATH ID          Preview shared file update; apply with sync-apply
+  repsync resource-history PATH             Read shared file history; restore with sync-restore
+  repsync projects                          List registered projects
+  repsync add PATH                          Register folder without running project commands
+  repsync remove PATH                       Remove registration; preserve folder and history
+  repsync relocate OLD_PATH NEW_PATH        Update registration path without moving files
+  repsync git-workspace PATH                Read worktrees, branches, cleanup candidates, and version
+  repsync git-cleanup PATH VERSION          Clean up reviewed candidates with recovery records
+  repsync git-restore PATH RECORD_ID         Restore cleaned local branches and worktrees
+  repsync git-stashes PATH                  List repository-wide stashes
+  repsync git-stash-show PATH OID            Preview stash changes and apply version
+  repsync git-stash-apply PATH OID VERSION    Apply to clean worktree; preserve stash
+  repsync status [PATH ...]                 Read services, ports, and run IDs
   repsync start [--dry-run | --wait] [--timeout 30s] PATH [PATH ...]
-  repsync stop-projects PATH [PATH ...]      批量停止选定项目的所属服务
-  repsync stop PATH SERVICE_ID RUN_ID        停止指定实例
-  repsync logs PATH SERVICE_ID RUN_ID        读取指定实例日志
-  repsync pipelines PATH                    查看流水线定义及版本
+  repsync stop-projects PATH [PATH ...]      Stop owned services for selected projects
+  repsync stop PATH SERVICE_ID RUN_ID        Stop specified service instance
+  repsync logs PATH SERVICE_ID RUN_ID        Read specified service logs
+  repsync pipelines PATH                    Read pipeline definitions and version
   repsync run [--wait] [--timeout 30s] PATH PIPELINE_ID VERSION
-  repsync runs PATH                         查看流水线运行记录
-  repsync pipeline-logs PATH RUN_ID          查看流水线状态与日志
-  repsync pipeline-stop PATH RUN_ID          停止指定流水线
-  repsync sync-source [FILE]                 查看或接入公共来源
-  repsync sync-status                        查看各项目采用状态
-  repsync sync-preview PATH                  预览公共规范更新
-  repsync policy-preview PATH                预览派生的 AI 规则说明
-  repsync sync-apply TOKEN                   应用已审查的预览
-  repsync sync-history PATH                  查看更新与恢复记录
-  repsync sync-restore RECORD_ID             恢复未产生后续改动的更新
+  repsync runs PATH                         Read pipeline run history
+  repsync pipeline-logs PATH RUN_ID          Read pipeline status and logs
+  repsync pipeline-stop PATH RUN_ID          Stop specified pipeline
+  repsync sync-source [FILE]                 Read or connect shared rules source
+  repsync sync-status                        Read project adoption status
+  repsync sync-preview PATH                  Preview shared rules update
+  repsync policy-preview PATH                Preview derived AI rule guidance
+  repsync sync-apply TOKEN                   Apply reviewed preview
+  repsync sync-history PATH                  Read update and restore history
+  repsync sync-restore RECORD_ID             Restore update if no later changes exist
 
-不传参数时打开桌面应用。路径可用绝对或相对路径；操作只接受已登记项目。
-start 可重复调用，复用配置一致的服务。wait 检查 TCP 就绪，未声明端口会标为 running_unchecked。
-等待超时或中断保留已启动任务，按回执处理；run 的 VERSION 来自 pipelines，防止执行过期配置。
-退出码：0 成功，1 操作失败，2 参数错误。REPSYNC_SOCKET 指定本机控制 socket。
-开发 CLI 使用 REPSYNC_APP 指定打包桌面程序的绝对路径；打包程序可自行 open。
+With no arguments, opens the desktop app. Paths may be absolute or relative; operations require registered projects.
+Repeated start reuses services with matching configuration. wait checks TCP readiness; undeclared ports yield running_unchecked.
+Timeouts or interruptions preserve started tasks; follow the receipt. run requires VERSION from pipelines to reject stale configuration.
+Exit codes: 0 success, 1 operation failed, 2 invalid arguments. REPSYNC_SOCKET selects the local control socket.
+Development CLI builds use REPSYNC_APP for the absolute packaged executable path; packaged apps can open themselves.
 `
 
 func Call(ctx context.Context, socket string, request Request) (Response, error) {
@@ -97,7 +97,7 @@ func Call(ctx context.Context, socket string, request Request) (Response, error)
 	req.Header.Set("Content-Type", "application/json")
 	result, err := client.Do(req)
 	if err != nil {
-		return Response{}, fmt.Errorf("无法连接 repsync，请先执行 repsync open 或启动桌面应用: %w", err)
+		return Response{}, fmt.Errorf("cannot connect to repsync; run repsync open or start the desktop app first: %w", err)
 	}
 	defer result.Body.Close()
 	var response Response
@@ -117,11 +117,11 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 	dryRun, wait := false, false
 	timeout := 30 * time.Second
 	if args[0] == "start" {
-		flags.BoolVar(&dryRun, "dry-run", false, "只预检，不启动")
+		flags.BoolVar(&dryRun, "dry-run", false, "Preflight only; do not start")
 	}
 	if args[0] == "start" || args[0] == "run" {
-		flags.BoolVar(&wait, "wait", false, "等待端口就绪或流水线结束")
-		flags.DurationVar(&timeout, "timeout", 30*time.Second, "等待时限")
+		flags.BoolVar(&wait, "wait", false, "Wait for port readiness or pipeline completion")
+		flags.DurationVar(&timeout, "timeout", 30*time.Second, "Wait timeout")
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -146,17 +146,17 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 			return err
 		}
 		if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
-			return errors.New("JSON 文件只能包含一个值")
+			return errors.New("JSON file must contain exactly one value")
 		}
 		return nil
 	}
 	if (wait && dryRun) || timeout <= 0 || timeout > 2*time.Hour {
-		return usage("dry-run 不能与 wait 同用；timeout 必须大于 0 且不超过 2h")
+		return usage("dry-run cannot be combined with wait; timeout must be positive and at most 2h")
 	}
 	switch request.Action {
 	case "project-memory-propose":
 		if len(paths) != 2 {
-			return usage("用法: repsync project-memory-propose PATH JSON_FILE")
+			return usage("Usage: repsync project-memory-propose PATH JSON_FILE")
 		}
 		request.Path = paths[0]
 		request.Memory = &workspace.ProjectMemoryInput{}
@@ -170,9 +170,9 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		}
 		if len(paths) != expected {
 			if expected == 3 {
-				return usage("用法: repsync codex-resource-apply PATH VERSION JSON_FILE")
+				return usage("Usage: repsync codex-resource-apply PATH VERSION JSON_FILE")
 			}
-			return usage("用法: repsync codex-resource-preview PATH JSON_FILE")
+			return usage("Usage: repsync codex-resource-preview PATH JSON_FILE")
 		}
 		request.Path = paths[0]
 		if expected == 3 {
@@ -184,23 +184,23 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		}
 	case "ai-resources", "ai-usage":
 		if len(paths) > 1 {
-			return usage("用法: repsync " + request.Action + " [PATH]")
+			return usage("Usage: repsync " + request.Action + " [PATH]")
 		}
 		if len(paths) == 1 {
 			request.Path = paths[0]
 		}
 	case "projects", "sync-status", "open", "resources":
 		if len(paths) != 0 {
-			return usage(request.Action + " 不接受路径参数")
+			return usage(request.Action + " does not accept path arguments")
 		}
 	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources", "project-memory":
 		if len(paths) != 1 {
-			return usage("用法: repsync " + request.Action + " PATH")
+			return usage("Usage: repsync " + request.Action + " PATH")
 		}
 		request.Path = paths[0]
 	case "review-check", "review-evidence", "review-resources", "review-profile", "review-task-context", "review-issue":
 		if len(paths) != 3 {
-			return usage("用法: repsync " + request.Action + " PATH VERSION JSON_FILE")
+			return usage("Usage: repsync " + request.Action + " PATH VERSION JSON_FILE")
 		}
 		request.Path, request.Version = paths[0], paths[1]
 		var input any
@@ -229,12 +229,12 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		}
 	case "review-task-start":
 		if len(paths) != 3 {
-			return usage("用法: repsync review-task-start PATH VERSION TITLE")
+			return usage("Usage: repsync review-task-start PATH VERSION TITLE")
 		}
 		request.Path, request.Version, request.Title = paths[0], paths[1], paths[2]
 	case "review-task-finish":
 		if len(paths) != 4 {
-			return usage("用法: repsync review-task-finish PATH TASK_ID VERSION JSON_FILE")
+			return usage("Usage: repsync review-task-finish PATH TASK_ID VERSION JSON_FILE")
 		}
 		request.Path, request.RunID, request.Version = paths[0], paths[1], paths[2]
 		request.ReviewFinish = &workspace.ReviewFinishInput{}
@@ -243,22 +243,22 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		}
 	case "review-handover":
 		if len(paths) != 2 {
-			return usage("用法: repsync review-handover PATH TASK_ID")
+			return usage("Usage: repsync review-handover PATH TASK_ID")
 		}
 		request.Path, request.RunID = paths[0], paths[1]
 	case "git-stash-show":
 		if len(paths) != 2 {
-			return usage("用法: repsync git-stash-show PATH OID")
+			return usage("Usage: repsync git-stash-show PATH OID")
 		}
 		request.Path, request.ObjectID = paths[0], paths[1]
 	case "git-stash-apply":
 		if len(paths) != 3 {
-			return usage("用法: repsync git-stash-apply PATH OID VERSION")
+			return usage("Usage: repsync git-stash-apply PATH OID VERSION")
 		}
 		request.Path, request.ObjectID, request.Version = paths[0], paths[1], paths[2]
 	case "git-cleanup", "git-restore":
 		if len(paths) != 2 {
-			return usage("用法: repsync " + request.Action + " PATH VERSION_OR_RECORD_ID")
+			return usage("Usage: repsync " + request.Action + " PATH VERSION_OR_RECORD_ID")
 		}
 		request.Path = paths[0]
 		if request.Action == "git-cleanup" {
@@ -268,60 +268,60 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		}
 	case "start", "stop-projects":
 		if len(paths) == 0 {
-			return usage("请明确指定项目路径")
+			return usage("Specify project paths explicitly")
 		}
 		request.Paths = paths
 	case "status":
 		request.Paths = paths
 	case "resource-add":
 		if len(paths) != 3 {
-			return usage("用法: repsync resource-add ID SOURCE TARGET")
+			return usage("Usage: repsync resource-add ID SOURCE TARGET")
 		}
 		request.ResourceID, request.Path, request.Target = paths[0], paths[1], paths[2]
 	case "resource-remove":
 		if len(paths) != 1 {
-			return usage("用法: repsync resource-remove ID")
+			return usage("Usage: repsync resource-remove ID")
 		}
 		request.ResourceID = paths[0]
 	case "resource-preview":
 		if len(paths) != 2 {
-			return usage("用法: repsync resource-preview PATH ID")
+			return usage("Usage: repsync resource-preview PATH ID")
 		}
 		request.Path, request.ResourceID = paths[0], paths[1]
 	case "relocate":
 		if len(paths) != 2 {
-			return usage("用法: repsync relocate OLD_PATH NEW_PATH")
+			return usage("Usage: repsync relocate OLD_PATH NEW_PATH")
 		}
 		request.Path, request.Destination = paths[0], paths[1]
 	case "run":
 		if len(paths) != 3 {
-			return usage("用法: repsync run [--wait] PATH PIPELINE_ID VERSION")
+			return usage("Usage: repsync run [--wait] PATH PIPELINE_ID VERSION")
 		}
 		request.Path, request.ServiceID, request.Version = paths[0], paths[1], paths[2]
 	case "pipeline-logs", "pipeline-stop":
 		if len(paths) != 2 {
-			return usage("用法: repsync " + request.Action + " PATH RUN_ID")
+			return usage("Usage: repsync " + request.Action + " PATH RUN_ID")
 		}
 		request.Path, request.RunID = paths[0], paths[1]
 	case "sync-apply", "sync-restore":
 		if len(paths) != 1 {
-			return usage("请指定预览或记录编号")
+			return usage("Specify a preview or record ID")
 		}
 		request.RunID = paths[0]
 	case "sync-source":
 		if len(paths) > 1 {
-			return usage("用法: repsync sync-source [FILE]")
+			return usage("Usage: repsync sync-source [FILE]")
 		}
 		if len(paths) == 1 {
 			request.Path = paths[0]
 		}
 	case "stop", "logs":
 		if len(paths) != 3 {
-			return usage("用法: repsync " + request.Action + " PATH SERVICE_ID RUN_ID")
+			return usage("Usage: repsync " + request.Action + " PATH SERVICE_ID RUN_ID")
 		}
 		request.Path, request.ServiceID, request.RunID = paths[0], paths[1], paths[2]
 	default:
-		return usage("未知命令，请使用 repsync --help")
+		return usage("Unknown command; use repsync --help")
 	}
 	canonical := func(path string) (string, error) {
 		absolute, err := filepath.Abs(path)
@@ -417,7 +417,7 @@ func waitForResult(ctx context.Context, socket string, request Request, initial 
 		if err != nil {
 			latest.OK, latest.Error = false, err.Error()
 			if ctx.Err() != nil {
-				latest.Error = "等待已结束（" + ctx.Err().Error() + "），任务保留，请按回执检查或停止"
+				latest.Error = "Wait ended (" + ctx.Err().Error() + "); tasks preserved; inspect or stop them using the receipt"
 			}
 			return latest
 		}
@@ -443,7 +443,7 @@ func waitForResult(ctx context.Context, socket string, request Request, initial 
 			}
 			complete = output.Run.Status != "running"
 			if complete && output.Run.Status != "success" {
-				latest.OK, latest.Error = false, "流水线未成功，请查看运行结果与日志"
+				latest.OK, latest.Error = false, "Pipeline did not succeed; review results and logs"
 			}
 		}
 		if complete {
@@ -451,7 +451,7 @@ func waitForResult(ctx context.Context, socket string, request Request, initial 
 		}
 		select {
 		case <-ctx.Done():
-			latest.OK, latest.Error = false, "等待已结束（"+ctx.Err().Error()+"），任务保留，请按回执检查或停止"
+			latest.OK, latest.Error = false, "Wait ended ("+ctx.Err().Error()+"); tasks preserved; inspect or stop them using the receipt"
 			return latest
 		case <-ticker.C:
 		}

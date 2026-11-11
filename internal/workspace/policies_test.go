@@ -258,7 +258,7 @@ func TestPolicyCIGateStopsBeforeExistingCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	output := waitPipeline(t, s, path, run.ID)
-	if output.Run.Status != "failure" || !strings.Contains(output.Log, "项目规则检查失败") {
+	if output.Run.Status != "failure" || !strings.Contains(output.Log, "Project rule checks failed") {
 		t.Fatalf("gate result: %+v", output)
 	}
 	if _, err := os.Stat(filepath.Join(path, "must-not-run")); !os.IsNotExist(err) {

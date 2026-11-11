@@ -46,10 +46,10 @@ func (s *Service) readProjectMemory(path string) ([]ProjectMemory, error) {
 		return items, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("读取项目记忆: %w", err)
+		return nil, fmt.Errorf("read project memory: %w", err)
 	}
 	if err := json.Unmarshal(data, &items); err != nil || items == nil || len(items) > maxProjectMemories {
-		return nil, errors.New("项目记忆文件无法读取")
+		return nil, errors.New("cannot read project memory file")
 	}
 	ids := map[string]bool{}
 	for i := range items {
@@ -58,7 +58,7 @@ func (s *Service) readProjectMemory(path string) ([]ProjectMemory, error) {
 			!slices.Contains([]string{"pending", "confirmed", "archived"}, item.Status) ||
 			(item.Status == "archived" && !slices.Contains([]string{"pending", "confirmed"}, item.ArchivedFrom)) ||
 			(item.Status == "confirmed" && item.ConfirmedAt == "") {
-			return nil, errors.New("项目记忆中有无效记录")
+			return nil, errors.New("project memory contains invalid records")
 		}
 		ids[item.ID] = true
 		item.Version = ""
@@ -124,7 +124,7 @@ func (s *Service) addProjectMemory(path string, input ProjectMemoryInput, origin
 		}
 	}
 	if len(items) >= maxProjectMemories {
-		return item, errors.New("项目记忆达到 256 条上限")
+		return item, errors.New("project memory limit of 256 records reached")
 	}
 	item = newProjectMemory(input, origin, status, nil)
 	return item, s.saveProjectMemories(path, append(items, item))
@@ -135,13 +135,13 @@ func normalizeMemoryInput(input ProjectMemoryInput) (ProjectMemoryInput, error) 
 	input.Source = strings.TrimSpace(input.Source)
 	input.Environment = strings.TrimSpace(input.Environment)
 	if input.Statement == "" || input.Source == "" || len(input.Statement) > 2048 || len(input.Source) > 1024 || len(input.Environment) > 256 {
-		return input, errors.New("请填写记忆内容和来源，并检查字段长度")
+		return input, errors.New("provide a memory statement and source; check field lengths")
 	}
 	if !utf8.ValidString(input.Statement) || !utf8.ValidString(input.Source) || !utf8.ValidString(input.Environment) {
-		return input, errors.New("项目记忆需要使用 UTF-8 文本")
+		return input, errors.New("project memory must use UTF-8 text")
 	}
 	if len(input.Keywords) > 12 {
-		return input, errors.New("最多填写 12 个文档关键词")
+		return input, errors.New("up to 12 document keywords allowed")
 	}
 	keywords := []string{}
 	for _, keyword := range input.Keywords {
@@ -150,7 +150,7 @@ func normalizeMemoryInput(input ProjectMemoryInput) (ProjectMemoryInput, error) 
 			continue
 		}
 		if len(keyword) > 100 || !utf8.ValidString(keyword) || strings.ContainsAny(keyword, "\x00\r\n") {
-			return input, errors.New("文档关键词需要是 100 字节以内的单行文本")
+			return input, errors.New("document keywords must be single-line text of up to 100 bytes")
 		}
 		if !slices.ContainsFunc(keywords, func(existing string) bool { return strings.EqualFold(existing, keyword) }) {
 			keywords = append(keywords, keyword)
@@ -186,7 +186,7 @@ func (s *Service) SetProjectMemoryState(path, id, version, action string) (Proje
 	}
 	index := slices.IndexFunc(items, func(item ProjectMemory) bool { return item.ID == id })
 	if index < 0 || items[index].Version != version {
-		return ProjectMemory{}, errors.New("记忆已变化，请重新载入后再操作")
+		return ProjectMemory{}, errors.New("memory changed; reload before continuing")
 	}
 	item := &items[index]
 	now := time.Now().UTC().Format(time.RFC3339Nano)
@@ -198,7 +198,7 @@ func (s *Service) SetProjectMemoryState(path, id, version, action string) (Proje
 	case action == "restore" && item.Status == "archived":
 		item.Status, item.ArchivedFrom = item.ArchivedFrom, ""
 	default:
-		return ProjectMemory{}, errors.New("此记忆状态不支持该操作")
+		return ProjectMemory{}, errors.New("this operation is not supported for the current memory state")
 	}
 	item.UpdatedAt = now
 	item.Version = ""
@@ -212,7 +212,7 @@ func (s *Service) saveProjectMemories(path string, items []ProjectMemory) error 
 		return err
 	}
 	if len(data) > 1024*1024 {
-		return errors.New("项目记忆达到 1 MiB 上限")
+		return errors.New("project memory reached the 1 MiB limit")
 	}
 	return saveJSON(s.projectMemoryPath(path), items)
 }

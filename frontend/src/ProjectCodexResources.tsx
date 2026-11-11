@@ -22,11 +22,11 @@ const initialChange: CodexResourceChange = {
   args: [],
 };
 const placementLabels: Record<string, string> = {
-  applied: "项目已启用",
-  changed: "项目配置已在外部修改",
-  missing: "项目链接已移除",
-  source_missing: "Skill 来源不可用",
-  disabled: "项目已停用",
+  applied: "Enabled for project",
+  changed: "Project configuration changed externally",
+  missing: "Project link removed",
+  source_missing: "Skill Source unavailable",
+  disabled: "Disabled for project",
 };
 
 type State = {
@@ -65,7 +65,7 @@ export default function ResourceSettings({
   const editing = !!resource;
   const userMCP =
     resource?.kind === "mcp" &&
-    resource.source === "Codex CLI 当前配置" &&
+    resource.source === "Codex CLI Current configuration" &&
     ["configured", "disabled"].includes(resource.availability);
   const override = placement?.source === "user";
   const globalDefault =
@@ -133,7 +133,11 @@ export default function ResourceSettings({
     update({ pending: true, error: "" });
     try {
       await Service.applyCodexResource(path, preview.change, preview.version);
-      update({ preview: null, selected: null, notice: "已保存资源设置" });
+      update({
+        preview: null,
+        selected: null,
+        notice: "Resource settings saved",
+      });
       onChanged();
     } catch (error) {
       update({ error: message(error) });
@@ -159,7 +163,7 @@ export default function ResourceSettings({
             <div className="flex flex-wrap items-end gap-2">
               <label className="grid gap-1">
                 <span className="text-xs text-muted">
-                  {path ? "项目设置" : "用户默认设置"}
+                  {path ? "Project settings" : "User defaults"}
                 </span>
                 <Select
                   value={selected}
@@ -168,19 +172,19 @@ export default function ResourceSettings({
                 >
                   {path && (
                     <option value="remove">
-                      继承默认
+                      Inherit defaults
                       {userMCP
                         ? globalDefault === "enable"
-                          ? "（启用）"
-                          : "（停用）"
+                          ? "(enabled)"
+                          : "(disabled)"
                         : ""}
                     </option>
                   )}
                   {(userMCP || current === "enable") && (
-                    <option value="enable">启用</option>
+                    <option value="enable">Enable</option>
                   )}
                   {(userMCP || current === "disable") && (
-                    <option value="disable">停用</option>
+                    <option value="disable">Disable</option>
                   )}
                 </Select>
               </label>
@@ -189,7 +193,7 @@ export default function ResourceSettings({
                 disabled={pending || selected === current}
                 onClick={() => planResource(selected)}
               >
-                预览变更
+                Preview changes
               </Button>
             </div>
           ) : !readOnly && placement ? (
@@ -199,8 +203,8 @@ export default function ResourceSettings({
               onClick={() => planResource("remove")}
             >
               {resource.kind === "skill"
-                ? "预览移除项目链接"
-                : "预览移除项目配置"}
+                ? "Preview removing project link"
+                : "Preview removing project configuration"}
             </Button>
           ) : !readOnly && path && resource.kind === "skill" ? (
             <Button
@@ -208,7 +212,7 @@ export default function ResourceSettings({
               disabled={pending}
               onClick={() => planResource("add")}
             >
-              预览接入项目
+              Preview project connection
             </Button>
           ) : null}
         </div>
@@ -221,7 +225,7 @@ export default function ResourceSettings({
         >
           <div className="flex flex-wrap gap-3">
             <label className="grid flex-1 gap-1">
-              <span className="text-xs text-muted">服务器名称</span>
+              <span className="text-xs text-muted">Server name</span>
               <input
                 className={inputClass}
                 required
@@ -231,21 +235,21 @@ export default function ResourceSettings({
               />
             </label>
             <label className="grid gap-1">
-              <span className="text-xs text-muted">连接方式</span>
+              <span className="text-xs text-muted">Transport</span>
               <Select
                 value={state.transport}
                 disabled={pending}
                 onChange={(e) => update({ transport: e.target.value })}
               >
                 <option value="http">Streamable HTTP</option>
-                <option value="stdio">标准输入输出</option>
+                <option value="stdio">Standard input/output</option>
               </Select>
             </label>
           </div>
           {state.transport === "http" ? (
             <>
               <label className="grid gap-1">
-                <span className="text-xs text-muted">服务器 URL</span>
+                <span className="text-xs text-muted">Server URL</span>
                 <input
                   className={inputClass}
                   required
@@ -255,7 +259,9 @@ export default function ResourceSettings({
                 />
               </label>
               <label className="grid gap-1">
-                <span className="text-xs text-muted">令牌环境变量（可选）</span>
+                <span className="text-xs text-muted">
+                  Token environment variable (optional)
+                </span>
                 <input
                   className={inputClass}
                   name="tokenEnv"
@@ -266,7 +272,7 @@ export default function ResourceSettings({
           ) : (
             <>
               <label className="grid gap-1">
-                <span className="text-xs text-muted">启动程序</span>
+                <span className="text-xs text-muted">Executable</span>
                 <input
                   className={inputClass}
                   required
@@ -275,7 +281,9 @@ export default function ResourceSettings({
                 />
               </label>
               <label className="grid gap-1">
-                <span className="text-xs text-muted">参数（每行一项）</span>
+                <span className="text-xs text-muted">
+                  Arguments (one per line)
+                </span>
                 <textarea
                   className={inputClass}
                   name="args"
@@ -286,7 +294,7 @@ export default function ResourceSettings({
             </>
           )}
           <Button type="submit" disabled={pending}>
-            预览添加
+            Preview addition
           </Button>
         </form>
       )}
@@ -304,7 +312,7 @@ export default function ResourceSettings({
         <div
           ref={previewRef}
           tabIndex={-1}
-          aria-label="资源变更预览"
+          aria-label="Resource change preview"
           className="space-y-2 border-t border-line-subtle pt-3"
         >
           <p className="break-all text-xs text-muted">
@@ -323,14 +331,14 @@ export default function ResourceSettings({
               disabled={pending}
               onClick={() => update({ preview: null })}
             >
-              取消
+              Cancel
             </Button>
             <Button
               primary
               disabled={!native || pending}
               onClick={() => void apply()}
             >
-              应用变更
+              Apply changes
             </Button>
           </div>
         </div>

@@ -85,11 +85,11 @@ func (s *Service) AIUsage(path string) (AIUsageReport, error) {
 		return AIUsageReport{}, err
 	}
 	report := scanCodexUsage(filepath.Join(paths.codex, "sessions"), path, time.Now())
-	coverage := AIUsageCoverage{Source: "RepSync 流水线回执", Status: "partial", Versions: []string{}, Detail: "每项目最近 20 条入口记录；不推定内部 CLI、发起人或业务验收结果"}
+	coverage := AIUsageCoverage{Source: "repsync pipeline receipts", Status: "partial", Versions: []string{}, Detail: "Latest 20 entry records per project; internal CLIs, initiators, and business acceptance are not inferred"}
 	for _, project := range projects {
 		runs, err := s.PipelineRuns(project.Path)
 		if err != nil {
-			report.Issues = append(report.Issues, "流水线回执读取失败: "+project.Path)
+			report.Issues = append(report.Issues, "Failed to read pipeline receipts: "+project.Path)
 			continue
 		}
 		for _, run := range runs {
@@ -105,7 +105,7 @@ func (s *Service) AIUsage(path string) (AIUsageReport, error) {
 			} else if run.Status == "failed" {
 				status = "failed"
 			}
-			report.Events = append(report.Events, AIUsageEvent{ID: aiID("entry", project.Path+":"+run.ID), ResourceID: "entry:pipeline:" + project.Path + ":" + run.PipelineID, Kind: "cli", Name: run.Name, Action: "pipeline", Status: status, Purpose: "entry", Actor: "repsync", Project: project.Path, Timestamp: run.StartedAt, Source: "RepSync / " + run.ID, Detail: "流水线入口回执；未展开内部命令，发起人未记录"})
+			report.Events = append(report.Events, AIUsageEvent{ID: aiID("entry", project.Path+":"+run.ID), ResourceID: "entry:pipeline:" + project.Path + ":" + run.PipelineID, Kind: "cli", Name: run.Name, Action: "pipeline", Status: status, Purpose: "entry", Actor: "repsync", Project: project.Path, Timestamp: run.StartedAt, Source: "RepSync / " + run.ID, Detail: "Pipeline entry receipt; internal commands not expanded; initiator not recorded"})
 		}
 	}
 	report.Coverage = append(report.Coverage, coverage)
@@ -116,10 +116,10 @@ func (s *Service) AIUsage(path string) (AIUsageReport, error) {
 func scanCodexUsage(directory, scope string, now time.Time) AIUsageReport {
 	since := now.AddDate(0, 0, -30)
 	report := AIUsageReport{Since: since.UTC().Format(time.RFC3339), Until: now.UTC().Format(time.RFC3339), Summaries: []AIUsageSummary{}, Events: []AIUsageEvent{}, Coverage: []AIUsageCoverage{}, Issues: []string{}}
-	coverage := AIUsageCoverage{Source: "Codex 本地 sessions", Status: "partial", Versions: []string{}, Detail: "最近 30 天可读取的 item_completed 事件；未覆盖归档、云端、其他 AI 工具及缺少事件的会话。Skill 仅记录可确认的成功读取命令"}
+	coverage := AIUsageCoverage{Source: "Local Codex sessions", Status: "partial", Versions: []string{}, Detail: "Readable item_completed events from the last 30 days; excludes archives, cloud sessions, other AI tools, and sessions without events. Skills count only verifiable successful reads."}
 	if _, err := os.Stat(directory); err != nil {
 		coverage.Status = "unavailable"
-		coverage.Detail = "Codex 本地会话目录不存在或无法读取；使用情况未知"
+		coverage.Detail = "Local Codex session directory missing or unreadable; usage unknown"
 		report.Coverage = append(report.Coverage, coverage)
 		return report
 	}
@@ -156,21 +156,21 @@ func scanCodexUsage(directory, scope string, now time.Time) AIUsageReport {
 		return nil
 	})
 	if err != nil {
-		report.Issues = append(report.Issues, "部分 Codex 会话目录无法读取")
+		report.Issues = append(report.Issues, "Some Codex session directories are unreadable")
 	}
 	slices.SortFunc(files, func(a, b file) int { return b.modified.Compare(a.modified) })
 	if len(files) > 256 {
 		files = files[:256]
-		report.Issues = append(report.Issues, "仅扫描最近修改的 256 个会话文件")
+		report.Issues = append(report.Issues, "Scans only the 256 most recently modified session files")
 	}
 	if nodes > 8000 {
-		report.Issues = append(report.Issues, "会话目录扫描达到 8000 个目录项上限")
+		report.Issues = append(report.Issues, "Session scan reached the 8000 directory entry limit")
 	}
 	remaining := int64(64 * 1024 * 1024)
 	matched := map[string]bool{}
 	for _, file := range files {
 		if remaining <= 0 || time.Now().After(deadline) || len(report.Events) >= 4000 {
-			report.Issues = append(report.Issues, "使用记录达到 64 MiB、6 秒或 4000 条事件上限；统计不完整")
+			report.Issues = append(report.Issues, "Usage scan reached 64 MiB, 6 seconds, or 4000 events; statistics incomplete")
 			break
 		}
 		coverage.Files++
@@ -189,7 +189,7 @@ func scanCodexUsage(directory, scope string, now time.Time) AIUsageReport {
 	}
 	coverage.Sessions = len(matched)
 	if coverage.PartialFiles > 0 {
-		report.Issues = append(report.Issues, fmt.Sprintf("%d 个文件读取不完整或存在无法识别的记录；缺失部分不计为零使用", coverage.PartialFiles))
+		report.Issues = append(report.Issues, fmt.Sprintf("%d files incompletely read or contain unrecognized records; missing data is not counted as zero usage", coverage.PartialFiles))
 	}
 	report.Coverage = append(report.Coverage, coverage)
 	finishAIUsage(&report)
@@ -341,7 +341,7 @@ func readCodexUsageFile(path, scope string, since, until time.Time, budget int64
 				continue
 			}
 			event.Kind, event.Name, event.ResourceID, event.Action = "mcp", item.Server, "mcp:codex:"+item.Server, item.Tool
-			event.Detail = "Codex 工具完成事件；不代表业务验收通过"
+			event.Detail = "Codex tool completion event; does not prove business acceptance"
 			var result struct {
 				IsError *bool `json:"isError"`
 			}
@@ -369,14 +369,14 @@ func readCodexUsageFile(path, scope string, since, until time.Time, budget int64
 			continue
 		}
 		event.Kind, event.Name, event.Action = "cli", filepath.Base(item.Command[0]), "execute"
-		event.Detail = "命令执行回执；未展开脚本内部命令"
+		event.Detail = "Command execution receipt; commands inside scripts not expanded"
 		commands := [][]string{item.Command}
 		if len(item.Command) >= 3 && slices.Contains([]string{"sh", "bash", "zsh"}, event.Name) && strings.Contains(item.Command[1], "c") {
 			commands = simpleEvidenceCommands(item.Command[2])
 			if len(commands) == 1 && len(commands[0]) > 0 {
 				event.Name = filepath.Base(commands[0][0])
 			} else {
-				event.Detail = "Shell 复合命令回执；内部 CLI 未逐项确认"
+				event.Detail = "Compound shell command receipt; internal CLIs not individually verified"
 			}
 		}
 		event.ResourceID = "cli:codex-name:" + event.Name
@@ -385,7 +385,7 @@ func readCodexUsageFile(path, scope string, since, until time.Time, budget int64
 		} else if len(commands) != 1 && filepath.IsAbs(item.Command[0]) {
 			event.ResourceID = aiID("cli", filepath.Clean(item.Command[0]))
 		} else {
-			event.Detail += "；可执行文件路径未记录，不与当前盘点来源合并"
+			event.Detail += "; executable path not recorded; not merged with current inventory sources"
 		}
 		if item.Status == "completed" && item.ExitCode != nil {
 			if *item.ExitCode == 0 {
@@ -437,7 +437,7 @@ func readCodexUsageFile(path, scope string, since, until time.Time, budget int64
 				skill := event
 				skill.ID, skill.Kind, skill.ResourceID = event.ID+":"+skillID(location), "skill", skillID(location)
 				skill.Name, skill.Action, skill.Purpose = filepath.Base(filepath.Dir(location)), "read", "instruction"
-				skill.Detail = "成功读取命令: " + location + "；正文完整性、当时版本及要求落实未核验"
+				skill.Detail = "Successful read command: " + location + "; content completeness, historical version, and compliance not verified"
 				events = append(events, skill)
 			}
 		}
@@ -529,7 +529,7 @@ func finishAIUsage(report *AIUsageReport) {
 	slices.SortStableFunc(events, func(a, b AIUsageEvent) int { return strings.Compare(b.Timestamp, a.Timestamp) })
 	if len(events) > 4000 {
 		events = events[:4000]
-		report.Issues = append(report.Issues, "仅展示和汇总最近 4000 条证据")
+		report.Issues = append(report.Issues, "Only the latest 4000 evidence records are displayed and summarized")
 	}
 	// Leave room for summaries and coverage within the control client's 4 MiB limit.
 	budget := 3 * 1024 * 1024
@@ -547,7 +547,7 @@ func finishAIUsage(report *AIUsageReport) {
 		}
 		if err != nil || size > budget {
 			events = events[:i]
-			report.Issues = append(report.Issues, "使用证据返回达到 3 MiB 上限，统计不完整")
+			report.Issues = append(report.Issues, "Usage evidence reached the 3 MiB response limit; statistics incomplete")
 			break
 		}
 		budget -= size

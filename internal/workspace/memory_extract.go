@@ -63,10 +63,10 @@ func (s *Service) ExtractProjectMemories(path, provider, file, sessionID, extrac
 		return result, err
 	}
 	if extractor == "" || memoryToolName(extractor) == "" {
-		return result, errors.New("请选择支持的提炼工具")
+		return result, errors.New("select a supported extraction tool")
 	}
 	if !s.memoryExtractMu.TryLock() {
-		return result, errors.New("已有会话正在提炼")
+		return result, errors.New("a session extraction is already running")
 	}
 	defer s.memoryExtractMu.Unlock()
 	directory, err := memorySessionsDir(provider)
@@ -109,7 +109,7 @@ func memoryToolName(provider string) string {
 func runMemoryExtraction(extractor string, messages []memoryMessage) ([]memoryProposal, error) {
 	tool := memoryToolName(extractor)
 	if tool == "" || extractor == "" {
-		return nil, errors.New("请选择支持的提炼工具")
+		return nil, errors.New("select a supported extraction tool")
 	}
 	input, err := json.Marshal(messages)
 	if err != nil {
@@ -141,7 +141,7 @@ func runMemoryExtraction(extractor string, messages []memoryMessage) ([]memoryPr
 	}
 	cmd, err := projectCommand(ctx, dir, "", nil, args, false)
 	if err != nil {
-		return nil, fmt.Errorf("找不到 %s CLI，请安装或检查 PATH", tool)
+		return nil, fmt.Errorf("%s CLI not found; install it or check PATH", tool)
 	}
 	configureCommandProcess(cmd, false)
 	cmd.Stdin = strings.NewReader(memoryPrompt + string(input))
@@ -155,13 +155,13 @@ func runMemoryExtraction(extractor string, messages []memoryMessage) ([]memoryPr
 	}
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("%s 提炼超时，请重试", tool)
+			return nil, fmt.Errorf("%s extraction timed out; try again", tool)
 		}
-		return nil, fmt.Errorf("%s 提炼失败，请检查 CLI 登录与连接后重试", tool)
+		return nil, fmt.Errorf("%s extraction failed; check CLI authentication and connectivity", tool)
 	}
 	data, err := readReviewData(output)
 	if err != nil {
-		return nil, fmt.Errorf("%s 未返回可读取的提炼结果", tool)
+		return nil, fmt.Errorf("%s returned no readable extraction result", tool)
 	}
 	if extractor == "claude" {
 		var envelope struct {
@@ -170,7 +170,7 @@ func runMemoryExtraction(extractor string, messages []memoryMessage) ([]memoryPr
 			Output  json.RawMessage `json:"structured_output"`
 		}
 		if json.Unmarshal(data, &envelope) != nil || envelope.IsError || envelope.Subtype != "success" || len(envelope.Output) == 0 {
-			return nil, errors.New("Claude Code 未返回成功的结构化提炼结果")
+			return nil, errors.New("Claude Code returned no successful structured extraction result")
 		}
 		data = envelope.Output
 	}
@@ -178,7 +178,7 @@ func runMemoryExtraction(extractor string, messages []memoryMessage) ([]memoryPr
 		Items []memoryProposal `json:"items"`
 	}
 	if err := json.Unmarshal(data, &result); err != nil || result.Items == nil || len(result.Items) > 5 {
-		return nil, fmt.Errorf("%s 返回的提炼结果格式不符合要求", tool)
+		return nil, fmt.Errorf("%s returned an invalid extraction result format", tool)
 	}
 	return result.Items, nil
 }
@@ -203,7 +203,7 @@ func (s *Service) saveMemoryProposals(path string, session MemorySession, file, 
 			continue
 		}
 		input, err := normalizeMemoryInput(ProjectMemoryInput{
-			Statement: proposal.Statement, Source: fmt.Sprintf("%s 会话 %s · 第 %d 行", memoryToolName(session.Provider), session.ID, proposal.Line),
+			Statement: proposal.Statement, Source: fmt.Sprintf("%s session %s · line %d", memoryToolName(session.Provider), session.ID, proposal.Line),
 			Environment: proposal.Environment, Keywords: proposal.Keywords,
 		})
 		if err != nil {
@@ -221,7 +221,7 @@ func (s *Service) saveMemoryProposals(path string, session MemorySession, file, 
 			continue
 		}
 		if len(items) >= maxProjectMemories {
-			return result, errors.New("项目记忆达到 256 条上限")
+			return result, errors.New("project memory limit of 256 records reached")
 		}
 		item := newProjectMemory(input, "ai", "pending", &citation)
 		items = append(items, item)

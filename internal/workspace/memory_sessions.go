@@ -69,11 +69,11 @@ func memorySessionsDir(provider string) (string, error) {
 			directory = filepath.Join(paths.home, ".claude")
 		}
 		if !filepath.IsAbs(directory) {
-			return "", errors.New("CLAUDE_CONFIG_DIR 必须是绝对路径")
+			return "", errors.New("CLAUDE_CONFIG_DIR must be an absolute path")
 		}
 		return filepath.Join(directory, "projects"), nil
 	default:
-		return "", errors.New("请选择支持的会话来源")
+		return "", errors.New("select a supported session source")
 	}
 }
 
@@ -195,14 +195,14 @@ func codexMemoryTitles(path string) map[string]string {
 
 func openMemoryLog(root *os.Root, name string) (*os.File, error) {
 	if filepath.Ext(name) != ".jsonl" {
-		return nil, errors.New("请选择 JSONL 会话")
+		return nil, errors.New("select a JSONL session")
 	}
 	if err := validateUpdatePath(root, name); err != nil {
-		return nil, errors.New("会话路径不在所选工具的会话目录中")
+		return nil, errors.New("session path is outside the selected tool's session directory")
 	}
 	info, err := root.Lstat(name)
 	if err != nil || !info.Mode().IsRegular() {
-		return nil, errors.New("会话文件不可读取")
+		return nil, errors.New("session file is unreadable")
 	}
 	file, err := root.Open(name)
 	if err != nil {
@@ -211,7 +211,7 @@ func openMemoryLog(root *os.Root, name string) (*os.File, error) {
 	opened, err := file.Stat()
 	if err != nil || !os.SameFile(info, opened) {
 		file.Close()
-		return nil, errors.New("会话文件已变化，请重新选择")
+		return nil, errors.New("session file changed; select again")
 	}
 	return file, nil
 }
@@ -251,7 +251,7 @@ func codexMemoryMetadata(scanner *bufio.Scanner, name string) (MemorySession, st
 	}
 	if !scanner.Scan() || json.Unmarshal(scanner.Bytes(), &entry) != nil || entry.Type != "session_meta" ||
 		json.Unmarshal(entry.Payload, &meta) != nil {
-		return MemorySession{}, "", errors.New("无法读取会话元数据")
+		return MemorySession{}, "", errors.New("cannot read session metadata")
 	}
 	if len(meta.Source) > 0 && meta.Source[0] == '{' {
 		return MemorySession{}, "", nil // agent-generated sessions
@@ -260,7 +260,7 @@ func codexMemoryMetadata(scanner *bufio.Scanner, name string) (MemorySession, st
 		meta.ID = meta.SessionID
 	}
 	if len(meta.ID) > 200 || strings.ContainsAny(meta.ID, "\x00\r\n") {
-		return MemorySession{}, "", errors.New("会话编号无效")
+		return MemorySession{}, "", errors.New("invalid session ID")
 	}
 	return MemorySession{Provider: "codex", ID: meta.ID, File: name, Started: meta.Timestamp}, evidencePath(meta.Cwd), nil
 }
@@ -280,7 +280,7 @@ func readCodexMemoryMessages(directory, path, fileName, expectedID string) (Memo
 	scanner := memoryScanner(reader)
 	session, cwd, err := codexMemoryMetadata(scanner, fileName)
 	if err != nil || session.ID == "" || session.ID != expectedID || cwd == "" || !withinAIScope(cwd, path) {
-		return session, nil, false, errors.New("该会话不属于当前项目或已变化，请重新选择")
+		return session, nil, false, errors.New("session does not belong to this project or has changed; select again")
 	}
 	partial := false
 	line := 1

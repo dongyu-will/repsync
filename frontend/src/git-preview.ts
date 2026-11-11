@@ -47,7 +47,7 @@ export function gitPreview(path: string): GitOverview {
             dirty: path === "/Projects/atlas",
             statusKnown: true,
             eligible: false,
-            reasons: ["主工作树", "已登记项目"],
+            reasons: ["Main worktree", "Registered project"],
           },
           {
             path: `${path}-worktrees/settings`,
@@ -59,7 +59,10 @@ export function gitPreview(path: string): GitOverview {
             dirty: true,
             statusKnown: true,
             eligible: false,
-            reasons: ["有修改、未跟踪或忽略文件", "尚未合并到基准分支"],
+            reasons: [
+              "Modified, untracked, or ignored files",
+              "Not merged into the base branch",
+            ],
           },
           {
             path: `${path}-worktrees/sidebar`,
@@ -85,7 +88,7 @@ export function gitPreview(path: string): GitOverview {
             merged: true,
             worktrees: current === "main" ? [path] : [],
             eligible: false,
-            reasons: ["受保护分支", "关联工作树需要保留"],
+            reasons: ["Protected branch", "Linked worktree must be kept"],
           },
           ...(current !== "main"
             ? [
@@ -97,7 +100,7 @@ export function gitPreview(path: string): GitOverview {
                   merged: true,
                   worktrees: [path],
                   eligible: false,
-                  reasons: ["关联工作树需要保留"],
+                  reasons: ["Linked worktree must be kept"],
                 },
               ]
             : []),
@@ -109,7 +112,7 @@ export function gitPreview(path: string): GitOverview {
             merged: false,
             worktrees: [`${path}-worktrees/settings`],
             eligible: false,
-            reasons: ["尚未合并到基准分支"],
+            reasons: ["Not merged into the base branch"],
           },
           {
             name: "fix/sidebar",
@@ -135,7 +138,7 @@ export function gitPreview(path: string): GitOverview {
       : [],
   };
   if (view.stashes.entries.length) {
-    const reason = `有 ${view.stashes.entries.length} 条 stash 待处理，暂不清理`;
+    const reason = `${view.stashes.entries.length} pending stashes; cleanup paused`;
     view.warnings.push(reason);
     for (const item of [...view.worktrees, ...view.branches]) {
       item.eligible = false;

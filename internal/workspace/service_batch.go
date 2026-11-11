@@ -94,7 +94,7 @@ func reserveTCPPort(port int) (net.Listener, error) {
 		return nil, err
 	}
 	if len(owners) > 0 {
-		return nil, fmt.Errorf("端口 %d 存在监听进程 %s（PID %d）", port, owners[0].Name, owners[0].PID)
+		return nil, fmt.Errorf("port %d has listener %s (PID %d)", port, owners[0].Name, owners[0].PID)
 	}
 	ipv4, err := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
@@ -127,14 +127,14 @@ func reserveServicePort(d LocalServiceDefinition, used map[int]string) (LocalSer
 		}
 		if owner, ok := used[port]; ok {
 			if !d.AutoPort {
-				return d, nil, fmt.Errorf("端口 %d 已由 %s 使用", port, owner)
+				return d, nil, fmt.Errorf("port %d is already used by %s", port, owner)
 			}
 			continue
 		}
 		listener, err := reserveTCPPort(port)
 		if err != nil {
 			if !d.AutoPort {
-				return d, nil, fmt.Errorf("端口 %d 不可用: %w；未停止其他进程", port, err)
+				return d, nil, fmt.Errorf("port %d unavailable: %w; other processes were not stopped", port, err)
 			}
 			continue
 		}
@@ -145,7 +145,7 @@ func reserveServicePort(d LocalServiceDefinition, used map[int]string) (LocalSer
 		}
 		return resolveServicePort(d, assigned), listener, nil
 	}
-	return d, nil, errors.New("找不到可用端口，请调整首选端口后重试")
+	return d, nil, errors.New("no available port found; change the preferred port and retry")
 }
 
 // StartProjects validates all selected projects before starting any new service.
@@ -159,7 +159,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 	defer s.serviceStartMu.Unlock()
 	result := ServiceBatch{DryRun: dryRun, Services: []ServiceStartResult{}}
 	if len(paths) == 0 || len(paths) > 32 {
-		return result, errors.New("一次需要指定 1–32 个已登记项目")
+		return result, errors.New("specify 1–32 registered projects per request")
 	}
 	plans, err := s.servicePlans(paths, selection)
 	if err != nil {
@@ -167,7 +167,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 	}
 	for _, plan := range plans {
 		if expected := versions[plan.path]; expected != "" && expected != plan.config.version {
-			return result, errors.New("服务配置已改变，请刷新并核对命令后启动")
+			return result, errors.New("service configuration changed; refresh and review commands before starting")
 		}
 	}
 	s.taskMu.Lock()
@@ -178,7 +178,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 	}()
 	if s.closing {
-		return result, errors.New("应用正在退出")
+		return result, errors.New("the app is shutting down")
 	}
 	count, ports := s.activeServicePortsLocked()
 	reservations := make([]net.Listener, len(plans))
@@ -216,7 +216,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 				if sameServiceDefinition(configured, plan.configured) && state.Status != "stopping" {
 					entry.Status = "already_running"
 				} else {
-					entry.Status, entry.Error = "blocked", "运行中的配置已变化或正在停止，请先核对并停止原实例"
+					entry.Status, entry.Error = "blocked", "Running configuration changed or is stopping; review and stop the original instance first"
 					blocked = true
 				}
 				result.Services[i] = entry
@@ -233,7 +233,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 		count++
 		if err == nil && count > 16 {
-			err = errors.New("最多同时运行 16 个本地服务")
+			err = errors.New("up to 16 local services can run concurrently")
 		}
 		entry.State = LocalServiceState{Definition: resolved, Status: "stopped", ExitCode: -1}
 		if err != nil {
@@ -252,7 +252,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 		resolved, err = resolveServiceLinks(resolved, plan, result.Services)
 		if err == nil && result.Services[i].Status == "already_running" && !maps.Equal(resolved.Env, result.Services[i].State.Definition.Env) {
-			err = errors.New("依赖服务的地址已变化，请重启此服务以更新环境变量")
+			err = errors.New("dependency endpoint changed; restart this service to update environment variables")
 		}
 		if err != nil {
 			result.Services[i].Status, result.Services[i].Error = "blocked", err.Error()
@@ -262,7 +262,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 	}
 	if blocked {
-		return result, errors.New("启动预检未通过，没有启动任何新服务")
+		return result, errors.New("startup preflight failed; no new services started")
 	}
 	// Detect configuration changes made during preflight before the first spawn.
 	for _, plan := range plans {
@@ -271,7 +271,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 		latest, err := s.localServiceConfig(plan.path)
 		if err != nil || latest.version != plan.config.version {
-			return result, fmt.Errorf("%s 配置已变化，请重新预检", plan.path)
+			return result, fmt.Errorf("%s configuration changed; run preflight again", plan.path)
 		}
 	}
 	if dryRun {
@@ -306,7 +306,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 		s.taskMu.Lock()
 		if startErr == nil && s.closing {
-			startErr = errors.New("应用正在退出")
+			startErr = errors.New("the app is shutting down")
 		}
 		if startErr == nil {
 			_, startErr = s.registeredProject(plan.path)
@@ -316,7 +316,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 			if readErr != nil {
 				startErr = readErr
 			} else if latest.version != plan.config.version {
-				startErr = errors.New("服务配置已变化，请重新预检")
+				startErr = errors.New("service configuration changed; run preflight again")
 			}
 		}
 		if reservations[i] != nil && startErr == nil {
@@ -337,7 +337,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 					result.Services[j].Status = "not_started"
 				}
 			}
-			return result, errors.New("部分服务启动失败，请按逐项结果处理；已启动服务保留")
+			return result, errors.New("some services failed to start; review individual results; started services remain running")
 		}
 		result.Services[i].Status = "started"
 	}
@@ -348,7 +348,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 func (s *Service) StopProjects(paths []string) (ServiceBatch, error) {
 	result := ServiceBatch{Services: []ServiceStartResult{}}
 	if len(paths) == 0 || len(paths) > 32 {
-		return result, errors.New("一次需要指定 1–32 个已登记项目")
+		return result, errors.New("specify 1–32 registered projects per request")
 	}
 	s.taskMu.Lock()
 	for _, path := range paths {
@@ -400,7 +400,7 @@ type ServiceRunRef struct {
 func (s *Service) ServiceReadiness(runs []ServiceRunRef) (ServiceBatch, error) {
 	result := ServiceBatch{Services: []ServiceStartResult{}}
 	if len(runs) == 0 || len(runs) > 256 {
-		return result, errors.New("需要指定 1–256 个服务运行编号")
+		return result, errors.New("specify 1–256 service run IDs")
 	}
 	failed := false
 	for _, run := range runs {
@@ -412,7 +412,7 @@ func (s *Service) ServiceReadiness(runs []ServiceRunRef) (ServiceBatch, error) {
 		case err != nil:
 			item.Status, item.Error, failed = "failed", err.Error(), true
 		case !localServiceRunning(output.State.Status) || output.State.Status == "stopping":
-			item.Status, item.Error, failed = "failed", "服务已结束或正在停止", true
+			item.Status, item.Error, failed = "failed", "Service exited or is stopping", true
 		case !item.PortChecked:
 			item.Status = "running_unchecked"
 		case servicePortConnects(output.State.Definition):
@@ -422,7 +422,7 @@ func (s *Service) ServiceReadiness(runs []ServiceRunRef) (ServiceBatch, error) {
 		result.Services = append(result.Services, item)
 	}
 	if failed {
-		return result, errors.New("部分服务未就绪，请查看逐项结果与日志")
+		return result, errors.New("some services are not ready; check individual results and logs")
 	}
 	return result, nil
 }

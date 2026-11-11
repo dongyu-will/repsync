@@ -22,7 +22,7 @@ func TestProjectMemoryDocumentEvidence(t *testing.T) {
 	f.run("add", "README.md")
 	f.run("commit", "-m", "database guide")
 	input := workspace.ProjectMemoryInput{
-		Statement: "PostgreSQL 已完成切换", Source: "部署记录 #42", Environment: "生产",
+		Statement: "PostgreSQL 已完成切换", Source: "部署记录 #42", Environment: "Production",
 		Keywords: []string{"MySQL"},
 	}
 	noSource := input

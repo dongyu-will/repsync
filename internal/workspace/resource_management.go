@@ -74,7 +74,7 @@ func (s *Service) SharedResources(path string) (ResourceOverview, error) {
 				var current projectConfigFile
 				current, err = loadProjectConfigFile(root)
 				if err == nil && file.version != current.version {
-					err = errors.New("项目配置在读取期间变化，请重新读取")
+					err = errors.New("project configuration changed while reading; reload")
 				}
 			}
 			if err != nil {
@@ -88,7 +88,7 @@ func (s *Service) SharedResources(path string) (ResourceOverview, error) {
 		for _, adoption := range project.Adoptions {
 			if !slices.ContainsFunc(result.Resources, func(item SharedResourceInfo) bool { return item.ID == adoption.ID }) {
 				result.Resources = append(result.Resources, SharedResourceInfo{
-					SharedResource: SharedResource{ID: adoption.ID}, Error: "公共来源未登记",
+					SharedResource: SharedResource{ID: adoption.ID}, Error: "Shared source not registered",
 				})
 			}
 		}
@@ -102,7 +102,7 @@ func (s *Service) checkResourceCatalog(version string) error {
 		return err
 	}
 	if version == "" || gitDigest(items) != version {
-		return errors.New("共享资源登记已变化，请重新读取后再操作")
+		return errors.New("shared resource registration changed; reload before continuing")
 	}
 	return nil
 }
@@ -147,7 +147,7 @@ func (s *Service) SetResourceAdoption(path, configVersion, catalogVersion, id st
 		}
 		index := slices.IndexFunc(items, func(item SharedResource) bool { return item.ID == id })
 		if index < 0 {
-			return errors.New("未登记此共享资源，请重新读取")
+			return errors.New("shared resource not registered; reload")
 		}
 		if _, err := readResourceSource(items[index]); err != nil {
 			return err
@@ -157,14 +157,14 @@ func (s *Service) SetResourceAdoption(path, configVersion, catalogVersion, id st
 		}
 		for _, item := range items {
 			if item.ID != id && slices.Contains(ids, item.ID) && item.Target == items[index].Target {
-				return errors.New("项目已采用写入同一目标的其他资源")
+				return errors.New("project already adopted another resource with the same destination")
 			}
 		}
 		if !slices.Contains(ids, id) {
 			ids = append(ids, id)
 		}
 		if len(ids) > 64 {
-			return errors.New("每项目最多采用 64 个共享资源")
+			return errors.New("each project can adopt up to 64 shared resources")
 		}
 	} else {
 		ids = slices.DeleteFunc(ids, func(value string) bool { return value == id })

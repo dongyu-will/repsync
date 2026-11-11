@@ -2,28 +2,13 @@
   "pipelines": [
     {
       "id": "ci",
-      "name": "本地 CI",
+      "name": "Local CI",
       "kind": "ci",
       "timeoutSeconds": 1800,
       "steps": [
-        [
-          "sh",
-          "tools/shared/check-go-format.sh",
-          "cmd",
-          "internal"
-        ],
-        [
-          "npm",
-          "--prefix",
-          "frontend",
-          "run",
-          "check"
-        ],
-        [
-          "go",
-          "vet",
-          "./..."
-        ],
+        ["sh", "tools/shared/check-go-format.sh", "cmd", "internal"],
+        ["npm", "--prefix", "frontend", "run", "check"],
+        ["go", "vet", "./..."],
         [
           "go",
           "test",
@@ -32,13 +17,7 @@
           "./internal/workspace",
           "./internal/control"
         ],
-        [
-          "npm",
-          "--prefix",
-          "frontend",
-          "run",
-          "build"
-        ]
+        ["npm", "--prefix", "frontend", "run", "build"]
       ],
       "coverage": [
         {
@@ -59,30 +38,17 @@
     },
     {
       "id": "package",
-      "name": "桌面打包",
+      "name": "Desktop package",
       "kind": "cd",
       "timeoutSeconds": 1800,
-      "steps": [
-        [
-          "go",
-          "tool",
-          "mygo",
-          "build"
-        ]
-      ]
+      "steps": [["go", "tool", "mygo", "build"]]
     }
   ],
   "services": [
     {
       "id": "frontend",
-      "name": "前端预览",
-      "command": [
-        "npm",
-        "--prefix",
-        "frontend",
-        "run",
-        "dev"
-      ],
+      "name": "Frontend preview",
+      "command": ["npm", "--prefix", "frontend", "run", "dev"],
       "url": "http://127.0.0.1:5178"
     }
   ],
@@ -90,55 +56,47 @@
     {
       "kind": "skill",
       "name": "golang-how-to",
-      "reason": "项目 AGENTS.md 要求 Go 工作加载该技能",
-      "tasks": "编写、检查或排查 Go 代码时使用"
+      "reason": "Required by AGENTS.md for Go work",
+      "tasks": "Go implementation, review, and troubleshooting"
     },
     {
       "kind": "skill",
       "name": "impeccable",
-      "reason": "沿用 DESIGN.md 的界面基线，复用界面实现与验收工作流",
-      "tasks": "新增或调整前端界面时按需使用"
+      "reason": "Follow the interface baseline in DESIGN.md",
+      "tasks": "Frontend interface changes and validation, as needed"
     },
     {
       "kind": "cli",
       "name": "go",
-      "reason": "项目后端与 MyGo 工具链使用 Go",
-      "tasks": "Go 检查、测试、类型绑定生成与桌面构建"
+      "reason": "Go backend and MyGo toolchain",
+      "tasks": "Go checks, integration tests, binding generation, and desktop packaging"
     },
     {
       "kind": "cli",
       "name": "npm",
-      "reason": "README.md 指定前端使用 npm 入口",
-      "tasks": "安装前端依赖、启动预览及执行已有检查"
+      "reason": "Frontend package manager specified in README.md",
+      "tasks": "Install frontend dependencies, start preview, and run checks"
     }
   ],
   "reviewResources": [
     {
       "id": "user-state",
-      "name": "项目登记与本机历史备份",
+      "name": "Project registry and local history backups",
       "kind": "manual",
       "target": "",
-      "guide": "核对系统用户配置目录 repsync 中的项目登记、规范备份、清理恢复引用及 review 交接记录是否有独立保留方式；本检查不自动复制或删除这些数据。"
+      "guide": "Verify independent retention of the user configuration directory: project registry, rules backups, cleanup recovery refs, and review handoffs. This check does not copy or delete data."
     }
   ],
   "reviewProfile": {
     "kind": "desktop",
-    "areas": [
-      "frontend",
-      "backend"
-    ],
+    "areas": ["frontend", "backend"],
     "requirements": [
       "frontend-static",
       "frontend-behavior",
       "backend-static",
       "backend-api"
     ],
-    "stages": [
-      "push",
-      "ci"
-    ]
+    "stages": ["push", "ci"]
   },
-  "resources": [
-    "go-format-check"
-  ]
+  "resources": ["go-format-check"]
 }

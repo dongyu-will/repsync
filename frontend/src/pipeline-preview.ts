@@ -16,7 +16,7 @@ export function pipelinePreview(path: string): {
         ? [
             {
               id: "ci",
-              name: "项目检查",
+              name: "Project checks",
               kind: "ci",
               steps: [
                 ["npm", "run", "lint"],
@@ -30,7 +30,7 @@ export function pipelinePreview(path: string): {
             },
             {
               id: "deploy",
-              name: "发布预览环境",
+              name: "Release preview environment",
               kind: "cd",
               steps: [
                 ["npm", "run", "build"],
@@ -49,7 +49,7 @@ export function pipelinePreview(path: string): {
           {
             id: "example-ci",
             pipelineId: "ci",
-            name: "项目检查",
+            name: "Project checks",
             kind: "ci",
             status: "failure",
             startedAt: "2026-11-10T02:30:00Z",
@@ -59,12 +59,12 @@ export function pipelinePreview(path: string): {
             step: 3,
             configVersion: "example",
             exitCode: 1,
-            error: "检查未通过",
+            error: "Checks failed",
           },
           {
             id: "example-deploy",
             pipelineId: "deploy",
-            name: "发布预览环境",
+            name: "Release preview environment",
             kind: "cd",
             status: "running",
             startedAt: "2026-11-11T02:30:00Z",
@@ -91,7 +91,7 @@ export function pipelinePreview(path: string): {
             {
               databaseId: 42,
               workflowName: "CI",
-              displayTitle: "调整项目工作区布局",
+              displayTitle: "Update project workspace layout",
               status: "completed",
               conclusion: "success",
               headBranch: "main",
@@ -102,7 +102,7 @@ export function pipelinePreview(path: string): {
             {
               databaseId: 41,
               workflowName: "Preview",
-              displayTitle: "更新预览环境",
+              displayTitle: "Update preview environment",
               status: "completed",
               conclusion: "failure",
               headBranch: "feat/workspace-layout",

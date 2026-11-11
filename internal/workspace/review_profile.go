@@ -40,14 +40,14 @@ type ReviewCoverageState struct {
 }
 
 var reviewRequirements = []ReviewRequirement{
-	{ID: "frontend-static", Name: "前端类型与静态检查", Area: "frontend", Method: "static"},
-	{ID: "frontend-behavior", Name: "浏览器与交互验收", Area: "frontend", Method: "behavior"},
-	{ID: "backend-static", Name: "后端静态检查", Area: "backend", Method: "static"},
-	{ID: "backend-api", Name: "真实 HTTP / API 集成", Area: "backend", Method: "integration"},
-	{ID: "database-integration", Name: "真实数据库集成", Area: "database", Method: "integration"},
-	{ID: "database-migrations", Name: "迁移状态与兼容性", Area: "database", Method: "migration"},
-	{ID: "database-consistency", Name: "数据一致性与关键业务约束", Area: "database", Method: "consistency"},
-	{ID: "database-recovery", Name: "备份与恢复演练", Area: "database", Method: "recovery"},
+	{ID: "frontend-static", Name: "Frontend type and static checks", Area: "frontend", Method: "static"},
+	{ID: "frontend-behavior", Name: "Browser and interaction acceptance", Area: "frontend", Method: "behavior"},
+	{ID: "backend-static", Name: "Backend static checks", Area: "backend", Method: "static"},
+	{ID: "backend-api", Name: "Real HTTP / API integration", Area: "backend", Method: "integration"},
+	{ID: "database-integration", Name: "Real database integration", Area: "database", Method: "integration"},
+	{ID: "database-migrations", Name: "Migration status and compatibility", Area: "database", Method: "migration"},
+	{ID: "database-consistency", Name: "Data consistency and key business constraints", Area: "database", Method: "consistency"},
+	{ID: "database-recovery", Name: "Backup and recovery drills", Area: "database", Method: "recovery"},
 }
 
 func (s *Service) reviewProfile(path string) (ReviewProfile, bool, error) {
@@ -66,32 +66,32 @@ func (s *Service) reviewProfile(path string) (ReviewProfile, bool, error) {
 		return profile, false, nil
 	}
 	if err := json.Unmarshal(data, &profile); err != nil {
-		return profile, false, errors.New("项目适用项配置无效")
+		return profile, false, errors.New("invalid project applicability configuration")
 	}
 	return profile, true, validateReviewProfile(profile)
 }
 
 func validateReviewProfile(profile ReviewProfile) error {
 	if !slices.Contains([]string{"web", "backend", "desktop", "library", "notes", "custom"}, profile.Kind) {
-		return errors.New("项目类型无效")
+		return errors.New("invalid project type")
 	}
 	seen := map[string]bool{}
 	for _, area := range profile.Areas {
 		if !slices.Contains([]string{"frontend", "backend", "database"}, area) || seen["area:"+area] {
-			return errors.New("检查范围无效或重复")
+			return errors.New("invalid or duplicate check scopes")
 		}
 		seen["area:"+area] = true
 	}
 	for _, id := range profile.Requirements {
 		index := slices.IndexFunc(reviewRequirements, func(r ReviewRequirement) bool { return r.ID == id })
 		if index < 0 || seen["requirement:"+id] || !slices.Contains(profile.Areas, reviewRequirements[index].Area) {
-			return errors.New("必需检查项无效、重复或不属于适用范围")
+			return errors.New("required checks are invalid, duplicated, or outside the applicable scope")
 		}
 		seen["requirement:"+id] = true
 	}
 	for _, stage := range profile.Stages {
 		if !slices.Contains([]string{"push", "ci", "deploy", "acceptance"}, stage) || seen["stage:"+stage] {
-			return errors.New("交付阶段无效或重复")
+			return errors.New("invalid or duplicate delivery stages")
 		}
 		seen["stage:"+stage] = true
 	}
@@ -107,7 +107,7 @@ func (s *Service) SaveReviewProfile(path, version string, profile ReviewProfile)
 
 func validateReviewCoverage(coverage []ReviewCoverage, environment, target string) error {
 	if len(coverage) > len(reviewRequirements)+1 || len(environment) > 200 || len(target) > 200 {
-		return errors.New("检查范围或环境说明超出限制")
+		return errors.New("check scope or environment notes exceed limits")
 	}
 	seen := map[string]bool{}
 	for _, c := range coverage {
@@ -117,17 +117,17 @@ func validateReviewCoverage(coverage []ReviewCoverage, environment, target strin
 			valid = true
 		}
 		if !valid || seen[c.Area+":"+c.Method] {
-			return errors.New("检查范围或方法无效、重复")
+			return errors.New("invalid or duplicate check scopes or methods")
 		}
 		seen[c.Area+":"+c.Method] = true
 		if c.Area == "database" && (strings.TrimSpace(environment) == "" || strings.TrimSpace(target) == "") {
-			return errors.New("数据库检查需要环境和目标别名，不能只填写命令通过")
+			return errors.New("database checks require environment and target aliases; command success alone is insufficient")
 		}
 	}
 	for _, value := range []string{environment, target} {
 		lower := strings.ToLower(value)
 		if strings.Contains(lower, "://") || strings.Contains(lower, "password=") || strings.Contains(lower, "pwd=") {
-			return errors.New("环境与目标只填写别名，不填写连接串或密码")
+			return errors.New("use aliases for environment and target, never connection strings or passwords")
 		}
 	}
 	return nil
@@ -139,7 +139,7 @@ func reviewCoverageStates(profile ReviewProfile, checks []ReviewCheck) []ReviewC
 		if !slices.Contains(profile.Requirements, requirement.ID) {
 			continue
 		}
-		state := ReviewCoverageState{Requirement: requirement, Status: "pending", Reason: "尚无对应范围和方法的检查记录"}
+		state := ReviewCoverageState{Requirement: requirement, Status: "pending", Reason: "No check records for this scope and method"}
 		for _, check := range checks {
 			if !slices.ContainsFunc(check.Coverage, func(c ReviewCoverage) bool { return c.Area == requirement.Area && c.Method == requirement.Method }) {
 				continue
@@ -149,21 +149,21 @@ func reviewCoverageStates(profile ReviewProfile, checks []ReviewCheck) []ReviewC
 			if check.Current == "current" {
 				if check.Status == "success" {
 					state.Status = "recorded"
-					state.Reason = "有当前内容的记录；覆盖范围与环境为声明信息"
+					state.Reason = "Record matches current content; coverage and environment are declared information"
 					if check.Source == "pipeline" {
 						state.Status = "passed"
-						state.Reason = "命令通过；需核对声明范围是否实际执行"
+						state.Reason = "Command passed; verify whether the declared scope actually executed"
 					}
 				} else if check.Status == "failure" {
 					state.Status = "failed"
-					state.Reason = "此项检查未通过"
+					state.Reason = "This check failed"
 				} else {
 					state.Status = "pending"
-					state.Reason = "此项检查尚未完成"
+					state.Reason = "This check is incomplete"
 				}
 			}
 			if requirement.Area == "database" && (check.Environment == "" || check.Target == "") {
-				state.Status, state.Reason = "unknown", "数据库环境或目标未记录，无法核验"
+				state.Status, state.Reason = "unknown", "Database environment or target not recorded; cannot verify"
 			}
 			break
 		}

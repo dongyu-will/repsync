@@ -77,7 +77,7 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 				issue("error", "executable", d.ID, err.Error())
 			}
 			if d.Port == 0 && !d.AutoPort {
-				issue("warning", "port_unchecked", d.ID, "未声明监听端口；若为网络服务，请由 AI 补齐端口输入")
+				issue("warning", "port_unchecked", d.ID, "No listening port declared; ask AI to configure it for network services")
 			}
 			report.Services = append(report.Services, check)
 		}
@@ -105,26 +105,26 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 							}
 						}
 						if unavailable {
-							issue("error", "dependency_not_running", plan.configured.ID, "引用的服务尚未运行或已停止")
+							issue("error", "dependency_not_running", plan.configured.ID, "Referenced service is not running or has stopped")
 						} else {
 							effective, resolveErr := resolveServiceLinks(resolveServicePort(plan.configured, live[i].State.Definition.Port), plan, live)
 							if resolveErr != nil {
 								issue("error", "dependency_endpoint", plan.configured.ID, resolveErr.Error())
 							} else if !maps.Equal(effective.Env, live[i].State.Definition.Env) {
-								issue("error", "dependency_address_changed", plan.configured.ID, "依赖地址已变化，请由 AI 重启此服务以重新注入地址")
+								issue("error", "dependency_address_changed", plan.configured.ID, "Dependency endpoint changed; ask AI to restart this service to inject the new address")
 							}
 						}
 					}
 					for _, index := range plan.dependencies {
 						source := plans[index].configured
 						if source.Port == 0 && !source.AutoPort {
-							issue("error", "dependency_endpoint", plan.configured.ID, "引用的服务未声明监听端口")
+							issue("error", "dependency_endpoint", plan.configured.ID, "Referenced service has no declared listening port")
 						}
 					}
 					for name, index := range plan.dependencies {
 						endpoint := plan.configured.EnvFrom[name]
 						if endpoint.Field != "port" && plans[index].configured.URL == "" {
-							issue("error", "dependency_endpoint", plan.configured.ID, "引用的服务未声明页面或 API URL")
+							issue("error", "dependency_endpoint", plan.configured.ID, "Referenced service has no page or API URL")
 						}
 					}
 				}
@@ -148,10 +148,10 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 	if err == nil {
 		for _, state := range overview.Services {
 			if !localServiceRunning(state.Status) && state.PortState == "occupied" && !state.Definition.AutoPort {
-				issue("error", "port_occupied", state.Definition.ID, fmt.Sprintf("固定端口 %d 已占用", state.Definition.Port))
+				issue("error", "port_occupied", state.Definition.ID, fmt.Sprintf("Fixed port %d is occupied", state.Definition.Port))
 			}
 			if state.ConfigChanged {
-				issue("warning", "restart_required", state.Definition.ID, "配置已变化，运行实例尚未更新")
+				issue("warning", "restart_required", state.Definition.ID, "Configuration changed; running instance not updated")
 			}
 		}
 	}
@@ -165,23 +165,23 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 			case "error":
 				issue("error", "resource", resource.ID, resource.Error)
 			case "modified":
-				issue("warning", "resource_modified", resource.ID, "共享文件有项目差异，更新将被阻止")
+				issue("warning", "resource_modified", resource.ID, "Shared file has project differences; updates will be blocked")
 			case "missing", "outdated":
-				issue("warning", "resource_update", resource.ID, "共享文件尚未同步到当前来源版本")
+				issue("warning", "resource_update", resource.ID, "Shared file not synced to current source version")
 			}
 		}
 	}
 	if len(report.Services) == 0 && len(report.Pipelines) == 0 {
-		issue("error", "commands_missing", "", "尚未接入启动或检查入口，请由 AI 读取项目指南补齐")
+		issue("error", "commands_missing", "", "No start or check entry configured; ask AI to read project guides and configure it")
 	}
 	report.AIResources = []AIResource{}
 	declarationsIssues := []string{}
 	for _, declaration := range readAIIntent(path, &declarationsIssues) {
-		resource := AIResource{ID: aiID(declaration.Kind, declaration.Name+":"+declaration.Source), Kind: declaration.Kind, Name: declaration.Name, Source: ".repsync.json", Location: declaration.Source, Availability: "unknown", Applicability: "adopted", Reason: declaration.Reason, Tasks: declaration.Tasks, Projects: []string{path}, Detail: "已声明采用；会话可见性与使用情况未核验"}
+		resource := AIResource{ID: aiID(declaration.Kind, declaration.Name+":"+declaration.Source), Kind: declaration.Kind, Name: declaration.Name, Source: ".repsync.json", Location: declaration.Source, Availability: "unknown", Applicability: "adopted", Reason: declaration.Reason, Tasks: declaration.Tasks, Projects: []string{path}, Detail: "Declared as adopted; session visibility and usage not verified"}
 		if declaration.Kind == "cli" {
 			command, err := projectCommand(context.Background(), path, "", nil, []string{declaration.Name}, false)
 			if err != nil {
-				resource.Availability, resource.Detail = "missing", "RepSync 执行环境未找到此 CLI"
+				resource.Availability, resource.Detail = "missing", "CLI not found in the repsync execution environment"
 				issue("warning", "ai_resource", declaration.Name, resource.Detail)
 			} else {
 				resource.Availability, resource.Location = "available", command.Path
@@ -189,7 +189,7 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 		}
 		if declaration.Kind == "skill" && declaration.Source != "" {
 			if info, err := os.Stat(declaration.Source); err != nil || !info.Mode().IsRegular() {
-				resource.Availability, resource.Detail = "missing", "声明的 Skill 来源不存在或不是普通文件"
+				resource.Availability, resource.Detail = "missing", "Declared Skill source missing or not a regular file"
 				issue("warning", "ai_resource", declaration.Name, resource.Detail)
 			} else {
 				resource.Availability = "discovered"

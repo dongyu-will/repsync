@@ -3,50 +3,51 @@ import type { Inspection } from "./mygo";
 // Browser-only document content; never read from local repositories.
 export const previewDocuments: Record<string, Record<string, string>> = {
   "/Projects/atlas": {
-    "AGENTS.md": `# Atlas 项目规范
+    "AGENTS.md": `# Atlas Project rules
 
-## 开发
-- 使用 React、TypeScript 和 Tailwind CSS。
-- 优先复用已有组件，保持修改范围清晰。
-- 桌面布局兼顾长路径、空状态与键盘操作。
+## Development
+- Use React, TypeScript  and  Tailwind CSS.
+- Reuse existing components and keep changes focused.
+- Desktop layouts handle long paths, empty states, and keyboard navigation.
 
-## 验证
-- 前端修改运行 npm run check。
-- 发布前运行 npm run build。
-- 提交前确认仅包含本次任务的文件。
+## Verify
+- For frontend changes, run npm run check.
+- Before releasing, run npm run build.
+- Include only task-related files in each commit.
 `,
-    "DESIGN.md": `# Atlas 界面设计
+    "DESIGN.md": `# Atlas Interface design
 
-- 使用紧凑侧栏与项目页签。
-- 保留键盘焦点、空状态和读取错误提示。
+- Use a compact sidebar and project tabs.
+- Preserve keyboard focus, empty states, and read errors.
 `,
-    "PRODUCT.md": `# Atlas 产品需求
+    "PRODUCT.md": `# Atlas Product requirements
 
-## 目标
-将多个本地项目的状态、命令和项目文档集中到一个工作台。
+## Goal
+Bring local project status, commands, and documents into one workspace.
 
-## 当前范围
-- 选择项目并查看项目上下文。
-- 查看项目根目录的 Markdown 文档。
+## Current scope
+- Select a project to view its context.
+- Browse the project root's Markdown  documents.
 `,
     "README.md": `# Atlas
 
-## 本地开发
+## Local development
 npm run dev
 
-## 检查
+## Check
 npm run check
 `,
   },
-  "/Projects/工作资料/产品设计与工程协作/桌面工作台/设计资料与项目交接文档": {
-    "AGENTS.md": `# 资料目录规范
+  "/Projects/Work documents/Product design and engineering collaboration/Desktop workspace/Design assets and project handoff documents":
+    {
+      "AGENTS.md": `# Document folder conventions
 
-- 保留设计稿、会议记录和交接文档的原始文件。
-- 文件命名使用日期与主题，便于查找。
-- 此目录不使用 Git，也没有 package.json 命令。
+- Preserve original designs, meeting notes, and handoff documents.
+- Name files by date and topic for easy discovery.
+- This folder does not use Git,  and has no package.json  commands.
 `,
-    "HANDOFF.md": "",
-  },
+      "HANDOFF.md": "",
+    },
 };
 
 // Browser-only examples. These paths are labels, never registered or inspected.
@@ -82,8 +83,8 @@ export const previewInspections: Inspection[] = [
   },
   {
     project: {
-      name: "设计资料与项目交接文档",
-      path: "/Projects/工作资料/产品设计与工程协作/桌面工作台/设计资料与项目交接文档",
+      name: "Design assets and project handoff documents",
+      path: "/Projects/Work documents/Product design and engineering collaboration/Desktop workspace/Design assets and project handoff documents",
     },
     git: false,
     branch: "",
@@ -93,7 +94,7 @@ export const previewInspections: Inspection[] = [
     status: "",
     documents: Object.keys(
       previewDocuments[
-        "/Projects/工作资料/产品设计与工程协作/桌面工作台/设计资料与项目交接文档"
+        "/Projects/Work documents/Product design and engineering collaboration/Desktop workspace/Design assets and project handoff documents"
       ],
     ),
     scripts: {},

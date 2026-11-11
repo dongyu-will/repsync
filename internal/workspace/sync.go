@@ -78,28 +78,28 @@ func (s *Service) syncDir() string { return filepath.Join(filepath.Dir(s.path), 
 
 func readSharedSource(path string) (SharedSource, error) {
 	if !filepath.IsAbs(path) || !markdownFile(path) {
-		return SharedSource{}, errors.New("请选择公共规则 Markdown 文件的绝对路径")
+		return SharedSource{}, errors.New("select the absolute path of a shared rules Markdown file")
 	}
 	canonical, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return SharedSource{}, fmt.Errorf("读取规范源：%w", err)
+		return SharedSource{}, fmt.Errorf("read rules source: %w", err)
 	}
 	info, err := os.Stat(canonical)
 	if err != nil {
 		return SharedSource{}, err
 	}
 	if !info.Mode().IsRegular() {
-		return SharedSource{}, errors.New("规范源必须是普通文件")
+		return SharedSource{}, errors.New("rules source must be a regular file")
 	}
 	content, err := readText(canonical)
 	if err != nil {
 		return SharedSource{}, err
 	}
 	if !utf8.ValidString(content) || strings.TrimSpace(content) == "" {
-		return SharedSource{}, errors.New("规范源必须是非空 UTF-8 文本")
+		return SharedSource{}, errors.New("rules source must be nonempty UTF-8 text")
 	}
 	if strings.Contains(content, sharedStart) || strings.Contains(content, sharedEnd) || strings.Contains(content, policyStart) || strings.Contains(content, policyEnd) {
-		return SharedSource{}, errors.New("规范源不能包含 repsync 受管理区块标记，请使用独立的公共规则文件")
+		return SharedSource{}, errors.New("rules source cannot contain repsync managed block markers; use an independent shared rules file")
 	}
 	return SharedSource{Path: canonical, Version: digest(content), Content: content}, nil
 }
@@ -123,7 +123,7 @@ func (s *Service) sharedSource() (SharedSource, error) {
 		Path string `json:"path"`
 	}
 	if err := json.Unmarshal(data, &config); err != nil {
-		return SharedSource{}, fmt.Errorf("规范源配置损坏：%w", err)
+		return SharedSource{}, fmt.Errorf("invalid rules source configuration: %w", err)
 	}
 	return readSharedSource(config.Path)
 }
@@ -164,7 +164,7 @@ func readUpdateTarget(path, target string) (fileSnapshot, error) {
 		return fileSnapshot{}, err
 	}
 	if !info.Mode().IsRegular() {
-		return fileSnapshot{}, fmt.Errorf("%s 必须是普通文件，暂不更新符号链接", target)
+		return fileSnapshot{}, fmt.Errorf("%s must be a regular file; symbolic links cannot be updated", target)
 	}
 	file, err := root.Open(target)
 	if err != nil {
@@ -176,7 +176,7 @@ func readUpdateTarget(path, target string) (fileSnapshot, error) {
 		return fileSnapshot{}, err
 	}
 	if !utf8.ValidString(content) {
-		return fileSnapshot{}, fmt.Errorf("%s 不是 UTF-8 文本", target)
+		return fileSnapshot{}, fmt.Errorf("%s is not UTF-8 text", target)
 	}
 	return fileSnapshot{Content: content, Exists: true, Mode: uint32(info.Mode().Perm())}, nil
 }
@@ -197,12 +197,12 @@ func sharedDocument(before, source string) (string, error) {
 	} else {
 		start, end := strings.Index(before, sharedStart), strings.Index(before, sharedEnd)
 		if starts != 1 || ends != 1 || end < start {
-			return "", errors.New("公共区块标记不完整或重复，请先修复 AGENTS.md")
+			return "", errors.New("shared block markers are incomplete or duplicated; fix AGENTS.md first")
 		}
 		after = before[:start] + block + before[end+len(sharedEnd):]
 	}
 	if len(after) > 256*1024 {
-		return "", errors.New("更新后的 AGENTS.md 超过 256 KiB")
+		return "", errors.New("updated AGENTS.md exceeds 256 KiB")
 	}
 	return after, nil
 }
@@ -220,10 +220,10 @@ func (s *Service) PreviewUpdate(path string) (UpdatePreview, error) {
 		return UpdatePreview{}, err
 	}
 	if source.Path == "" {
-		return UpdatePreview{}, errors.New("请先接入公共规范源")
+		return UpdatePreview{}, errors.New("connect a shared rules source first")
 	}
 	if source.Path == filepath.Join(path, "AGENTS.md") {
-		return UpdatePreview{}, errors.New("规范源与项目 AGENTS.md 不能是同一个文件")
+		return UpdatePreview{}, errors.New("rules source and project AGENTS.md cannot be the same file")
 	}
 	before, err := readTarget(path)
 	if err != nil {
@@ -247,7 +247,7 @@ func (s *Service) PreviewUpdate(path string) (UpdatePreview, error) {
 		s.previews = map[string]pendingUpdate{}
 	}
 	if len(s.previews) >= 32 {
-		return UpdatePreview{}, errors.New("待处理预览过多，请稍后重试")
+		return UpdatePreview{}, errors.New("too many pending previews; try again later")
 	}
 	token := rand.Text()
 	record := updateRecord{UpdateHistory: UpdateHistory{ID: token, Project: project, SourcePath: source.Path, Version: source.Version, CreatedAt: now.UTC().Format("2006-01-02T15:04:05.000000000Z"), State: "prepared"}, Before: before, After: fileSnapshot{Content: after, Exists: true, Mode: before.Mode}}
@@ -266,14 +266,14 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 	defer s.syncMu.Unlock()
 	plan, ok := s.previews[token]
 	if !ok || time.Now().After(plan.Expires) {
-		return UpdateHistory{}, errors.New("预览已过期，请重新预览")
+		return UpdateHistory{}, errors.New("preview expired; generate a new preview")
 	}
 	record := plan.Record
 	if _, err := s.registeredProject(record.Project.Path); err != nil {
 		return UpdateHistory{}, err
 	}
 	if record.Conflict {
-		return UpdateHistory{}, errors.New("共享文件有项目差异，未覆盖；请先处理差异或改用独立共享文件")
+		return UpdateHistory{}, errors.New("shared file has project differences and was not overwritten; resolve them or use an independent shared file")
 	}
 	if record.ResourceID != "" {
 		if err := s.validateResourceAdoption(record.Project.Path); err != nil {
@@ -284,7 +284,7 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 			return UpdateHistory{}, err
 		}
 		if source.Path != record.SourcePath || source.Version != record.Version || source.Target != record.Target || source.Mode != record.ResourceMode {
-			return UpdateHistory{}, errors.New("共享资源或采用配置已变化，请重新预览")
+			return UpdateHistory{}, errors.New("shared resource or adoption configuration changed; preview again")
 		}
 	} else if record.PolicyVersion != "" {
 		config, err := s.ProjectPolicies(record.Project.Path)
@@ -292,7 +292,7 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 			return UpdateHistory{}, err
 		}
 		if config.Version != record.PolicyVersion {
-			return UpdateHistory{}, errors.New("项目规则已变化，请重新预览")
+			return UpdateHistory{}, errors.New("project rules changed; preview again")
 		}
 	} else {
 		source, err := s.sharedSource()
@@ -300,7 +300,7 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 			return UpdateHistory{}, err
 		}
 		if source.Path != record.SourcePath || source.Version != record.Version {
-			return UpdateHistory{}, errors.New("公共规范已变化，请重新预览")
+			return UpdateHistory{}, errors.New("shared rules changed; preview again")
 		}
 	}
 	current, err := readUpdateTarget(record.Project.Path, updateTarget(record))
@@ -308,14 +308,14 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 		return UpdateHistory{}, err
 	}
 	if !sameSnapshot(current, record.Before) {
-		return UpdateHistory{}, errors.New("项目文件已变化，请重新预览；已有改动未被覆盖")
+		return UpdateHistory{}, errors.New("project file changed; preview again; existing changes were preserved")
 	}
 	if sameSnapshot(record.Before, record.After) {
-		return UpdateHistory{}, errors.New("内容已是最新，无需应用")
+		return UpdateHistory{}, errors.New("content is already up to date")
 	}
 	recordPath := filepath.Join(s.syncDir(), "history", record.ID+".json")
 	if err := saveJSON(recordPath, record); err != nil {
-		return UpdateHistory{}, fmt.Errorf("保存更新备份：%w", err)
+		return UpdateHistory{}, fmt.Errorf("save update backup: %w", err)
 	}
 	if err := replaceUpdateTarget(record.Project.Path, updateTarget(record), record.Before, record.After); err != nil {
 		return UpdateHistory{}, err
@@ -323,7 +323,7 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 	delete(s.previews, token)
 	record.State = "applied"
 	if err := saveJSON(recordPath, record); err != nil {
-		return UpdateHistory{}, fmt.Errorf("文件已更新，备份已保存；完成状态记录失败：%w", err)
+		return UpdateHistory{}, fmt.Errorf("file updated and backup saved; failed to record completion: %w", err)
 	}
 	return record.UpdateHistory, nil
 }
@@ -385,7 +385,7 @@ func (s *Service) updateHistory(path string, resources bool) ([]UpdateHistory, e
 
 func (s *Service) readRecord(id string) (updateRecord, error) {
 	if id == "" || filepath.Base(id) != id || strings.ContainsAny(id, "/\\") {
-		return updateRecord{}, errors.New("无效的更新记录")
+		return updateRecord{}, errors.New("invalid update record")
 	}
 	data, err := os.ReadFile(filepath.Join(s.syncDir(), "history", id+".json"))
 	if err != nil {
@@ -393,10 +393,10 @@ func (s *Service) readRecord(id string) (updateRecord, error) {
 	}
 	var record updateRecord
 	if err := json.Unmarshal(data, &record); err != nil {
-		return updateRecord{}, fmt.Errorf("更新记录损坏：%w", err)
+		return updateRecord{}, fmt.Errorf("invalid update record: %w", err)
 	}
 	if record.ID != id {
-		return updateRecord{}, errors.New("更新记录标识不一致")
+		return updateRecord{}, errors.New("update record IDs do not match")
 	}
 	return record, nil
 }
@@ -417,7 +417,7 @@ func (s *Service) RestoreUpdate(id string) (UpdateHistory, error) {
 	}
 	record.State = "restored"
 	if err := saveJSON(filepath.Join(s.syncDir(), "history", id+".json"), record); err != nil {
-		return UpdateHistory{}, fmt.Errorf("文件已恢复，状态记录失败：%w", err)
+		return UpdateHistory{}, fmt.Errorf("file restored; failed to record status: %w", err)
 	}
 	return record.UpdateHistory, nil
 }
@@ -437,7 +437,7 @@ func replaceUpdateTarget(path, target string, expected, next fileSnapshot) error
 		return err
 	}
 	if !sameSnapshot(current, expected) {
-		return errors.New("项目文件已有后续改动，操作已停止")
+		return errors.New("project file changed since this update; operation stopped")
 	}
 	if !next.Exists {
 		return root.Remove(target)
@@ -468,7 +468,7 @@ func replaceUpdateTarget(path, target string, expected, next fileSnapshot) error
 		return err
 	}
 	if !sameSnapshot(current, expected) {
-		return errors.New("项目文件已有后续改动，操作已停止")
+		return errors.New("project file changed since this update; operation stopped")
 	}
 	return root.Rename(temp, target)
 }
@@ -537,10 +537,10 @@ func documentDiff(before, after string) (string, error) {
 	err = cmd.Run()
 	var exit *exec.ExitError
 	if err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 1) {
-		return "", fmt.Errorf("生成差异：%w %s", err, stderr.String())
+		return "", fmt.Errorf("generate diff: %w %s", err, stderr.String())
 	}
 	if out.overflow {
-		return "", errors.New("差异超过显示限制")
+		return "", errors.New("diff exceeds display limits")
 	}
 	diff := strings.ReplaceAll(out.String(), a, "/AGENTS.md")
 	diff = strings.ReplaceAll(diff, b, "/AGENTS.md")

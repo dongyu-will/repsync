@@ -12,12 +12,12 @@ export default function SharedWorkspace({ projects }: { projects: Project[] }) {
     <div className="space-y-5">
       <div
         role="group"
-        aria-label="公共资源分区"
+        aria-label="Shared resource sections"
         className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
       >
         {[
-          ["rules", "公共规则"],
-          ["files", "共享文件"],
+          ["rules", "Shared rules"],
+          ["files", "Shared files"],
         ].map(([id, label]) => (
           <button
             key={id}

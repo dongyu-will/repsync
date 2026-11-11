@@ -130,7 +130,7 @@ func (s *Service) gitState(path string) (string, gitWorkspaceState, error) {
 		state.Seen = map[string]gitObserved{}
 	}
 	if err == nil && (state.Policy.RetentionDays < 1 || state.Policy.RetentionDays > 365) {
-		err = errors.New("清理设置中的保留期无效，已停止检查")
+		err = errors.New("invalid retention period in cleanup settings; check stopped")
 	}
 	return dir, state, err
 }
@@ -150,7 +150,7 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 	}
 	if _, err := git(path, "rev-parse", "--git-dir"); err != nil {
 		if info, statErr := os.Stat(path); statErr != nil || !info.IsDir() {
-			return view, errors.New("项目目录不可访问")
+			return view, errors.New("project folder inaccessible")
 		}
 		return view, nil
 	}
@@ -168,7 +168,7 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 	base := "refs/heads/" + state.Policy.BaseBranch
 	baseOID, baseErr := git(path, "rev-parse", "--verify", base+"^{commit}")
 	if baseErr != nil {
-		view.Warnings = append(view.Warnings, "请选择有效的本地基准分支后再清理")
+		view.Warnings = append(view.Warnings, "Select a valid local base branch before cleanup")
 	}
 	raw, err := git(path, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
@@ -176,7 +176,7 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 	}
 	for _, block := range strings.Split(raw, "\x00\x00") {
 		if len(view.Worktrees) >= 64 || time.Now().After(deadline) {
-			return view, errors.New("工作树检查超出 64 个或 25 秒限制，未进行清理")
+			return view, errors.New("worktree scan exceeded 64 entries or 25 seconds; no cleanup performed")
 		}
 		if block == "" {
 			continue
@@ -198,20 +198,20 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 			}
 		}
 		if w.Path == "" {
-			return view, errors.New("无法完整解析工作树列表")
+			return view, errors.New("could not fully parse worktree list")
 		}
 		if w.Primary {
-			w.Reasons = append(w.Reasons, "主工作树")
+			w.Reasons = append(w.Reasons, "Main worktree")
 		}
 		if w.Locked {
-			w.Reasons = append(w.Reasons, "已锁定")
+			w.Reasons = append(w.Reasons, "Locked")
 		}
 		if w.Missing {
-			w.Reasons = append(w.Reasons, "目录缺失，保留登记供修复")
+			w.Reasons = append(w.Reasons, "Folder missing. Registration kept for repair.")
 		}
 		// Codex owns the lifecycle and active-chat state of its own worktrees.
 		if strings.Contains(filepath.ToSlash(w.Path), "/.codex/worktrees/") {
-			w.Reasons = append(w.Reasons, "由 Codex 管理，请在对应聊天归档或移除")
+			w.Reasons = append(w.Reasons, "Managed by Codex; archive or remove through its owning chat")
 		}
 		projects, e := s.List()
 		if e != nil {
@@ -219,19 +219,19 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		}
 		for _, p := range projects {
 			if pathsOverlap(w.Path, p.Path) {
-				w.Reasons = append(w.Reasons, "已登记或包含已登记项目")
+				w.Reasons = append(w.Reasons, "Registered or contains a registered project")
 				break
 			}
 		}
 		status, e := git(w.Path, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching")
 		w.StatusKnown, w.Dirty = e == nil, status != ""
 		if e != nil {
-			w.Reasons = append(w.Reasons, "无法读取完整文件状态")
+			w.Reasons = append(w.Reasons, "Cannot read full file state")
 		} else if w.Dirty {
-			w.Reasons = append(w.Reasons, "有修改、未跟踪或忽略文件")
+			w.Reasons = append(w.Reasons, "Modified, untracked, or ignored files")
 		}
 		if w.Branch == "" {
-			w.Reasons = append(w.Reasons, "分离 HEAD，需人工处理")
+			w.Reasons = append(w.Reasons, "Detached HEAD; manual action required")
 		}
 		if len(w.Reasons) == 0 {
 			if e := worktreeIdle(w.Path); e != nil {
@@ -241,29 +241,29 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		view.Worktrees = append(view.Worktrees, w)
 	}
 	raw, err = git(path, "for-each-ref", "--sort=refname", "--format=%(refname:strip=2)%00%(objectname)%00%(upstream:short)%00%(committerdate:iso8601-strict)", "refs/heads/")
-	if err != nil || strings.Contains(raw, "[输出超过 1 MiB") {
-		return view, errors.New("无法完整读取本地分支")
+	if err != nil || strings.Contains(raw, "[output exceeds 1 MiB") {
+		return view, errors.New("could not read all local branches")
 	}
 	now := time.Now().UTC()
 	seen := map[string]gitObserved{}
 	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
 		if len(view.Branches) >= 256 || time.Now().After(deadline) {
-			return view, errors.New("分支检查超出 256 个或 25 秒限制，未进行清理")
+			return view, errors.New("branch scan exceeded 256 entries or 25 seconds; no cleanup performed")
 		}
 		if line == "" {
 			continue
 		}
 		fields := strings.Split(line, "\x00")
 		if len(fields) != 4 {
-			return view, errors.New("无法完整解析本地分支")
+			return view, errors.New("could not fully parse local branches")
 		}
 		b := GitBranch{Name: fields[0], Commit: fields[1], Upstream: fields[2], UpdatedAt: fields[3], Worktrees: []string{}, Reasons: []string{}}
 		b.Merged = baseErr == nil && gitAncestor(path, b.Commit, base)
 		if !b.Merged {
-			b.Reasons = append(b.Reasons, "尚未合并到基准分支")
+			b.Reasons = append(b.Reasons, "Not merged into the base branch")
 		}
 		if protectedGitBranch(b.Name, state.Policy.BaseBranch) {
-			b.Reasons = append(b.Reasons, "受保护分支")
+			b.Reasons = append(b.Reasons, "Protected branch")
 		}
 		key := "branch:" + b.Name
 		observed := state.Seen[key]
@@ -274,12 +274,12 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		last := observed.Since
 		changed, e := gitRefChanged(path, "refs/heads/"+b.Name)
 		if e != nil {
-			b.Reasons = append(b.Reasons, "无法确认分支最近变更时间")
+			b.Reasons = append(b.Reasons, "Cannot confirm the branch's latest change time")
 		} else if changed.After(last) {
 			last = changed
 		}
 		if last.After(now.Add(-time.Duration(state.Policy.RetentionDays) * 24 * time.Hour)) {
-			b.Reasons = append(b.Reasons, "未满保留期（从首次观察或最近变更起算）")
+			b.Reasons = append(b.Reasons, "Within retention (since first observation or latest change)")
 		}
 		for i := range view.Worktrees {
 			w := &view.Worktrees[i]
@@ -297,16 +297,16 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 			w.Reasons = append(w.Reasons, b.Reasons...)
 			checkout, e := gitRefChanged(w.Path, "HEAD")
 			if e != nil {
-				w.Reasons = append(w.Reasons, "无法确认工作树最近检出时间")
+				w.Reasons = append(w.Reasons, "Cannot confirm the worktree's latest checkout time")
 			} else if checkout.After(wo.Since) {
 				wo.Since = checkout
 			}
 			if wo.Since.After(now.Add(-time.Duration(state.Policy.RetentionDays) * 24 * time.Hour)) {
-				w.Reasons = append(w.Reasons, "工作树未满保留期")
+				w.Reasons = append(w.Reasons, "Worktree is within retention")
 			}
 			w.Eligible = len(w.Reasons) == 0
 			if !w.Eligible {
-				b.Reasons = append(b.Reasons, "关联工作树需要保留")
+				b.Reasons = append(b.Reasons, "Linked worktree must be kept")
 			}
 		}
 		b.Eligible = len(b.Reasons) == 0
@@ -314,9 +314,9 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 	}
 	stashProtection := ""
 	if view.StashError != "" {
-		stashProtection = "无法确认 stash 状态，暂不清理"
+		stashProtection = "Cannot verify stash state; cleanup paused"
 	} else if len(view.Stashes.Entries) > 0 {
-		stashProtection = fmt.Sprintf("有 %d 条 stash 待处理，暂不清理", len(view.Stashes.Entries))
+		stashProtection = fmt.Sprintf("%d pending stashes; cleanup paused", len(view.Stashes.Entries))
 	}
 	if stashProtection != "" {
 		view.Warnings = append(view.Warnings, stashProtection)
@@ -345,7 +345,7 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		var record GitCleanupRecord
 		data, e := os.ReadFile(filepath.Join(dir, "history", entry.Name()))
 		if e != nil || json.Unmarshal(data, &record) != nil {
-			return view, errors.New("清理记录读取失败")
+			return view, errors.New("failed to read cleanup history")
 		}
 		view.History = append(view.History, record)
 	}
@@ -378,7 +378,7 @@ func gitRefChanged(path, ref string) (time.Time, error) {
 	log, err := git(path, "reflog", "show", "-1", "--format=%gD", "--date=unix", ref)
 	_, stamp, ok := strings.Cut(log, "@{")
 	if err != nil || !ok {
-		return time.Time{}, errors.New("reflog 不可用")
+		return time.Time{}, errors.New("reflog unavailable")
 	}
 	n, err := strconv.ParseInt(strings.TrimSuffix(strings.TrimSpace(stamp), "}"), 10, 64)
 	return time.Unix(n, 0), err
@@ -387,10 +387,10 @@ func gitRefChanged(path, ref string) (time.Time, error) {
 func worktreeIdle(path string) error {
 	gitDir, err := git(path, "rev-parse", "--path-format=absolute", "--git-dir")
 	if err != nil {
-		return errors.New("无法检查 Git 操作状态")
+		return errors.New("cannot check Git operation state")
 	}
 	if _, err := os.Lstat(filepath.Join(strings.TrimSpace(gitDir), "config.worktree")); !errors.Is(err, os.ErrNotExist) {
-		return errors.New("有工作树专属配置或无法检查，需人工保留")
+		return errors.New("worktree-specific configuration exists or cannot be checked; manual retention required")
 	}
 	if err := gitOperationIdle(path); err != nil {
 		return err
@@ -402,17 +402,17 @@ func worktreeIdle(path string) error {
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	err = cmd.Run()
 	if ctx.Err() != nil || stderr.Len() > 0 || out.overflow {
-		return errors.New("无法确认工作树未被进程使用")
+		return errors.New("cannot confirm the worktree is unused by processes")
 	}
 	if out.Len() > 0 {
-		return errors.New("有进程正在使用工作树")
+		return errors.New("a process is using the worktree")
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) && exit.ExitCode() == 1 {
 		return nil
 	}
 	if err != nil {
-		return errors.New("无法确认工作树未被进程使用（需要 lsof）")
+		return errors.New("cannot verify the worktree is unused (lsof required)")
 	}
 	return nil
 }
@@ -420,11 +420,11 @@ func worktreeIdle(path string) error {
 func gitOperationIdle(path string) error {
 	gitDir, err := git(path, "rev-parse", "--path-format=absolute", "--git-dir")
 	if err != nil {
-		return errors.New("无法检查 Git 操作状态")
+		return errors.New("cannot check Git operation state")
 	}
 	for _, name := range []string{"index.lock", "HEAD.lock", "MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer"} {
 		if _, err := os.Lstat(filepath.Join(strings.TrimSpace(gitDir), name)); !errors.Is(err, os.ErrNotExist) {
-			return errors.New("Git 操作进行中或无法检查")
+			return errors.New("Git operation in progress or state unavailable")
 		}
 	}
 	return nil
@@ -442,13 +442,13 @@ func (s *Service) SaveGitCleanupPolicy(path, version string, policy GitCleanupPo
 		return err
 	}
 	if gitDigest(state.Policy) != version {
-		return errors.New("清理设置已变化，请刷新后重试")
+		return errors.New("cleanup settings changed; refresh and try again")
 	}
 	if policy.RetentionDays < 1 || policy.RetentionDays > 365 {
-		return errors.New("保留期需为 1–365 天")
+		return errors.New("retention must be 1–365 days")
 	}
 	if _, err := git(path, "show-ref", "--verify", "refs/heads/"+policy.BaseBranch); err != nil {
-		return errors.New("请选择存在的本地基准分支")
+		return errors.New("select an existing local base branch")
 	}
 	state.Policy = policy
 	return saveJSON(filepath.Join(dir, "state.json"), state)

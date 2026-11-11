@@ -13,14 +13,14 @@ import {
 
 const native = isMyGo();
 const titles: Record<string, string> = {
-  "no-unit-tests": "禁止新增单元测试",
-  "react-no-use-state": "React 使用 useReducer，禁用 useState",
+  "no-unit-tests": "Disallow new unit tests",
+  "react-no-use-state": "Use useReducer instead of useState",
 };
 const levels = [
-  ["off", "关闭"],
-  ["advice", "仅提示 AI"],
-  ["warn", "检查警告"],
-  ["error", "检查失败"],
+  ["off", "Off"],
+  ["advice", "AI guidance"],
+  ["warn", "Warn"],
+  ["error", "Enforce"],
 ];
 const field =
   "min-h-9 min-w-0 rounded-md border border-control bg-white px-2 py-1.5 text-sm";
@@ -164,7 +164,7 @@ export default function ProjectRules({
       update({
         revision: state.revision + 1,
         report: null,
-        notice: "规则已保存，重新检查后查看结果。",
+        notice: "Rules saved. Run checks again for updated results.",
       });
     } catch (error) {
       update({ error: errorText(error) });
@@ -199,7 +199,10 @@ export default function ProjectRules({
     update({ busy: "apply", error: "" });
     try {
       await Service.applyUpdate(state.preview.token);
-      update({ preview: null, notice: "已更新 AGENTS.md，更新前内容已备份。" });
+      update({
+        preview: null,
+        notice: "Updated AGENTS.md, Previous content backed up.",
+      });
       onUpdated?.();
     } catch (error) {
       update({ preview: null, error: errorText(error) });
@@ -213,23 +216,23 @@ export default function ProjectRules({
       JSON.stringify(path ? state.project?.overrides : state.defaults.rules);
   return (
     <section
-      aria-label={path ? "项目规则" : "公共项目规则"}
+      aria-label={path ? "Project rules" : "Default project rules"}
       className="space-y-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         {path ? (
-          <h2 className="sr-only">项目规则</h2>
+          <h2 className="sr-only">Project rules</h2>
         ) : (
-          <h2 className="text-base font-semibold">公共项目规则</h2>
+          <h2 className="text-base font-semibold">Default project rules</h2>
         )}
         <div className="flex items-center gap-2">
           <button
             className="icon-button"
-            aria-label="重新载入规则"
-            title="重新载入规则"
+            aria-label="Reload rules"
+            title="Reload rules"
             disabled={!!state.busy}
             onClick={() => {
-              if (dirty && !window.confirm("放弃未保存的规则并重新载入？"))
+              if (dirty && !window.confirm("Discard unsaved rules and reload?"))
                 return;
               update({
                 revision: state.revision + 1,
@@ -249,7 +252,7 @@ export default function ProjectRules({
               disabled={!native || !!state.busy || !!dirty || !state.project}
               onClick={() => void check()}
             >
-              {state.busy === "check" ? "检查中…" : "检查规则"}
+              {state.busy === "check" ? "Checking…" : "Check rules"}
             </Button>
           )}
           <Button
@@ -257,13 +260,13 @@ export default function ProjectRules({
             disabled={!native || !!state.busy || !state.defaults || !dirty}
             onClick={() => void save()}
           >
-            {state.busy === "save" ? "保存中…" : "保存规则"}
+            {state.busy === "save" ? "Saving…" : "Save rules"}
           </Button>
         </div>
       </div>
       {!path && (
         <p className="text-sm text-muted">
-          作为项目默认值，项目可单独设置例外。
+          as project defaults. Each project can define exceptions.
         </p>
       )}
       {state.error && (
@@ -279,7 +282,7 @@ export default function ProjectRules({
       {!state.defaults ? (
         !state.error && (
           <p role="status" className="text-sm text-muted">
-            正在读取规则…
+            Loading rules…
           </p>
         )
       ) : (
@@ -303,14 +306,17 @@ export default function ProjectRules({
                     <h3 className="text-sm font-medium">{titles[rule.id]}</h3>
                     {path && !effective?.applies && rule.scope === "react" && (
                       <p className="mt-1 text-xs text-muted">
-                        检查工作目录中未识别到 React 依赖
+                        Not detected in the working directory: React
+                        Dependencies
                       </p>
                     )}
                   </div>
                   <label className="text-sm">
-                    <span className="sr-only">{titles[rule.id]}执行强度</span>
+                    <span className="sr-only">
+                      {titles[rule.id]}Enforcement
+                    </span>
                     <Select
-                      aria-label={`${titles[rule.id]}执行强度`}
+                      aria-label={`${titles[rule.id]} enforcement`}
                       disabled={!!state.busy}
                       value={level}
                       onChange={(event) => {
@@ -328,7 +334,7 @@ export default function ProjectRules({
                     >
                       {path && (
                         <option value="inherit">
-                          继承 ·{" "}
+                          Inherit ·{" "}
                           {
                             levels.find(
                               ([value]) => value === inherited.level,
@@ -345,7 +351,7 @@ export default function ProjectRules({
                   </label>
                 </div>
                 <ActionDialog
-                  title="适用范围与例外"
+                  title="Scope and exceptions"
                   busy={!!state.busy}
                   error={state.error}
                   notice={state.notice}
@@ -355,30 +361,30 @@ export default function ProjectRules({
                     className="mt-3 space-y-3"
                   >
                     <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                      适用项目
+                      Applicable projects
                       <Select
                         value={rule.scope}
                         onChange={(event) =>
                           change(rule.id, { scope: event.target.value })
                         }
                       >
-                        <option value="all">全部项目</option>
-                        <option value="react">React 项目</option>
+                        <option value="all">All projects</option>
+                        <option value="react">React Project</option>
                       </Select>
                     </label>
                     {path && !override && (
                       <p className="text-xs text-muted">
-                        选择项目执行强度后，可修改项目例外。
+                        Choose project enforcement to edit exceptions.
                       </p>
                     )}
                     {rule.id === "react-no-use-state" && (
                       <label className="block space-y-1 text-sm">
-                        ESLint 工作目录
+                        ESLint Working directory
                         <input
-                          aria-label="ESLint 工作目录"
+                          aria-label="ESLint Working directory"
                           className={`${field} w-full`}
                           value={rule.cwd}
-                          placeholder="留空使用项目根目录，例如 frontend"
+                          placeholder="Leave blank for the project root, e.g. frontend"
                           onChange={(event) =>
                             change(rule.id, { cwd: event.target.value })
                           }
@@ -387,17 +393,17 @@ export default function ProjectRules({
                     )}
                     <label className="block space-y-1 text-sm">
                       {rule.id === "no-unit-tests"
-                        ? "单元测试路径（每行一个）"
-                        : "源码路径（留空检查全部 JS / TS 源码）"}
+                        ? "Unit test paths (one per line)"
+                        : "Source paths (leave blank to check all JS / TS  source files)"}
                       <textarea
-                        aria-label={`${titles[rule.id]}识别路径`}
+                        aria-label={`${titles[rule.id]} detected paths`}
                         rows={2}
                         className={`${field} w-full resize-y font-mono`}
                         value={(rule.include || []).join("\n")}
                         placeholder={
                           rule.id === "no-unit-tests"
-                            ? "例如 **/*.unit.test.ts"
-                            : "例如 frontend/src/**"
+                            ? "e.g. **/*.unit.test.ts"
+                            : "e.g. frontend/src/**"
                         }
                         onChange={(event) =>
                           change(rule.id, {
@@ -407,13 +413,13 @@ export default function ProjectRules({
                       />
                     </label>
                     <label className="block space-y-1 text-sm">
-                      路径例外
+                      Path exceptions
                       <textarea
-                        aria-label={`${titles[rule.id]}路径例外`}
+                        aria-label={`${titles[rule.id]} path exceptions`}
                         rows={2}
                         className={`${field} w-full resize-y font-mono`}
                         value={(rule.exclude || []).join("\n")}
-                        placeholder="例如 **/integration/**"
+                        placeholder="e.g. **/integration/**"
                         onChange={(event) =>
                           change(rule.id, {
                             exclude: lines(event.target.value),
@@ -422,13 +428,13 @@ export default function ProjectRules({
                       />
                     </label>
                     <label className="block space-y-1 text-sm">
-                      文件例外标记（整行匹配）
+                      File exception marker (whole line match)
                       <textarea
-                        aria-label={`${titles[rule.id]}例外标记`}
+                        aria-label={`${titles[rule.id]}Exception marker`}
                         rows={2}
                         className={`${field} w-full resize-y font-mono`}
                         value={(rule.excludeMarkers || []).join("\n")}
-                        placeholder="例如 //go:build integration"
+                        placeholder="e.g. //go:build integration"
                         onChange={(event) =>
                           change(rule.id, {
                             excludeMarkers: lines(event.target.value),
@@ -442,7 +448,8 @@ export default function ProjectRules({
                   rule.id === "no-unit-tests" &&
                   !(rule.include || []).length && (
                     <p className="text-xs text-removed">
-                      代码检查前需要明确单元测试路径及集成测试例外。
+                      Declare unit test paths and integration test exceptions
+                      before checking code.
                     </p>
                   )}
               </div>
@@ -454,23 +461,23 @@ export default function ProjectRules({
         <>
           {dirty && (
             <p role="status" className="text-xs text-muted">
-              有未保存的规则，保存后再检查或更新 AI 规范。
+              Save rule changes before checking or updating AI rules.
             </p>
           )}
           {state.report && (
-            <section aria-label="规则检查结果" className="space-y-3">
+            <section aria-label="Rule check results" className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">
                   {!state.report.rulesChecked.length
-                    ? "未启用代码检查"
+                    ? "Code checks disabled"
                     : !state.report.complete
-                      ? "检查未完成"
+                      ? "Checks incomplete"
                       : state.report.passed
-                        ? "检查通过"
-                        : "检查未通过"}
+                        ? "Checks passed"
+                        : "Checks failed"}
                 </h3>
                 <span className="text-xs text-muted">
-                  {new Date(state.report.checkedAt).toLocaleTimeString("zh-CN")}
+                  {new Date(state.report.checkedAt).toLocaleTimeString("en-US")}
                 </span>
               </div>
               {state.report.errors.map((error, index) => (
@@ -485,7 +492,10 @@ export default function ProjectRules({
               {state.report.skipped.length > 0 && (
                 <ActionDialog
                   title={
-                    <>{state.report.skipped.length} 个文件按 ESLint 配置跳过</>
+                    <>
+                      {state.report.skipped.length} files by ESLint Skipped by
+                      configuration
+                    </>
                   }
                   busy={!!state.busy}
                   error={state.error}
@@ -498,18 +508,19 @@ export default function ProjectRules({
               )}
               {state.report.baseline === "unavailable" && (
                 <p className="text-xs text-muted">
-                  缺少 Git HEAD 基线，违规暂时无法区分历史与新增。
+                  Missing Git HEAD baseline. Existing and new violations cannot
+                  yet be distinguished.
                 </p>
               )}
               <div
                 role="group"
-                aria-label="违规范围"
+                aria-label="Violation scope"
                 className="flex flex-wrap gap-2"
               >
                 {[
-                  ["new", "新增"],
-                  ["historical", "历史"],
-                  ["unknown", "待判定"],
+                  ["new", "New"],
+                  ["historical", "Existing"],
+                  ["unknown", "Unclassified"],
                 ].map(([kind, label]) => (
                   <button
                     key={kind}
@@ -544,11 +555,15 @@ export default function ProjectRules({
               </div>
               {!state.report.findings.some(
                 (finding) => finding.kind === state.filter,
-              ) && <p className="text-sm text-muted">此范围没有违规。</p>}
+              ) && (
+                <p className="text-sm text-muted">
+                  No violations in this scope.
+                </p>
+              )}
             </section>
           )}
           <ActionDialog
-            title="AI 规范说明"
+            title="AI Rule guidance"
             busy={!!state.busy}
             error={state.error}
             notice={state.notice}
@@ -557,23 +572,25 @@ export default function ProjectRules({
               disabled={!native || !!state.busy || !!dirty || !state.project}
               onClick={() => void preview()}
             >
-              {state.busy === "preview" ? "预览中…" : "预览 AGENTS.md 更新"}
+              {state.busy === "preview"
+                ? "Generating preview…"
+                : "Preview AGENTS.md Update"}
             </Button>
             {state.preview && (
               <div className="space-y-3">
                 <pre
                   className="source-panel max-h-80"
                   tabIndex={0}
-                  aria-label="项目规则差异"
+                  aria-label="Project rule diff"
                 >
-                  {state.preview.diff || "规则说明已是最新。"}
+                  {state.preview.diff || "Rule guidance is up to date."}
                 </pre>
                 <Button
                   primary
                   disabled={!!state.busy || !state.preview.changed}
                   onClick={() => void apply()}
                 >
-                  {state.busy === "apply" ? "应用中…" : "应用规范更新"}
+                  {state.busy === "apply" ? "Applying…" : "Apply rule update"}
                 </Button>
               </div>
             )}

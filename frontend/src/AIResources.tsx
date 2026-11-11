@@ -22,34 +22,34 @@ const kindNames: Record<string, string> = {
   cli: "CLI",
 };
 const availability: Record<string, string> = {
-  discovered: "已发现文件",
-  available: "已定位命令",
-  configured: "配置已启用",
-  disabled: "配置已禁用",
-  missing: "未找到",
-  error: "读取失败",
-  unknown: "待核验",
+  discovered: "File discovered",
+  available: "Command located",
+  configured: "Enabled in configuration",
+  disabled: "Disabled in configuration",
+  missing: "Not found",
+  error: "Read failed",
+  unknown: "Unverified",
 };
 const applicability: Record<string, string> = {
-  adopted: "项目已采用",
-  recommended: "指南已提及",
-  candidate: "按任务选择",
-  unassigned: "未关联项目",
+  adopted: "Adopted by project",
+  recommended: "Mentioned in guide",
+  candidate: "Choose per task",
+  unassigned: "No linked project",
 };
 const statuses: Record<string, string> = {
-  succeeded: "成功",
-  failed: "失败",
-  unknown: "结果未知",
-  declined: "执行前已拒绝",
-  cancelled: "已取消，执行情况未知",
+  succeeded: "Succeeded",
+  failed: "Failed",
+  unknown: "Result unknown",
+  declined: "Rejected before execution",
+  cancelled: "Cancelled; execution unknown",
 };
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 const date = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf())
-    ? "时间未知"
-    : parsed.toLocaleString("zh-CN", {
+    ? "Time unknown"
+    : parsed.toLocaleString("en-US", {
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
@@ -152,7 +152,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
         id: "project-setting:" + placement.kind + ":" + placement.name,
         kind: placement.kind,
         name: placement.name,
-        source: "项目配置",
+        source: "Project configuration",
         location: placement.target,
         availability:
           placement.state === "applied"
@@ -206,13 +206,13 @@ export default function AIResources({ path = "" }: { path?: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="group"
-          aria-label="AI 资源分区"
+          aria-label="AI resource sections"
           className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
         >
           {[
-            ["resources", "资源"],
-            ...(path ? [["memory", "项目记忆"]] : []),
-            ["usage", "使用记录"],
+            ["resources", "Resources"],
+            ...(path ? [["memory", "Project memory"]] : []),
+            ["usage", "Usage records"],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -237,7 +237,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
             }
           >
             <Icon name="refresh" size={16} />
-            {state.busy === "inventory" ? "正在盘点…" : "重新盘点"}
+            {state.busy === "inventory" ? "Scanning…" : "Rescan"}
           </Button>
         ) : state.view === "usage" ? (
           <Button
@@ -246,16 +246,16 @@ export default function AIResources({ path = "" }: { path?: string }) {
             onClick={() => void readUsage()}
           >
             {state.busy === "usage"
-              ? "正在读取…"
+              ? "Loading…"
               : state.usage
-                ? "重新读取记录"
-                : "读取使用记录"}
+                ? "Reload records"
+                : "Load usage records"}
           </Button>
         ) : null}
       </div>
 
       {state.view === "resources" && path && (
-        <ActionDialog title="添加项目 MCP">
+        <ActionDialog title="Add project MCP">
           <div className="mt-3 max-w-xl pb-2">
             <ResourceSettings path={path} onChanged={refreshResources} />
           </div>
@@ -280,32 +280,39 @@ export default function AIResources({ path = "" }: { path?: string }) {
         <>
           {!state.usage ? (
             <p className="py-3 leading-5 text-muted">
-              按需读取最近 30 天的 Codex 会话和 RepSync 流水线回执。
+              Load recent records on demand: 30 days of Codex sessions and
+              RepSync pipeline receipts.
             </p>
           ) : (
-            <ActionDialog title="近 30 天 · 采集范围">
+            <ActionDialog title="Last  30  days · Coverage">
               <div className="mt-2 space-y-3 border-b border-line-subtle pb-3">
                 <p>
                   {date(state.usage.since)} — {date(state.usage.until)}
                 </p>
-                <p>未接入的数据源保持未知。Skill 读取和要求落实分别判断。</p>
+                <p>
+                  Unconnected data sources remain unknown. Skill reads and
+                  compliance are evaluated separately.
+                </p>
                 {state.usage.coverage.map((coverage) => (
                   <div key={coverage.source} className="space-y-1">
                     <p className="font-medium text-ink">
                       {coverage.source} ·{" "}
                       {coverage.status === "unavailable"
-                        ? "未接入"
-                        : "部分覆盖"}
+                        ? "Not connected"
+                        : "Partial coverage"}
                       {" · "}
-                      {coverage.files} 个文件 · {coverage.sessions} 个关联会话
+                      {coverage.files} files · {coverage.sessions} linked
+                      sessions
                     </p>
                     <p>{coverage.detail}</p>
                     {coverage.partialFiles > 0 && (
-                      <p>{coverage.partialFiles} 个文件存在读取缺口。</p>
+                      <p>
+                        {coverage.partialFiles} files could not be fully read.
+                      </p>
                     )}
                     {coverage.versions.length > 0 && (
                       <p className="break-words">
-                        记录版本：{coverage.versions.join("、")}
+                        Recorded version: {coverage.versions.join(", ")}
                       </p>
                     )}
                   </div>
@@ -321,7 +328,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <label className="relative min-w-0 flex-1">
-              <span className="sr-only">搜索 AI 资源</span>
+              <span className="sr-only">Search AI resources</span>
               <span className="pointer-events-none absolute left-2.5 top-2.5 text-muted">
                 <Icon name="search" size={16} />
               </span>
@@ -330,7 +337,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
                 onChange={(event) =>
                   update({ query: event.target.value, page: 0 })
                 }
-                placeholder="搜索资源"
+                placeholder="Search resources"
                 className="h-9 w-full min-w-0 rounded-md border border-control bg-white pl-8 pr-3"
               />
             </label>
@@ -341,33 +348,33 @@ export default function AIResources({ path = "" }: { path?: string }) {
               onClick={() => update({ filtersOpen: !state.filtersOpen })}
             >
               <Icon name="settings" size={16} />
-              {filtersChanged ? "筛选 · 已调整" : "筛选"}
+              {filtersChanged ? "Filter · Customized" : "Filter"}
             </Button>
           </div>
           <div id={filterPanelId} hidden={!state.filtersOpen}>
             <div className="flex flex-wrap items-center gap-2 rounded-md bg-sidebar p-2">
               <Select
-                aria-label="资源类型"
+                aria-label="Resource type"
                 value={state.kind}
                 onChange={(event) =>
                   update({ kind: event.target.value, page: 0 })
                 }
               >
-                <option value="all">全部类型</option>
+                <option value="all">All types</option>
                 <option value="skill">Skill</option>
                 <option value="mcp">MCP</option>
                 <option value="cli">CLI</option>
               </Select>
               {state.view === "resources" && path && (
                 <Select
-                  aria-label="项目适配筛选"
+                  aria-label="Filter by project fit"
                   value={state.filter}
                   onChange={(event) =>
                     update({ filter: event.target.value, page: 0 })
                   }
                 >
-                  <option value="relevant">推荐与已采用</option>
-                  <option value="all">全部资源</option>
+                  <option value="relevant">Recommended and adopted</option>
+                  <option value="all">All resources</option>
                 </Select>
               )}
             </div>
@@ -390,8 +397,8 @@ export default function AIResources({ path = "" }: { path?: string }) {
         !state.report ? (
           <p role="status" className="py-6 text-muted">
             {state.busy
-              ? "正在读取资源来源与项目声明…"
-              : "盘点未完成，请重试。"}
+              ? "Loading resource sources and project declarations…"
+              : "Inventory incomplete. Try again."}
           </p>
         ) : resources.length ? (
           <div className="grouped-list">
@@ -416,17 +423,17 @@ export default function AIResources({ path = "" }: { path?: string }) {
           </div>
         ) : (
           <div className="grouped-list space-y-2 p-4 leading-6">
-            <p className="font-medium">没有符合条件的资源</p>
+            <p className="font-medium">No matching resources</p>
             <p className="text-muted">
-              项目适配依据来自 AGENTS.md 与
-              .repsync.json，技术栈候选可在全部资源中查看。
+              Project fit is based on AGENTS.md and .repsync.json, View
+              stack-based suggestions under All resources.
             </p>
             <Button
               onClick={() =>
                 update({ query: "", kind: "all", filter: "all", page: 0 })
               }
             >
-              查看全部资源
+              View all resources
             </Button>
           </div>
         )
@@ -449,8 +456,12 @@ export default function AIResources({ path = "" }: { path?: string }) {
           </div>
         ) : (
           <div className="grouped-list p-4 leading-6">
-            <p className="font-medium">本次记录未观察到匹配的使用证据</p>
-            <p className="text-muted">采集范围列出了可读取的来源和缺口。</p>
+            <p className="font-medium">
+              No matching usage evidence observed in these records
+            </p>
+            <p className="text-muted">
+              Coverage lists readable sources and known gaps.
+            </p>
           </div>
         ))
       )}
@@ -458,20 +469,20 @@ export default function AIResources({ path = "" }: { path?: string }) {
       {total > 20 && (
         <div className="flex items-center justify-between gap-3 text-xs text-muted">
           <span>
-            第 {currentPage + 1} / {Math.ceil(total / 20)} 页
+            Page {currentPage + 1} / {Math.ceil(total / 20)} page
           </span>
           <div className="flex gap-2">
             <Button
               disabled={currentPage === 0}
               onClick={() => update({ page: currentPage - 1 })}
             >
-              上一页
+              Previous page
             </Button>
             <Button
               disabled={(currentPage + 1) * 20 >= total}
               onClick={() => update({ page: currentPage + 1 })}
             >
-              下一页
+              Next page
             </Button>
           </div>
         </div>
@@ -479,14 +490,17 @@ export default function AIResources({ path = "" }: { path?: string }) {
       {state.view === "resources" && state.report && (
         <section className="text-xs leading-5 text-muted">
           <h3 className="break-words text-sm font-medium">
-            {resources.length} 项资源 · 盘点详情
+            {resources.length} resources · Inventory details
           </h3>
           <div className="mt-2 max-w-2xl space-y-2">
             <p>
-              最近盘点：{date(state.report.checkedAt)}
-              。当前会话可见性需另行核验。
+              Last inventory: {date(state.report.checkedAt)}. Availability in
+              the current session requires separate verification.
             </p>
-            <p>让 AI 根据项目指南在 .repsync.json 中维护资源适配与任务条件。</p>
+            <p>
+              Ask AI to maintain resource selection and task conditions in
+              .repsync.json, following the project guide.
+            </p>
           </div>
         </section>
       )}
@@ -511,20 +525,20 @@ function ResourceRow({
   placement?: CodexResourcePlacement;
   onChanged: () => void;
 }) {
-  const availabilityLabel = availability[resource.availability] || "待核验";
+  const availabilityLabel = availability[resource.availability] || "Unverified";
   const availabilityDetail = resource.detail.startsWith(availabilityLabel)
     ? resource.detail
     : [availabilityLabel, resource.detail].filter(Boolean).join(" · ");
-  const fitLabel = applicability[resource.applicability] || "待判断";
+  const fitLabel = applicability[resource.applicability] || "Needs evaluation";
   const hasIssue = ["missing", "error", "disabled", "unknown"].includes(
     resource.availability,
   );
   const needsAttention = ["missing", "error"].includes(resource.availability);
   const rowStatus =
     placement?.state === "disabled"
-      ? "项目已停用"
+      ? "Disabled for project"
       : placement?.state === "applied"
-        ? "项目已启用"
+        ? "Enabled for project"
         : hasIssue
           ? availabilityLabel
           : resource.applicability === "unassigned"
@@ -544,7 +558,7 @@ function ResourceRow({
             </span>
             <span className="text-xs text-muted">
               {kindNames[resource.kind] || resource.kind}
-              {duplicates > 1 && " · 同名"}
+              {duplicates > 1 && " · Same name"}
             </span>
           </span>
           {rowStatus && (
@@ -558,7 +572,8 @@ function ResourceRow({
       }
     >
       {(placement ||
-        (resource.kind === "mcp" && resource.source === "Codex CLI 当前配置") ||
+        (resource.kind === "mcp" &&
+          resource.source === "Codex CLI Current configuration") ||
         (path &&
           resource.kind === "skill" &&
           resource.availability === "discovered")) && (
@@ -573,45 +588,53 @@ function ResourceRow({
       )}
       <dl className="space-y-2 border-t border-line-subtle bg-editor px-3 py-3 text-xs leading-5">
         {[
-          ["项目适配", [fitLabel, resource.reason].filter(Boolean).join(" · ")],
           [
-            "适用条件",
-            resource.tasks ||
-              "遵循项目指南中的任务条件；未声明时由 AI 按任务判断",
+            "Project fit",
+            [fitLabel, resource.reason].filter(Boolean).join(" · "),
           ],
           [
-            "用途",
+            "When to use",
+            resource.tasks ||
+              "Follow task conditions in the project guide. If unspecified, ask AI Evaluate per task",
+          ],
+          [
+            "Purpose",
             resource.description === resource.reason
               ? ""
               : resource.description,
           ],
-          ["可用性", availabilityDetail],
+          ["Availability", availabilityDetail],
           [
-            "来源",
-            [resource.source, duplicates > 1 ? `${duplicates} 个同名来源` : ""]
+            "Source",
+            [
+              resource.source,
+              duplicates > 1 ? `${duplicates}  sources with this name` : "",
+            ]
               .filter(Boolean)
               .join(" · "),
           ],
-          ["位置", resource.location || "未提供来源路径"],
+          ["Location", resource.location || "No source path provided"],
           [
-            "内容版本",
-            resource.version ? resource.version.slice(0, 12) : "未采集版本",
+            "Content version",
+            resource.version
+              ? resource.version.slice(0, 12)
+              : "Version not collected",
           ],
           [
-            "采用项目",
+            "Adopting projects",
             resource.projects.length
               ? resource.projects.join("\n")
-              : "没有明确采用记录",
+              : "No explicit adoption record",
           ],
           [
-            "使用证据",
+            "Usage evidence",
             usage
               ? resource.kind === "skill"
-                ? `${usage.sessions} 个会话有读取证据；要求落实未核验`
-                : `${usage.calls} 次调用；最近 ${date(usage.lastUsed)}`
+                ? `${usage.sessions}  sessions with read evidence; compliance not verified`
+                : `${usage.calls}  calls; latest ${date(usage.lastUsed)}`
               : usageRead
-                ? "本次记录未观察到匹配证据"
-                : "尚未读取使用记录",
+                ? "No matching evidence observed in these records"
+                : "Usage records not loaded",
           ],
         ]
           .filter(([, value]) => value)
@@ -640,16 +663,16 @@ function UsageRow({
 }) {
   const count =
     summary.kind === "skill"
-      ? `${summary.sessions} 个会话`
+      ? `${summary.sessions}  sessions`
       : summary.appRuns
-        ? `${summary.appRuns} 次入口运行`
-        : `${summary.calls} 次${summary.kind === "mcp" ? "请求" : "执行记录"}`;
+        ? `${summary.appRuns}  entry runs`
+        : `${summary.calls}  times${summary.kind === "mcp" ? "Requests" : "Execution records"}`;
   const breakdown =
     summary.kind === "skill"
-      ? "成功读取命令证据。正文完整性与要求落实未核验。"
+      ? "Read-command evidence found. Content completeness and compliance were not verified."
       : summary.appRuns
-        ? "RepSync 入口回执，未归因于 AI。"
-        : `成功 ${summary.succeeded} · 失败 ${summary.failed} · 未知 ${summary.unknown} · 拒绝 ${summary.declined} · 取消 ${summary.cancelled}${summary.probes ? ` · 含探测 ${summary.probes}` : ""}`;
+        ? "RepSync entry receipts; not attributed to AI."
+        : `Succeeded ${summary.succeeded} · Failed ${summary.failed} · Unknown ${summary.unknown} · Rejected ${summary.declined} · Cancel ${summary.cancelled}${summary.probes ? ` · includes probes ${summary.probes}` : ""}`;
 
   return (
     <ActionDialog
@@ -673,7 +696,7 @@ function UsageRow({
       }
     >
       <p className="border-t border-line-subtle bg-editor px-3 pt-3 text-xs leading-5 text-muted">
-        {breakdown} 最近记录 {date(summary.lastUsed)}
+        {breakdown} Recent records {date(summary.lastUsed)}
       </p>
       <UsageEvidence events={events} />
     </ActionDialog>
@@ -693,12 +716,12 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
           <li key={event.id} className="space-y-1 text-xs leading-5">
             <p className="flex flex-wrap gap-x-3">
               <span className="font-medium">
-                {event.action === "read" ? "读取 Skill" : event.action}
+                {event.action === "read" ? "Read Skill" : event.action}
               </span>
-              <span>{statuses[event.status] || "未知"}</span>
+              <span>{statuses[event.status] || "Unknown"}</span>
               <span className="text-muted">
                 {date(event.timestamp)} · {event.actor}
-                {event.purpose === "probe" ? " · 环境探测" : ""}
+                {event.purpose === "probe" ? " · Environment probe" : ""}
               </span>
             </p>
             <p className="break-words [overflow-wrap:anywhere]">
@@ -706,11 +729,11 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
             </p>
             <dl className="text-muted">
               {[
-                ["项目", event.project || "归属未知"],
-                ["会话", event.session || "未记录"],
-                ["事件", event.id],
+                ["Project", event.project || "Attribution unknown"],
+                ["Session", event.session || "Not recorded"],
+                ["Events", event.id],
                 [
-                  "来源",
+                  "Source",
                   `${event.source}${event.line ? `:${event.line}` : ""}`,
                 ],
               ].map(([label, value]) => (
@@ -731,20 +754,20 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
       {events.length > 10 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
           <span>
-            {events.length} 条证据 · 第 {currentPage + 1} 页
+            {events.length} evidence records · Page {currentPage + 1} page
           </span>
           <div className="flex gap-2">
             <Button
               disabled={currentPage === 0}
               onClick={() => setPage(currentPage - 1)}
             >
-              前 10 条
+              Before 10 records
             </Button>
             <Button
               disabled={(currentPage + 1) * 10 >= events.length}
               onClick={() => setPage(currentPage + 1)}
             >
-              后 10 条
+              After 10 records
             </Button>
           </div>
         </div>

@@ -13,15 +13,15 @@ import { Button } from "./components";
 import ActionDialog from "./ActionDialog";
 
 const states = {
-  pending: { label: "未运行", icon: Circle },
-  success: { label: "已完成", icon: Check },
-  running: { label: "运行中", icon: LoaderCircle },
-  failure: { label: "未通过", icon: X },
-  cancelled: { label: "已停止", icon: Pause },
-  timed_out: { label: "超时", icon: Pause },
-  interrupted: { label: "已中断", icon: CircleHelp },
-  skipped: { label: "未执行", icon: Minus },
-  unknown: { label: "待核对", icon: CircleHelp },
+  pending: { label: "Not run", icon: Circle },
+  success: { label: "Completed", icon: Check },
+  running: { label: "Running", icon: LoaderCircle },
+  failure: { label: "Failed", icon: X },
+  cancelled: { label: "Stopped", icon: Pause },
+  timed_out: { label: "Timed out", icon: Pause },
+  interrupted: { label: "Interrupted", icon: CircleHelp },
+  skipped: { label: "Not executed", icon: Minus },
+  unknown: { label: "Needs review", icon: CircleHelp },
 };
 type StepState = keyof typeof states;
 
@@ -88,7 +88,7 @@ export default function PipelineFlow({
       <ol
         ref={flow}
         className="pipeline-flow"
-        aria-label={`${pipeline.name}执行步骤`}
+        aria-label={`${pipeline.name}Execution steps`}
       >
         {steps.map((args, index) => {
           const state = stepState(index);
@@ -102,7 +102,7 @@ export default function PipelineFlow({
               <button
                 type="button"
                 className="pipeline-node"
-                aria-label={`步骤 ${index + 1}：${command}，${label}`}
+                aria-label={`Step ${index + 1}: ${command}, ${label}`}
                 aria-haspopup="dialog"
                 aria-current={currentStep === index + 1 ? "step" : undefined}
                 onClick={() => select(index)}
@@ -126,18 +126,19 @@ export default function PipelineFlow({
       </ol>
       {observed && run && !known && (
         <p className="mt-2 text-xs text-muted">
-          这次运行缺少可匹配的步骤依据，请在日志中核对；节点显示当前配置。
+          Step evidence is unavailable for this run. Check the logs; nodes show
+          the current configuration.
         </p>
       )}
       {known && run.step === 0 && (
         <p className="mt-2 text-xs text-muted">
           {run.status === "running"
-            ? "正在准备运行，尚未开始执行步骤。"
-            : "运行在执行步骤前结束，请查看日志。"}
+            ? "Preparing to run. No steps have started."
+            : "The run ended before any steps executed. Check the logs."}
         </p>
       )}
       <ActionDialog
-        title={selected === null ? "执行步骤" : `步骤 ${selected + 1}`}
+        title={selected === null ? "Execution steps" : `Step ${selected + 1}`}
         trigger={null}
         open={selected !== null}
         onOpenChange={(open) => {
@@ -153,12 +154,12 @@ export default function PipelineFlow({
                 .join(" ")}
             </pre>
             <p className="text-xs text-muted">
-              工作目录：{pipeline.cwd || "项目根目录"}
+              Working directory: {pipeline.cwd || "Project root"}
             </p>
             <p className="text-xs text-muted">
-              超时：{Math.ceil(pipeline.timeoutSeconds / 60)} 分钟
+              Timeout: {Math.ceil(pipeline.timeoutSeconds / 60)} minutes
               {Object.keys(pipeline.env || {}).length
-                ? ` · 环境变量：${Object.keys(pipeline.env).join("、")}`
+                ? ` · Environment variables: ${Object.keys(pipeline.env).join(", ")}`
                 : ""}
             </p>
             {run && (
@@ -168,7 +169,7 @@ export default function PipelineFlow({
                   onOpenLog(run.id);
                 }}
               >
-                查看这次运行日志
+                View logs for this run
               </Button>
             )}
           </>

@@ -55,7 +55,12 @@ export function Brand({ size = 28 }: { size?: number }) {
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      <img src="/brand.svg" width={22.5} height={12.5} alt="" />
+      <img
+        src={`${import.meta.env.BASE_URL}brand.svg`}
+        width={22.5}
+        height={12.5}
+        alt=""
+      />
     </span>
   );
 }

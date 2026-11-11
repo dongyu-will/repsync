@@ -19,21 +19,21 @@ const errorMessage = (error: unknown) =>
 const isRunning = (state: LocalServiceState) =>
   ["starting", "running", "stopping"].includes(state.status);
 const statusLabels: Record<string, string> = {
-  starting: "启动中",
-  running: "运行中",
-  stopping: "停止中",
-  stopped: "已停止",
-  failure: "启动或运行失败",
-  exited: "已退出",
-  interrupted: "已中断",
+  starting: "Starting",
+  running: "Running",
+  stopping: "Stopping",
+  stopped: "Stopped",
+  failure: "Failed to start or run",
+  exited: "Exited",
+  interrupted: "Interrupted",
 };
 const portLabels: Record<string, string> = {
-  listening: "端口可连接",
-  waiting: "等待端口",
-  occupied: "端口被占用",
-  available: "端口空闲",
-  unknown: "端口状态未知",
-  none: "未配置端口",
+  listening: "Port reachable",
+  waiting: "Waiting for port",
+  occupied: "Port in use",
+  available: "Port available",
+  unknown: "Port status unknown",
+  none: "No port configured",
 };
 
 export default function ProjectCommands({
@@ -190,7 +190,7 @@ export default function ProjectCommands({
   return (
     <div className="min-w-0 space-y-4">
       <div className="section-heading flex items-center justify-between gap-3">
-        <h2>本地服务</h2>
+        <h2>Local services</h2>
         <div className="flex items-center gap-2">
           <ProjectConfigEditor
             path={path}
@@ -200,7 +200,7 @@ export default function ProjectCommands({
           {native && (
             <button
               className="icon-button"
-              aria-label="刷新本地服务"
+              aria-label="Refresh services"
               onClick={() => setRevision((value) => value + 1)}
             >
               <Icon name="refresh" size={16} />
@@ -216,7 +216,7 @@ export default function ProjectCommands({
       {!overview ? (
         !loadError && (
           <p role="status" className="text-sm text-muted">
-            正在读取本地服务…
+            Loading local services…
           </p>
         )
       ) : overview.services.length ? (
@@ -245,10 +245,10 @@ export default function ProjectCommands({
                         </span>
                       </div>
                       <p className="mt-1 break-all text-xs text-muted">
-                        {d.port ? `端口 ${d.port} · ` : ""}
+                        {d.port ? `Port ${d.port} · ` : ""}
                         {portLabels[state.portState] || state.portState}
                         {!active && state.exitCode >= 0
-                          ? ` · 上次退出码 ${state.exitCode}`
+                          ? ` · Last exit code ${state.exitCode}`
                           : ""}
                       </p>
                     </div>
@@ -256,7 +256,7 @@ export default function ProjectCommands({
                       {active ? (
                         <>
                           <Button
-                            aria-label={`停止${d.name}`}
+                            aria-label={`Stop ${d.name}`}
                             disabled={
                               !native ||
                               !!pending ||
@@ -264,10 +264,10 @@ export default function ProjectCommands({
                             }
                             onClick={() => void action(state, "stop")}
                           >
-                            停止
+                            Stop
                           </Button>
                           <Button
-                            aria-label={`重启${d.name}`}
+                            aria-label={`Restart ${d.name}`}
                             disabled={
                               !native ||
                               !!pending ||
@@ -277,20 +277,20 @@ export default function ProjectCommands({
                             }
                             onClick={() => void action(state, "restart")}
                           >
-                            重启
+                            Restart
                           </Button>
                         </>
                       ) : (
                         <Button
-                          aria-label={`启动${d.name}`}
+                          aria-label={`Start ${d.name}`}
                           disabled={!native || !!pending || !canStart}
                           onClick={() => void action(state, "start")}
                         >
-                          {pending === d.id ? "处理中…" : "启动"}
+                          {pending === d.id ? "Working…" : "Start"}
                         </Button>
                       )}
                       <Button
-                        aria-label={`查看${d.name}日志`}
+                        aria-label={`View ${d.name} logs`}
                         disabled={!state.runId}
                         onClick={() => {
                           setSelected((current) =>
@@ -300,7 +300,7 @@ export default function ProjectCommands({
                           setLogError("");
                         }}
                       >
-                        日志
+                        Logs
                       </Button>
                     </div>
                   </div>
@@ -315,7 +315,7 @@ export default function ProjectCommands({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          打开页面
+                          Open page
                           <Icon name="arrow" size={13} />
                         </a>
                       )}
@@ -324,28 +324,29 @@ export default function ProjectCommands({
                         className="min-h-7 text-accent"
                         onClick={() => void inspectPort(state)}
                       >
-                        查看端口占用
+                        View port usage
                       </button>
                     )}
-                    <ActionDialog title="启动命令" className="min-w-0">
+                    <ActionDialog title="Start command" className="min-w-0">
                       <pre tabIndex={0} className="source-panel mt-2">
                         {(d.command || [])
                           .map((arg) =>
                             /\s/.test(arg) ? JSON.stringify(arg) : arg,
                           )
                           .join(" ")}
-                        {`\n工作目录：${d.cwd || "项目根目录"}`}
+                        {`\nWorking directory: ${d.cwd || "Project root"}`}
                         {Object.keys(d.env || {}).length
-                          ? `\n环境变量：${Object.keys(d.env).join("、")}`
+                          ? `\nEnvironment variables: ${Object.keys(d.env).join(", ")}`
                           : ""}
                         {d.url ? `\n${d.url}` : ""}
-                        {state.pid ? `\n进程 PID：${state.pid}` : ""}
+                        {state.pid ? `\nProcess PID: ${state.pid}` : ""}
                       </pre>
                     </ActionDialog>
                   </div>
                   {state.configChanged && (
                     <p className="mt-2 text-xs text-muted">
-                      配置已变化，停止后刷新并核对新命令再启动。
+                      Configuration changed. Stop, refresh, and review the
+                      command before restarting.
                     </p>
                   )}
                   {state.error && (
@@ -356,7 +357,7 @@ export default function ProjectCommands({
                   {ownerID === d.id && (
                     <div className="mt-2 text-xs text-muted">
                       {!owners ? (
-                        <span role="status">正在读取端口占用…</span>
+                        <span role="status">Loading port usage…</span>
                       ) : owners.error ? (
                         <span role="alert">{owners.error}</span>
                       ) : owners.data?.length ? (
@@ -366,7 +367,7 @@ export default function ProjectCommands({
                           </p>
                         ))
                       ) : (
-                        "未找到监听进程；端口状态可能已变化，请刷新。"
+                        "No listening process found. The port may have changed; refresh to check."
                       )}
                     </div>
                   )}
@@ -377,18 +378,19 @@ export default function ProjectCommands({
         </>
       ) : (
         !overview.error && (
-          <Empty icon="file" title="还没有本地服务">
-            让 AI 接入项目已有的启动命令，或通过「配置服务」手动添加。
+          <Empty icon="file" title="No local services yet">
+            Ask AI to connect existing start commands, or add them in Configure
+            services.
           </Empty>
         )
       )}
       {selectedState?.runId && (
-        <section aria-label="服务日志">
+        <section aria-label="Service logs">
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold">
-              {selectedState.definition.name} · 日志
+              {selectedState.definition.name} · Logs
             </h3>
-            <span className="text-xs text-muted">最近 256 KiB</span>
+            <span className="text-xs text-muted">Recent 256 KiB</span>
           </div>
           {logError ? (
             <p role="alert" className="text-sm text-removed">
@@ -398,20 +400,20 @@ export default function ProjectCommands({
             <pre
               tabIndex={0}
               className="source-panel max-h-64"
-              aria-label="服务日志内容"
+              aria-label="Service log content"
             >
-              {output.log || "暂无输出"}
+              {output.log || "No output yet"}
             </pre>
           ) : (
             <p role="status" className="text-sm text-muted">
-              正在读取日志…
+              Loading logs…
             </p>
           )}
         </section>
       )}
       {!!Object.keys(scripts).length && (
         <ActionDialog
-          title={<>package.json 脚本 · {Object.keys(scripts).length}</>}
+          title={<>package.json Script · {Object.keys(scripts).length}</>}
           className="min-w-0"
         >
           <div className="grouped-list mt-3">

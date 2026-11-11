@@ -42,10 +42,12 @@ export default function MarkdownPreview({
         img({ alt, src }) {
           return typeof src === "string" && /^https?:\/\//i.test(src) ? (
             <a href={src} target="_blank" rel="noreferrer">
-              {alt || "查看图片"}
+              {alt || "Open image"}
             </a>
           ) : (
-            <span className="text-muted">{alt || "本地图片暂不展示"}</span>
+            <span className="text-muted">
+              {alt || "Local images are not supported yet"}
+            </span>
           );
         },
         table({ children }) {

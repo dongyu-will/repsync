@@ -38,30 +38,30 @@ var scpRemote = regexp.MustCompile(`^[A-Za-z0-9._][A-Za-z0-9._-]*@[A-Za-z0-9][A-
 
 func validateCloneRemote(remote string) error {
 	if remote == "" || len(remote) > 4096 || strings.IndexFunc(remote, unicode.IsControl) >= 0 {
-		return errors.New("请输入有效的远程仓库地址")
+		return errors.New("enter a valid remote repository URL")
 	}
 	if !strings.Contains(remote, "://") {
 		if scpRemote.MatchString(remote) {
 			return nil
 		}
-		return errors.New("请输入 HTTPS 或 SSH 仓库地址，例如 git@github.com:owner/repo.git")
+		return errors.New("enter an HTTPS or SSH repository URL, e.g. git@github.com:owner/repo.git")
 	}
 	address, err := url.Parse(remote)
 	if err != nil || address.Hostname() == "" || strings.HasPrefix(address.Hostname(), "-") || address.Path == "" || address.Path == "/" {
-		return errors.New("远程仓库地址不完整")
+		return errors.New("remote repository URL is incomplete")
 	}
 	switch address.Scheme {
 	case "https", "http", "ssh", "git":
 	default:
-		return errors.New("仅支持 HTTP(S)、SSH 和 Git 远程地址")
+		return errors.New("only HTTP(S), SSH, and Git remote URLs are supported")
 	}
 	if address.RawQuery != "" || address.Fragment != "" {
-		return errors.New("仓库地址不能包含查询参数或片段，请使用 Git 克隆地址")
+		return errors.New("repository URL cannot contain query parameters or fragments; use a Git clone URL")
 	}
 	if address.User != nil {
 		_, password := address.User.Password()
 		if address.Scheme != "ssh" || password || strings.HasPrefix(address.User.Username(), "-") {
-			return errors.New("请勿在地址中填写密码或令牌，请使用本机 Git 凭据或 SSH 密钥")
+			return errors.New("do not put passwords or tokens in URLs; use local Git credentials or SSH keys")
 		}
 	}
 	return nil
@@ -74,18 +74,18 @@ func (s *Service) StartClone(remote, parent, name string) (CloneState, error) {
 		return CloneState{}, err
 	}
 	if !filepath.IsAbs(parent) {
-		return CloneState{}, errors.New("请选择保存仓库的上级目录")
+		return CloneState{}, errors.New("select the parent folder for the repository")
 	}
 	if name == "" || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, "/\\\x00") {
-		return CloneState{}, errors.New("目录名称必须是单个文件夹名称")
+		return CloneState{}, errors.New("folder name must be a single path component")
 	}
 	gitBinary, err := exec.LookPath("git")
 	if err != nil {
-		return CloneState{}, errors.New("未找到 Git，请先安装 Git 并确认应用可以访问")
+		return CloneState{}, errors.New("Git not found; install Git and make sure the app can access it")
 	}
 	canonical, err := filepath.EvalSymlinks(parent)
 	if err != nil {
-		return CloneState{}, fmt.Errorf("上级目录不可访问：%w", err)
+		return CloneState{}, fmt.Errorf("parent folder inaccessible: %w", err)
 	}
 	root, err := os.OpenRoot(canonical)
 	if err != nil {
@@ -95,14 +95,14 @@ func (s *Service) StartClone(remote, parent, name string) (CloneState, error) {
 	s.taskMu.Lock()
 	defer s.taskMu.Unlock()
 	if s.closing {
-		return CloneState{}, errors.New("应用正在退出")
+		return CloneState{}, errors.New("the app is shutting down")
 	}
 	if s.activeClone != nil {
 		s.activeClone.mu.Lock()
 		running := s.activeClone.state.Status == "running"
 		s.activeClone.mu.Unlock()
 		if running {
-			return CloneState{}, errors.New("已有仓库正在克隆，请等待完成或停止后再试")
+			return CloneState{}, errors.New("a clone is already running; wait or stop it first")
 		}
 	}
 	id := rand.Text()
@@ -118,9 +118,9 @@ func (s *Service) StartClone(remote, parent, name string) (CloneState, error) {
 		file.Close()
 		os.Remove(file.Name())
 		if errors.Is(err, os.ErrExist) {
-			return CloneState{}, errors.New("目标目录已存在，请使用已有本地目录或更换目录名称")
+			return CloneState{}, errors.New("destination exists; use the existing local folder or choose another name")
 		}
-		return CloneState{}, fmt.Errorf("创建目标目录：%w", err)
+		return CloneState{}, fmt.Errorf("create destination folder: %w", err)
 	}
 	state := CloneState{ID: id, Remote: remote, Destination: filepath.Join(canonical, name), Status: "running"}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -159,27 +159,27 @@ func (s *Service) executeClone(ctx context.Context, gitBinary, parent, name stri
 	active.state.Cloned = err == nil
 	if ctx.Err() != nil {
 		active.state.Status = "cancelled"
-		active.state.Error = "克隆已停止；如有部分文件，保留在目标目录。"
+		active.state.Error = "Clone stopped. Any partial files remain in the destination folder."
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			active.state.Status = "timed_out"
-			active.state.Error = "克隆超过 30 分钟，已停止；请检查网络后使用新目录重试。"
+			active.state.Error = "Clone stopped after 30 minutes. Check your network and retry with a new folder."
 		}
 		return
 	}
 	if err != nil {
 		active.state.Status = "failure"
-		active.state.Error = "克隆失败，请查看输出；检查地址、网络及本机仓库访问权限。如有部分文件，保留在目标目录。"
+		active.state.Error = "Clone failed. Review output, URL, network, and local repository access. Any partial files remain in the destination."
 		return
 	}
 	if logErr != nil {
 		active.state.Status = "failure"
-		active.state.Error = "仓库已克隆，但日志保存失败：" + logErr.Error()
+		active.state.Error = "Repository cloned, but log save failed: " + logErr.Error()
 		return
 	}
 	project, err := s.Add(active.state.Destination)
 	if err != nil {
 		active.state.Status = "failure"
-		active.state.Error = "仓库已克隆，但登记失败，可改用已有本地目录添加：" + err.Error()
+		active.state.Error = "Repository cloned, but registration failed. Add it as an existing local folder: " + err.Error()
 		return
 	}
 	active.state.Project = project
@@ -192,12 +192,12 @@ func (s *Service) CloneStatus(id string) (CloneState, error) {
 	active := s.activeClone
 	s.taskMu.Unlock()
 	if active == nil {
-		return CloneState{}, errors.New("没有这条克隆任务，应用可能已重启")
+		return CloneState{}, errors.New("clone task not found; the app may have restarted")
 	}
 	active.mu.Lock()
 	defer active.mu.Unlock()
 	if active.state.ID != id {
-		return CloneState{}, errors.New("克隆任务已被替换")
+		return CloneState{}, errors.New("clone task replaced")
 	}
 	state := active.state
 	state.Log = active.log.Text()
@@ -210,12 +210,12 @@ func (s *Service) CancelClone(id string) error {
 	active := s.activeClone
 	s.taskMu.Unlock()
 	if active == nil {
-		return errors.New("没有正在克隆的仓库")
+		return errors.New("no repository is being cloned")
 	}
 	active.mu.Lock()
 	defer active.mu.Unlock()
 	if active.state.ID != id {
-		return errors.New("克隆任务标识不一致")
+		return errors.New("clone task IDs do not match")
 	}
 	if active.state.Status == "running" {
 		active.cancel()

@@ -9,3 +9,8 @@ build/
 *.tsbuildinfo
 .impeccable/review/
 .impeccable/hook.cache.json
+
+# Local credentials and environment configuration
+.env
+.env.*
+!.env.example

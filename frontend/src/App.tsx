@@ -13,12 +13,12 @@ import AIResources from "./AIResources";
 const native = isMyGo();
 type Page = "project" | "shared" | "ai-resources" | "settings";
 const tabs: ProjectTab[] = [
-  "概览",
-  "工作树",
+  "Overview",
+  "Worktrees",
   "CI/CD",
-  "规范",
-  "AI 资源",
-  "文档",
+  "Rules",
+  "AI resources",
+  "Documents",
 ];
 const lastProjectKey = native
   ? "repsync:last-project"
@@ -47,11 +47,18 @@ function savedTab(path: string): ProjectTab {
           localStorage.getItem(
             `repsync:tab:${path.replace(/^\/Projects(?=\/)/, "/示例项目")}`,
           )) ||
-        '"概览"',
+        '"Overview"',
     );
-    return tabs.includes(value) ? value : "概览";
+    const legacyTabs: Record<string, ProjectTab> = {
+      "\u6982\u89c8": "Overview",
+      "\u5de5\u4f5c\u6811": "Worktrees",
+      "\u89c4\u8303": "Rules",
+      "AI \u8d44\u6e90": "AI resources",
+      "\u6587\u6863": "Documents",
+    };
+    return tabs.includes(value) ? value : legacyTabs[value] || "Overview";
   } catch {
-    return "概览";
+    return "Overview";
   }
 }
 
@@ -67,9 +74,9 @@ export default function App() {
   const [listError, setListError] = useState("");
   const [listRefresh, setListRefresh] = useState(0);
   const [selectedTab, setTab] = useState<ProjectTab>(() =>
-    project ? savedTab(project.path) : "概览",
+    project ? savedTab(project.path) : "Overview",
   );
-  const tab = tabs.includes(selectedTab) ? selectedTab : "概览";
+  const tab = tabs.includes(selectedTab) ? selectedTab : "Overview";
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
@@ -135,7 +142,7 @@ export default function App() {
                 setError("");
                 setLoading(!!next);
                 setManaging(false);
-                setTab(next ? savedTab(next.path) : "概览");
+                setTab(next ? savedTab(next.path) : "Overview");
                 try {
                   if (next) localStorage.setItem(lastProjectKey, next.path);
                   else localStorage.removeItem(lastProjectKey);
@@ -303,12 +310,12 @@ export default function App() {
   );
   const heading =
     page === "project"
-      ? "项目"
+      ? "Project"
       : page === "shared"
-        ? "公共规范"
+        ? "Shared rules"
         : page === "ai-resources"
-          ? "AI 资源"
-          : "设置";
+          ? "AI resources"
+          : "Settings";
 
   return (
     <div className="flex h-dvh min-h-0 bg-white text-ink">
@@ -322,13 +329,16 @@ export default function App() {
           </div>
           <button
             className="icon-button ml-auto"
-            aria-label="搜索项目"
+            aria-label="Search projects"
             onClick={focusSearch}
           >
             <Icon name="search" size={16} />
           </button>
         </div>
-        <nav className="flex min-h-0 flex-col px-2" aria-label="项目导航">
+        <nav
+          className="flex min-h-0 flex-col px-2"
+          aria-label="Project navigation"
+        >
           <div className="mb-2 flex shrink-0 items-center gap-1">
             <button
               type="button"
@@ -340,7 +350,7 @@ export default function App() {
             >
               <Icon name="folder" />
               <span className="min-w-0 flex-1">
-                <span className="block">项目</span>
+                <span className="block">Projects</span>
                 {!projectsExpanded && project && (
                   <span
                     className="block truncate text-xs font-normal text-muted"
@@ -359,7 +369,7 @@ export default function App() {
             {native && (
               <button
                 className="icon-button"
-                aria-label="添加项目"
+                aria-label="Add project"
                 onClick={openAdd}
               >
                 <Icon name="plus" size={18} />
@@ -391,7 +401,7 @@ export default function App() {
               ))}
               {listing ? (
                 <p role="status" className="px-3 py-3 text-xs text-muted">
-                  正在读取项目…
+                  Loading projects…
                 </p>
               ) : listError ? (
                 <button
@@ -401,26 +411,26 @@ export default function App() {
                     reloadProjects();
                   }}
                 >
-                  项目读取失败，点击重试
+                  Could not load projects. Click to retry.
                 </button>
               ) : (
                 !projects.length && (
                   <p className="px-3 py-3 text-xs leading-6 text-muted">
-                    尚未添加项目
+                    No projects added
                   </p>
                 )
               )}
             </div>
           </div>
         </nav>
-        <nav className="shrink-0 px-2 pb-3 pt-3" aria-label="全局导航">
+        <nav className="shrink-0 px-2 pb-3 pt-3" aria-label="Global navigation">
           <button
             className={`nav-item ${page === "shared" ? "selected" : ""}`}
             aria-current={page === "shared" ? "page" : undefined}
             onClick={() => setPage("shared")}
           >
             <Icon name="layers" />
-            公共规范
+            Shared rules
           </button>
           <button
             className={`nav-item ${page === "ai-resources" ? "selected" : ""}`}
@@ -428,7 +438,7 @@ export default function App() {
             onClick={() => setPage("ai-resources")}
           >
             <Icon name="file" />
-            AI 资源
+            AI resources
           </button>
           <button
             className={`nav-item ${page === "settings" ? "selected" : ""}`}
@@ -436,7 +446,7 @@ export default function App() {
             onClick={() => setPage("settings")}
           >
             <Icon name="settings" />
-            设置
+            Settings
           </button>
         </nav>
       </aside>
@@ -460,28 +470,28 @@ export default function App() {
                 </div>
                 <button
                   className="flex min-h-7 max-w-[30%] items-center gap-2 rounded-md bg-surface px-2 text-sm hover:bg-nav-hover"
-                  title="查看工作树和分支"
-                  aria-label="查看工作树和分支"
+                  title="View worktrees and branches"
+                  aria-label="View worktrees and branches"
                   onClick={() => {
                     setGitSection("worktrees");
-                    chooseTab("工作树");
+                    chooseTab("Worktrees");
                   }}
                 >
                   <Icon name="branch" size={17} />
                   <span className="truncate">
                     {loading
-                      ? "读取中…"
+                      ? "Loading…"
                       : details
-                        ? details.branch || "非 Git 项目"
-                        : "未读取"}
+                        ? details.branch || "Non-Git project"
+                        : "Not loaded"}
                   </span>
                 </button>
                 {native && (
                   <button
                     className="icon-button text-muted hover:text-ink"
                     onClick={() => setManaging(true)}
-                    aria-label="管理项目"
-                    title="管理项目"
+                    aria-label="Manage project"
+                    title="Manage project"
                   >
                     <Icon name="settings" size={16} />
                   </button>
@@ -491,8 +501,8 @@ export default function App() {
                     className="icon-button text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                     onClick={reloadProject}
                     disabled={loading}
-                    aria-label="刷新项目"
-                    title="刷新项目"
+                    aria-label="Refresh project"
+                    title="Refresh project"
                   >
                     <Icon name="refresh" size={16} />
                   </button>
@@ -500,8 +510,8 @@ export default function App() {
               </div>
               <div
                 role="tablist"
-                aria-label="项目页面"
-                className="flex gap-4 border-b border-line"
+                aria-label="Project pages"
+                className="flex gap-1 overflow-x-auto whitespace-nowrap border-b border-line"
               >
                 {tabs.map((name, index) => (
                   <button
@@ -533,7 +543,7 @@ export default function App() {
                       }
                     }}
                     onClick={() => chooseTab(name)}
-                    className={`flex min-h-9 items-center border-b-2 px-3 text-sm ${tab === name ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"}`}
+                    className={`flex min-h-9 shrink-0 items-center border-b-2 px-3 text-sm ${tab === name ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"}`}
                   >
                     {name}
                   </button>
@@ -549,7 +559,7 @@ export default function App() {
             >
               {loading ? (
                 <p role="status" className="py-8 text-sm text-muted">
-                  正在读取 {project.name}…
+                  Loading {project.name}…
                 </p>
               ) : error ? (
                 <div
@@ -558,7 +568,7 @@ export default function App() {
                 >
                   {error}
                   <button className="ml-3 underline" onClick={reloadProject}>
-                    重试
+                    Retry
                   </button>
                 </div>
               ) : details ? (
@@ -571,11 +581,13 @@ export default function App() {
                   onOpenCI={() => chooseTab("CI/CD")}
                   onOpenStashes={() => {
                     setGitSection("stashes");
-                    chooseTab("工作树");
+                    chooseTab("Worktrees");
                   }}
                 />
               ) : (
-                <Empty title="暂时没有项目内容">请刷新重试。</Empty>
+                <Empty title="No project content yet">
+                  Refresh to try again.
+                </Empty>
               )}
             </section>
           </>
@@ -592,33 +604,36 @@ export default function App() {
               {page === "project" ? (
                 listing ? (
                   <p role="status" className="py-8 text-sm text-muted">
-                    正在读取项目…
+                    Loading projects…
                   </p>
                 ) : listError ? (
                   <div role="alert" className="space-y-3 text-sm text-red-800">
                     <p>{listError}</p>
-                    <Button onClick={reloadProjects}>重试</Button>
+                    <Button onClick={reloadProjects}>Retry</Button>
                   </div>
                 ) : (
                   <Empty
                     title={
-                      projects.length ? "选择一个项目" : "添加你的第一个项目"
+                      projects.length
+                        ? "Choose a project"
+                        : "Add your first project"
                     }
                   >
                     {projects.length ? (
-                      <Button onClick={focusSearch}>选择项目</Button>
+                      <Button onClick={focusSearch}>Select project</Button>
                     ) : native ? (
                       <>
-                        添加本地目录，开始查看项目文档和管理公共规范。
+                        Add a local folder to browse project documents and
+                        manage shared rules.
                         <div className="mt-4">
                           <Button primary onClick={openAdd}>
                             <Icon name="plus" size={16} />
-                            添加项目
+                            Add project
                           </Button>
                         </div>
                       </>
                     ) : (
-                      "请在桌面应用中添加本地项目。"
+                      "Use the desktop app to add local projects."
                     )}
                   </Empty>
                 )
@@ -628,16 +643,16 @@ export default function App() {
                 <AIResources />
               ) : (
                 <>
-                  <dl className="grouped-list" aria-label="本地工作区">
+                  <dl className="grouped-list" aria-label="Local workspace">
                     {[
-                      ...(native ? [["运行模式", "桌面应用"]] : []),
+                      ...(native ? [["Runtime", "Desktop app"]] : []),
                       [
-                        "项目登记",
+                        "Project registry",
                         native
-                          ? "保存于系统用户配置目录 / repsync / projects.json"
-                          : `${projects.length} 个项目`,
+                          ? "Stored in your user configuration directory / repsync / projects.json"
+                          : `${projects.length}  projects`,
                       ],
-                      ["当前版本", "0.1.0"],
+                      ["Version", "0.1.0"],
                     ].map(([label, value]) => (
                       <div key={label} className="info-row">
                         <dt className="text-muted">{label}</dt>
@@ -665,11 +680,11 @@ export default function App() {
             id="search-project-title"
             className="flex-1 text-lg font-semibold"
           >
-            查找项目
+            Find a project
           </h2>
           <button
             className="icon-button"
-            aria-label="关闭搜索"
+            aria-label="Close search"
             onClick={closeSearch}
           >
             <Icon name="close" size={18} />
@@ -691,14 +706,14 @@ export default function App() {
                 choose(filtered[0]);
               }
             }}
-            placeholder="项目名称或目录…"
-            aria-label="查找项目"
+            placeholder="Project name or path…"
+            aria-label="Find a project"
             className="h-9 w-full rounded-md border border-control px-3 text-sm"
           />
           <div className="mt-4 max-h-[40dvh] overflow-y-auto">
             {listing ? (
               <p role="status" className="py-3 text-sm text-muted">
-                正在读取项目…
+                Loading projects…
               </p>
             ) : listError ? (
               <p role="alert" className="py-3 text-sm text-removed">
@@ -727,7 +742,7 @@ export default function App() {
               </div>
             ) : (
               <p role="status" className="py-3 text-sm text-muted">
-                {projects.length ? "没有匹配的项目" : "尚未添加项目"}
+                {projects.length ? "No matching projects" : "No projects added"}
               </p>
             )}
           </div>

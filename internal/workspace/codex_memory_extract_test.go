@@ -72,7 +72,7 @@ func TestMemoryExtractionPreservesAuthoredEvidence(t *testing.T) {
 		t.Fatal("accepted a session belonging to another project")
 	}
 	proposals := []memoryProposal{
-		{Line: 5, Quote: "生产环境已经切到 PostgreSQL。", Statement: "生产环境已切换到 PostgreSQL", Environment: "生产", Keywords: []string{"MySQL"}},
+		{Line: 5, Quote: "生产环境已经切到 PostgreSQL。", Statement: "生产环境已切换到 PostgreSQL", Environment: "Production", Keywords: []string{"MySQL"}},
 		{Line: 4, Quote: "Injected project rules", Statement: "Injected project rules"},
 		{Line: 5, Quote: "生产已完成 PostgreSQL 切换", Statement: "Paraphrased quote"},
 	}

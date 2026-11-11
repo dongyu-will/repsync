@@ -75,7 +75,7 @@ func claudeMemoryMetadata(scanner *bufio.Scanner, name string) (MemorySession, s
 	for scanner.Scan() {
 		var entry claudeMemoryEntry
 		if json.Unmarshal(scanner.Bytes(), &entry) != nil {
-			return MemorySession{}, "", errors.New("无法读取 Claude Code 会话元数据")
+			return MemorySession{}, "", errors.New("cannot read Claude Code session metadata")
 		}
 		if entry.IsSidechain {
 			return MemorySession{}, "", nil
@@ -85,17 +85,17 @@ func claudeMemoryMetadata(scanner *bufio.Scanner, name string) (MemorySession, s
 			continue
 		}
 		if len(entry.SessionID) > 200 || strings.ContainsAny(entry.SessionID, "\x00\r\n") {
-			return MemorySession{}, "", errors.New("会话编号无效")
+			return MemorySession{}, "", errors.New("invalid session ID")
 		}
 		return MemorySession{Provider: "claude", ID: entry.SessionID, File: name,
 			Title: truncateAIText(strings.TrimSpace(text), 120), Started: entry.Timestamp}, evidencePath(entry.Cwd), nil
 	}
-	return MemorySession{}, "", errors.New("无法读取 Claude Code 用户会话")
+	return MemorySession{}, "", errors.New("cannot read Claude Code user session")
 }
 
 func readClaudeMemoryMessages(directory, path, name, expectedID string) (MemorySession, []memoryMessage, bool, error) {
 	if len(strings.Split(filepath.ToSlash(name), "/")) != 2 {
-		return MemorySession{}, nil, false, errors.New("请选择 Claude Code 主会话")
+		return MemorySession{}, nil, false, errors.New("select a main Claude Code session")
 	}
 	root, err := os.OpenRoot(directory)
 	if err != nil {
@@ -110,7 +110,7 @@ func readClaudeMemoryMessages(directory, path, name, expectedID string) (MemoryS
 	metadata := memoryScanner(io.LimitReader(file, 2*1024*1024))
 	session, cwd, err := claudeMemoryMetadata(metadata, name)
 	if err != nil || session.ID == "" || session.ID != expectedID || cwd == "" || !withinAIScope(cwd, path) {
-		return session, nil, false, errors.New("该会话不属于当前项目或已变化，请重新选择")
+		return session, nil, false, errors.New("session does not belong to this project or has changed; select again")
 	}
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return session, nil, false, err
@@ -135,13 +135,13 @@ func readClaudeMemoryMessages(directory, path, name, expectedID string) (MemoryS
 			continue
 		}
 		if entry.IsSidechain {
-			return session, nil, false, errors.New("不能从子 Agent 会话提炼用户记忆")
+			return session, nil, false, errors.New("user memories cannot be extracted from subagent sessions")
 		}
 		if entry.Type != "user" && entry.Type != "assistant" {
 			continue
 		}
 		if entry.SessionID != expectedID || expectedID == "" {
-			return session, nil, false, errors.New("会话编号已变化，请重新选择")
+			return session, nil, false, errors.New("session ID changed; select again")
 		}
 		if !withinAIScope(evidencePath(entry.Cwd), path) {
 			current = nil
@@ -187,7 +187,7 @@ func readClaudeMemoryMessages(directory, path, name, expectedID string) (MemoryS
 		}
 	}
 	if !belongs {
-		return session, nil, false, errors.New("该会话不属于当前项目或已变化，请重新选择")
+		return session, nil, false, errors.New("session does not belong to this project or has changed; select again")
 	}
 	partial = partial || scanner.Err() != nil || reader.N == 0
 	messages, truncated := recentMemoryMessages(messages)

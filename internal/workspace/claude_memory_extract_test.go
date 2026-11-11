@@ -85,7 +85,7 @@ func TestClaudeMemorySessionsAndExtraction(t *testing.T) {
 	result, err := service.ExtractProjectMemories(project.Path, "claude", file, id, "claude")
 	if err != nil || result.Messages != 1 || len(result.Added) != 1 || result.Added[0].Status != "pending" ||
 		result.Added[0].Session.Provider != "claude" || result.Added[0].Session.Extractor != "claude" ||
-		!strings.HasPrefix(result.Added[0].Source, "Claude Code 会话") {
+		!strings.HasPrefix(result.Added[0].Source, "Claude Code session") {
 		t.Fatalf("Claude extraction: %+v %v", result, err)
 	}
 	result, err = service.ExtractProjectMemories(project.Path, "claude", file, id, "codex")

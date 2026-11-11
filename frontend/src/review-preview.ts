@@ -4,7 +4,7 @@ import { gitPreview } from "./git-preview";
 export function reviewPreview(path: string): ProjectReview {
   const git = gitPreview(path);
   const report: ProjectReview = {
-    project: { name: path.split("/").at(-1) || "项目", path },
+    project: { name: path.split("/").at(-1) || "Project", path },
     checkedAt: "2026-11-10T05:30:00Z",
     configVersion: "preview",
     version: "preview",
@@ -26,49 +26,49 @@ export function reviewPreview(path: string): ProjectReview {
     coverageOptions: [
       {
         id: "frontend-static",
-        name: "前端类型与静态检查",
+        name: "Frontend type and static checks",
         area: "frontend",
         method: "static",
       },
       {
         id: "frontend-behavior",
-        name: "浏览器与交互验收",
+        name: "Browser and interaction acceptance",
         area: "frontend",
         method: "behavior",
       },
       {
         id: "backend-static",
-        name: "后端静态检查",
+        name: "Backend static checks",
         area: "backend",
         method: "static",
       },
       {
         id: "backend-api",
-        name: "真实 HTTP / API 集成",
+        name: "Real HTTP / API Integration",
         area: "backend",
         method: "integration",
       },
       {
         id: "database-integration",
-        name: "真实数据库集成",
+        name: "Real database integration",
         area: "database",
         method: "integration",
       },
       {
         id: "database-migrations",
-        name: "迁移状态与兼容性",
+        name: "Migration status and compatibility",
         area: "database",
         method: "migration",
       },
       {
         id: "database-consistency",
-        name: "数据一致性与关键业务约束",
+        name: "Data consistency and key business constraints",
         area: "database",
         method: "consistency",
       },
       {
         id: "database-recovery",
-        name: "备份与恢复演练",
+        name: "Backup and recovery drills",
         area: "database",
         method: "recovery",
       },
@@ -113,27 +113,27 @@ export function reviewPreview(path: string): ProjectReview {
       {
         kind: "untracked",
         section: "changes",
-        message: "1 个未跟踪文件尚未纳入 Git",
+        message: "1 untracked file not included in Git",
       },
       {
         kind: "ahead",
         section: "changes",
-        message: "2 个本地提交需要核对是否已推送",
+        message: "2  local commits need push verification",
       },
       {
         kind: "stash",
         section: "changes",
-        message: `${git.stashes.entries.length} 条 stash 待核对`,
+        message: `${git.stashes.entries.length} stashes need review`,
       },
       {
         kind: "checks",
         section: "checks",
-        message: "检查之后文件内容发生变化",
+        message: "File contents changed after checks",
       },
       {
         kind: "deploy",
         section: "delivery",
-        message: "部署及线上验收尚未核验",
+        message: "Deployment and live acceptance not verified",
       },
     ],
     checks: [
@@ -141,60 +141,61 @@ export function reviewPreview(path: string): ProjectReview {
         id: "preview-check",
         command: "npm run check",
         status: "success",
-        scope: "前端 TypeScript 与 ESLint",
+        scope: "Frontend TypeScript  and  ESLint",
         coverage: [{ area: "frontend", method: "static" }],
         environment: "local",
         target: "atlas-web",
-        evidence: "本地检查日志，已通过",
+        evidence: "Local check log: passed",
         source: "external",
         createdAt: "2026-11-10T04:30:00Z",
         commit: "previous",
         fingerprint: "previous",
         current: "stale",
-        reason: "检查之后文件内容发生变化",
+        reason: "File contents changed after checks",
       },
     ],
     delivery: [
       {
         stage: "working",
-        name: "本地改动",
+        name: "Local changes",
         status: "observed",
-        detail: "仍有未提交文件",
+        detail: "Uncommitted files remain",
         recordedAt: "",
       },
       {
         stage: "commit",
-        name: "提交",
+        name: "Commit",
         status: "observed",
-        detail: "已读取当前提交",
+        detail: "Current commit loaded",
         recordedAt: "",
       },
       {
         stage: "push",
-        name: "推送",
+        name: "Push",
         status: "pending",
-        detail: "相对本地上游引用领先 2 个提交，未联网核验",
+        detail:
+          "Ahead of local upstream ref by 2  commits; not verified online",
         recordedAt: "",
       },
       {
         stage: "ci",
-        name: "CI / 检查",
+        name: "CI / Check",
         status: "stale",
-        detail: "最近检查之后文件内容变化",
+        detail: "File contents changed since the last check",
         recordedAt: "",
       },
       {
         stage: "deploy",
-        name: "部署",
+        name: "Deploy",
         status: "pending",
-        detail: "需要独立核验部署结果",
+        detail: "Deployment results require separate verification",
         recordedAt: "",
       },
       {
         stage: "acceptance",
-        name: "线上验收",
+        name: "Live acceptance",
         status: "pending",
-        detail: "需要核验业务行为",
+        detail: "Business behavior needs verification",
         recordedAt: "",
       },
     ],
@@ -203,10 +204,11 @@ export function reviewPreview(path: string): ProjectReview {
         state: {
           definition: {
             id: "database",
-            name: "本地数据库与备份",
+            name: "Local database and backups",
             kind: "manual",
             target: "",
-            guide: "按项目指南确认最近备份及恢复演练记录",
+            guide:
+              "Verify the latest backup and recovery drill records against the project guide",
           },
           observed: "needs_confirmation",
           version: "preview",
@@ -223,10 +225,11 @@ export function reviewPreview(path: string): ProjectReview {
         state: {
           definition: {
             id: "env",
-            name: "本地环境配置",
+            name: "Local environment configuration",
             kind: "file",
             target: ".env.local",
-            guide: "确认有独立保留方式；不读取或展示配置内容",
+            guide:
+              "Confirm an independent backup exists; configuration contents are not read or shown",
           },
           observed: "exists",
           version: "preview",
@@ -244,7 +247,7 @@ export function reviewPreview(path: string): ProjectReview {
     tasks: [
       {
         id: "preview-task",
-        title: "侧栏布局调整",
+        title: "Sidebar layout update",
         startedAt: "2026-11-10T03:00:00Z",
         endedAt: "2026-11-10T05:00:00Z",
         start: {
@@ -267,25 +270,26 @@ export function reviewPreview(path: string): ProjectReview {
           stashes: [],
           known: true,
         },
-        summary: "调整侧栏与标题对齐",
-        checks: "前端专项检查通过，后续又修改了文件，需要按范围核对",
-        blockers: "核对未跟踪笔记与推送状态",
+        summary: "Align sidebar and title",
+        checks:
+          "Frontend checks passed, but files changed afterward. Recheck the affected scope.",
+        blockers: "Review untracked notes and push status",
         newStashes: [],
         newUntracked: ["docs/notes.md"],
         handover:
-          "# 侧栏布局调整\n\n## 完成内容\n\n调整侧栏与标题对齐。\n\n## 检查\n\n前端专项检查通过，后续又修改了文件，需要按范围核对。\n\n## 遗留问题\n\n- docs/notes.md 尚未纳入 Git\n- 推送、部署与线上验收尚未核验\n",
+          "# Sidebar layout update\n\n## Completed work\n\nAlign the sidebar and title.\n\n## Check\n\nFrontend checks passed, but files changed afterward. Recheck the affected scope.\n\n## Open issues\n\n- docs/notes.md not yet included in Git\n- Push, deployment, and live acceptance not verified\n",
       },
     ],
   };
   if (!git.git) {
-    report.snapshot.error = "此目录不是 Git 工作树";
+    report.snapshot.error = "This folder is not a Git Worktrees";
     report.snapshot.files = [];
     report.snapshot.stashes = [];
     report.issues = [
       {
         kind: "git",
         section: "changes",
-        message: "Git 状态不可用，数据与交接可手动记录",
+        message: "Git status unavailable; record data and handoff manually",
       },
     ];
     report.checks = [];
@@ -305,7 +309,7 @@ export function reviewPreview(path: string): ProjectReview {
     for (const stage of report.delivery) {
       if (["working", "commit", "push", "ci"].includes(stage.stage)) {
         stage.status = "unknown";
-        stage.detail = "Git 状态不可用";
+        stage.detail = "Git status unavailable";
       }
     }
   }
@@ -316,8 +320,8 @@ export function reviewPreview(path: string): ProjectReview {
       status: requirement.id === "frontend-static" ? "stale" : "pending",
       reason:
         requirement.id === "frontend-static"
-          ? "检查之后文件内容发生变化"
-          : "尚无对应范围和方法的检查记录",
+          ? "File contents changed after checks"
+          : "No check records for this scope and method",
       checkId: "",
       source: "",
       evidence: "",
@@ -331,7 +335,7 @@ export function reviewPreview(path: string): ProjectReview {
       ...report.coverage.map((item) => ({
         kind: `coverage_${item.requirement.id}`,
         section: "checks",
-        message: `${item.requirement.name}需要核验：${item.reason}`,
+        message: `${item.requirement.name}Verification needed: ${item.reason}`,
       })),
     );
   }

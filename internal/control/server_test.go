@@ -241,7 +241,7 @@ func TestControlRejectsBadRequestsAndDisconnectedCLI(t *testing.T) {
 	}
 	server.Close()
 	missing, code := cli(t, socket, "projects")
-	if code != 1 || missing.OK || !strings.Contains(missing.Error, "桌面应用") {
+	if code != 1 || missing.OK || !strings.Contains(missing.Error, "desktop app") {
 		t.Fatalf("disconnection not actionable: %+v", missing)
 	}
 }
@@ -358,7 +358,7 @@ func TestControlWaitTimeoutKeepsRunAndReportsFailure(t *testing.T) {
 	timeout, code := cli(t, socket, "start", "--wait", "--timeout", "100ms", project.Path)
 	var batch workspace.ServiceBatch
 	json.Unmarshal(timeout.Data, &batch)
-	if code != 1 || len(batch.Services) != 1 || batch.Services[0].State.RunID == "" || !strings.Contains(timeout.Error, "等待") {
+	if code != 1 || len(batch.Services) != 1 || batch.Services[0].State.RunID == "" || !strings.Contains(timeout.Error, "Wait") {
 		t.Fatalf("timeout lost receipt: %+v", timeout)
 	}
 	status, err := service.LocalServices(project.Path)

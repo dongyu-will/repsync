@@ -109,7 +109,7 @@ func TestServiceLinksRejectCycleAndMissingDependency(t *testing.T) {
 		{ID: "a", Name: "A", Command: []string{"/bin/sleep", "30"}, EnvFrom: map[string]workspace.ServiceEndpoint{"API": {Service: "b"}}},
 		{ID: "b", Name: "B", Command: []string{"/bin/sleep", "30"}, EnvFrom: map[string]workspace.ServiceEndpoint{"API": {Service: "a"}}},
 	})
-	if _, err := s.StartProjects([]string{path}, false); err == nil || !strings.Contains(err.Error(), "循环") {
+	if _, err := s.StartProjects([]string{path}, false); err == nil || !strings.Contains(err.Error(), "circular") {
 		t.Fatalf("cycle accepted: %v", err)
 	}
 	writeLocalServices(t, path, []workspace.LocalServiceDefinition{{ID: "a", Name: "A", Command: []string{"/bin/sleep", "30"}, EnvFrom: map[string]workspace.ServiceEndpoint{"API": {Service: "missing"}}}})

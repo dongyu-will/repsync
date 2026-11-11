@@ -118,13 +118,13 @@ func viteServicePort(path string, d LocalServiceDefinition) (LocalServiceDefinit
 		return d, nil, false, nil
 	}
 	if err != nil {
-		return d, nil, false, fmt.Errorf("读取服务脚本: %w", err)
+		return d, nil, false, fmt.Errorf("read service script: %w", err)
 	}
 	var pkg struct {
 		Scripts map[string]string `json:"scripts"`
 	}
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return d, data, false, fmt.Errorf("读取服务 package.json: %w", err)
+		return d, data, false, fmt.Errorf("read service package.json: %w", err)
 	}
 	script := strings.TrimSpace(pkg.Scripts[args[index+1]])
 	words := strings.Fields(script)

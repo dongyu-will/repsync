@@ -73,7 +73,7 @@ export default function SharedRules({
       setSource(value);
       setDraft(null);
       setPreview(null);
-      setNotice("已接入公共规范，项目文件尚未修改。");
+      setNotice("Shared rules connected. Project files have not changed.");
     } catch (error) {
       setError(String(error));
     } finally {
@@ -104,7 +104,7 @@ export default function SharedRules({
       await Service.applyUpdate(preview.token);
       setPreview(null);
       setHistoryRevision((value) => value + 1);
-      setNotice(`已更新 ${preview.project.name} 的 AGENTS.md，备份已保存。`);
+      setNotice(`Updated ${preview.project.name}   AGENTS.md, Backup saved.`);
       onUpdated?.();
     } catch (error) {
       setError(String(error));
@@ -122,7 +122,7 @@ export default function SharedRules({
     setPreview(null);
     try {
       await Service.restoreUpdate(record.id);
-      setNotice(`已恢复 ${record.project.name} 更新前的 AGENTS.md。`);
+      setNotice(`Restored ${record.project.name} Previous AGENTS.md.`);
       onUpdated?.();
     } catch (error) {
       setError(String(error));
@@ -138,11 +138,11 @@ export default function SharedRules({
         {showProjectRules && (
           <ProjectRules path={project.path} onUpdated={onUpdated} />
         )}
-        <section aria-label="公共规范" className="space-y-3">
+        <section aria-label="Shared rules" className="space-y-3">
           <p className="text-sm text-muted">
-            接入公共规范源后，可预览并应用项目更新。
+            Connect a shared rules source to preview and apply project updates.
           </p>
-          <Button disabled>预览差异</Button>
+          <Button disabled>Preview diff</Button>
         </section>
       </div>
     );
@@ -150,12 +150,12 @@ export default function SharedRules({
     return (
       <div className="space-y-5">
         {showProjectRules && <ProjectRules />}
-        <Empty icon="layers" title="尚未接入公共规范">
-          接入规则文件后，可预览各项目的规范差异。
+        <Empty icon="layers" title="No shared rules connected">
+          Connect a rules file to preview changes for each project.
         </Empty>
       </div>
     );
-  if (!ready) return <p role="status">正在读取公共规范…</p>;
+  if (!ready) return <p role="status">Loading shared rules…</p>;
 
   return (
     <div className="space-y-5">
@@ -176,12 +176,12 @@ export default function SharedRules({
         </p>
       )}
       {!project && (
-        <section aria-label="公共规则来源" className="space-y-3">
+        <section aria-label="Shared rules source" className="space-y-3">
           <div className="section-heading">
-            <h2>公共规则来源</h2>
+            <h2>Shared rules source</h2>
             <p>
-              选择一份公共规则 Markdown 文件，按项目预览后同步到 AGENTS.md
-              的公共区块。
+              Choose a shared rules Markdown file. Preview each project before
+              syncing to AGENTS.md shared block.
             </p>
           </div>
           <form onSubmit={connect} className="space-y-3">
@@ -189,7 +189,7 @@ export default function SharedRules({
               htmlFor="shared-source"
               className="block text-sm font-medium"
             >
-              公共规则文件
+              Shared rules file
             </label>
             <div className="flex gap-2">
               <input
@@ -212,7 +212,7 @@ export default function SharedRules({
                 primary
                 disabled={!!busy || !(draft ?? source?.path ?? "").trim()}
               >
-                {busy === "connect" ? "正在接入…" : "接入文件"}
+                {busy === "connect" ? "Connecting…" : "Connect file"}
               </Button>
             </div>
           </form>
@@ -220,7 +220,7 @@ export default function SharedRules({
             <>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="text-muted">
-                  内容版本{" "}
+                  Content version{" "}
                   <code title={source.version}>
                     {source.version.slice(0, 12)}
                   </code>
@@ -232,26 +232,30 @@ export default function SharedRules({
         </section>
       )}
       <section
-        aria-label={project ? "公共规范" : "项目规范更新"}
+        aria-label={project ? "Shared rules" : "Project rule updates"}
         className={`space-y-4 ${project ? "" : "border-t border-line pt-5"}`}
       >
         <div className="section-heading">
-          {!project && <h2>项目规范更新</h2>}
+          {!project && <h2>Project rule updates</h2>}
           <div className="space-y-3">
             <p className="mt-2 leading-5">
-              公共区块之外的项目内容保持原样。应用前重新核对源文件与项目文件，备份保存在本机。
+              Project content outside the shared block is preserved. Source and
+              project files are rechecked before applying; backups stay on this
+              device.
             </p>
           </div>
         </div>
         {!source?.path &&
           (project ? (
             <>
-              <p className="text-sm text-muted">尚未接入公共规范源。</p>
-              <Button onClick={onOpenShared}>接入公共规范</Button>
+              <p className="text-sm text-muted">
+                No shared rules source connected.
+              </p>
+              <Button onClick={onOpenShared}>Connect shared rules</Button>
             </>
           ) : (
             <p className="text-sm text-muted">
-              接入上方的公共规则文件后，即可预览项目更新。
+              Connect a shared rules file above to preview project updates.
             </p>
           ))}
         {projects.length ? (
@@ -278,7 +282,7 @@ export default function SharedRules({
                       className="mt-1 text-xs text-muted"
                       title={source.version}
                     >
-                      来源版本 {source.version.slice(0, 12)}
+                      Source version {source.version.slice(0, 12)}
                     </p>
                   )}
                 </div>
@@ -287,7 +291,7 @@ export default function SharedRules({
                   className="min-w-0 flex-1 text-sm font-medium"
                   htmlFor="update-project"
                 >
-                  目标项目
+                  Target project
                   <Select
                     id="update-project"
                     className="mt-2 w-full"
@@ -312,25 +316,25 @@ export default function SharedRules({
                 onClick={previewUpdate}
                 disabled={!!busy || !source?.path}
               >
-                {busy === "preview" ? "正在预览…" : "预览差异"}
+                {busy === "preview" ? "Generating preview…" : "Preview diff"}
               </Button>
             </div>
             {project && source?.path && <RuleContent source={source} />}
             {preview && (
-              <section aria-label="更新预览" className="space-y-3">
+              <section aria-label="Update preview" className="space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="min-w-0 flex-1 text-sm font-semibold">
                     {preview.project.name} / AGENTS.md
                   </h3>
                   <span className="text-xs text-muted" title={preview.version}>
-                    来源版本 {preview.version.slice(0, 12)}
+                    Source version {preview.version.slice(0, 12)}
                   </span>
                   <Button
                     primary
                     onClick={apply}
                     disabled={!!busy || !preview.changed}
                   >
-                    {busy === "apply" ? "正在应用…" : "应用更新"}
+                    {busy === "apply" ? "Applying…" : "Apply update"}
                   </Button>
                 </div>
                 {preview.changed ? (
@@ -338,7 +342,7 @@ export default function SharedRules({
                     className="source-panel"
                     tabIndex={0}
                     role="region"
-                    aria-label="AGENTS.md 更新差异"
+                    aria-label="AGENTS.md Update diff"
                   >
                     {preview.diff.split("\n").map((line, index) => (
                       <span
@@ -351,11 +355,11 @@ export default function SharedRules({
                   </pre>
                 ) : (
                   <p role="status" className="text-sm text-muted">
-                    公共规则已是最新，无需更新。
+                    Shared rules are up to date.
                   </p>
                 )}
                 <ActionDialog
-                  title="保留的项目内容"
+                  title="Preserved project content"
                   busy={!!busy}
                   error={error}
                   notice={notice}
@@ -364,20 +368,20 @@ export default function SharedRules({
                     <pre
                       className="source-panel mt-3"
                       tabIndex={0}
-                      aria-label="公共区块外的项目内容"
+                      aria-label="Project content outside the shared block"
                     >
                       {preview.projectContent}
                     </pre>
                   ) : (
                     <p className="mt-2 text-sm text-muted">
-                      公共区块外没有项目内容。
+                      No project content outside the shared block.
                     </p>
                   )}
                 </ActionDialog>
               </section>
             )}
             <ActionDialog
-              title="更新记录与恢复"
+              title="Update history and restore"
               busy={!!busy}
               error={error}
               notice={notice}
@@ -393,8 +397,8 @@ export default function SharedRules({
             </ActionDialog>
           </>
         ) : (
-          <Empty title="尚未添加项目">
-            先在侧栏添加本地项目，再预览规范更新。
+          <Empty title="No projects added">
+            Add a local project in the sidebar to preview rule updates.
           </Empty>
         )}
       </section>
@@ -403,13 +407,13 @@ export default function SharedRules({
 }
 
 const adoptionStates: Record<string, string> = {
-  current: "已最新",
-  outdated: "待更新",
-  modified: "公共区块有改动",
-  untracked: "采用版本未知",
-  not_adopted: "尚未采用",
-  no_source: "未接入来源",
-  error: "读取失败",
+  current: "Up to date",
+  outdated: "Update available",
+  modified: "Shared block modified",
+  untracked: "Adopted version unknown",
+  not_adopted: "Not adopted",
+  no_source: "No source connected",
+  error: "Read failed",
 };
 
 function Adoptions({
@@ -449,11 +453,11 @@ function Adoptions({
   return (
     <section>
       <h3 className="break-words text-sm font-medium">
-        {project ? "规范采用情况" : "各项目采用情况"}
+        {project ? "Rule adoption" : "Adoption by project"}
       </h3>
       <div className="mt-3 space-y-3">
         <Button onClick={() => setRevision((value) => value + 1)}>
-          刷新采用状态
+          Refresh adoption status
         </Button>
         {error ? (
           <p role="alert" className="break-words text-sm text-red-800">
@@ -461,7 +465,7 @@ function Adoptions({
           </p>
         ) : !selected ? (
           <p role="status" className="text-sm text-muted">
-            正在读取采用状态…
+            Loading adoption status…
           </p>
         ) : (
           <div className="grouped-list">
@@ -488,9 +492,11 @@ function Adoptions({
                     {item.project.path}
                   </p>
                   <p className="mt-1 break-all text-xs text-muted">
-                    来源 {item.sourceVersion.slice(0, 12) || "未知"} · 采用{" "}
-                    {item.adoptedVersion.slice(0, 12) || "未知"}
-                    {item.hasProjectContent ? " · 保留项目内容" : ""}
+                    Source {item.sourceVersion.slice(0, 12) || "Unknown"} ·
+                    Adoption {item.adoptedVersion.slice(0, 12) || "Unknown"}
+                    {item.hasProjectContent
+                      ? " · Preserve project content"
+                      : ""}
                   </p>
                   {item.error && (
                     <p
@@ -513,12 +519,15 @@ function Adoptions({
 
 function RuleContent({ source }: { source: SharedSource }) {
   return (
-    <ActionDialog title="公共规范原文" trigger="查看公共规范原文">
+    <ActionDialog
+      title="Shared rules source"
+      trigger="View shared rules source"
+    >
       <pre
         className="source-panel mt-3"
         tabIndex={0}
         role="region"
-        aria-label="公共规范原文"
+        aria-label="Shared rules source"
       >
         {source.content}
       </pre>
@@ -527,10 +536,10 @@ function RuleContent({ source }: { source: SharedSource }) {
 }
 
 const historyStates: Record<string, string> = {
-  applied: "可恢复",
-  restored: "已恢复",
-  changed: "文件已有后续改动",
-  "not-applied": "未应用",
+  applied: "Restorable",
+  restored: "Restored",
+  changed: "File changed since this update",
+  "not-applied": "Not applied",
 };
 
 function History({
@@ -558,17 +567,19 @@ function History({
     };
   }, [path]);
   return (
-    <section aria-label="更新记录">
+    <section aria-label="Update history">
       {error ? (
         <p role="alert" className="break-words text-sm text-red-800">
-          无法读取更新记录：{error}
+          Could not load update history: {error}
         </p>
       ) : !records ? (
         <p role="status" className="text-sm text-muted">
-          正在读取记录…
+          Loading history…
         </p>
       ) : !records.length ? (
-        <p className="text-sm text-muted">该项目还没有更新记录。</p>
+        <p className="text-sm text-muted">
+          No update history for this project yet.
+        </p>
       ) : (
         <div className="grouped-list">
           {records.map((record) => (
@@ -581,7 +592,7 @@ function History({
                   {new Date(record.createdAt).toLocaleString()}
                 </time>
                 <p className="mt-1 break-all text-xs text-muted">
-                  AGENTS.md · 来源版本 {record.version.slice(0, 12)}
+                  AGENTS.md · Source version {record.version.slice(0, 12)}
                 </p>
               </div>
               <span className="text-muted">
@@ -591,7 +602,7 @@ function History({
                 disabled={busy || record.state !== "applied"}
                 onClick={() => onRestore(record)}
               >
-                恢复更新前内容
+                Restore previous content
               </Button>
             </div>
           ))}

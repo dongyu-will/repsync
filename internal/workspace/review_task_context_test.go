@@ -32,7 +32,7 @@ func TestProjectReviewTaskContextWarnsAboutSharedDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := review(t, f)
-	if !strings.Contains(strings.Join(r.TaskWarnings, " "), "相同数据库环境和目标") {
+	if !strings.Contains(strings.Join(r.TaskWarnings, " "), "Same database environment and target") {
 		t.Fatalf("shared database unnoticed: %+v", r.TaskWarnings)
 	}
 	done, err := f.service.FinishReviewTask(f.repo, first.ID, r.Version, workspace.ReviewFinishInput{Summary: "done", Checks: "API only", Blockers: "coordinate migration"})

@@ -167,7 +167,7 @@ func TestGitStashConflictsAndIgnoredFilesRetainOriginal(t *testing.T) {
 			t.Fatal(err)
 		}
 		result, err := f.service.ApplyGitStash(f.repo, list.Entries[0].OID, list.Version)
-		if err != nil || result.Applied || !strings.Contains(result.Message, "原 stash 已保留") {
+		if err != nil || result.Applied || !strings.Contains(result.Message, "Original stash preserved") {
 			t.Fatalf("conflict: %+v %v", result, err)
 		}
 		if f.run("rev-parse", "refs/stash") != list.Entries[0].OID {

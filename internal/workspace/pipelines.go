@@ -39,7 +39,7 @@ func readProjectConfig(root *os.Root, name string) ([]byte, error) {
 		return nil, err
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("%s 必须是普通文件", name)
+		return nil, fmt.Errorf("%s must be a regular file", name)
 	}
 	f, err := root.Open(name)
 	if err != nil {
@@ -62,7 +62,7 @@ func projectPackageManager(root *os.Root, field string) (string, error) {
 		}
 	}
 	if !slices.Contains([]string{"npm", "pnpm", "yarn", "bun"}, manager) {
-		return "", errors.New("无法识别包管理器，请在 .repsync.json 中明确配置命令")
+		return "", errors.New("cannot detect package manager; configure commands explicitly in .repsync.json")
 	}
 	return manager, nil
 }
@@ -85,7 +85,7 @@ func (s *Service) Pipelines(path string) (PipelineConfig, error) {
 	}
 	if err == nil {
 		if err = json.Unmarshal(data, &file); err != nil {
-			return config, fmt.Errorf("读取 .repsync.json: %w", err)
+			return config, fmt.Errorf("read .repsync.json: %w", err)
 		}
 		config.Pipelines = file.Pipelines
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -105,7 +105,7 @@ func (s *Service) Pipelines(path string) (PipelineConfig, error) {
 			PackageManager string            `json:"packageManager"`
 		}
 		if err = json.Unmarshal(data, &pkg); err != nil {
-			return config, fmt.Errorf("读取 package.json: %w", err)
+			return config, fmt.Errorf("read package.json: %w", err)
 		}
 		for _, name := range []string{"ci", "check:ci", "check"} {
 			if _, ok := pkg.Scripts[name]; !ok {
@@ -138,13 +138,13 @@ func (s *Service) Pipelines(path string) (PipelineConfig, error) {
 
 func validatePipelines(pipelines []Pipeline) error {
 	if len(pipelines) > 32 {
-		return errors.New("每个项目最多配置 32 条流水线")
+		return errors.New("each project supports up to 32 pipelines")
 	}
 	ids := map[string]bool{}
 	for i := range pipelines {
 		p := &pipelines[i]
 		if p.ID == "" || len(p.ID) > 80 || ids[p.ID] || strings.TrimSpace(p.Name) == "" || (p.Kind != "ci" && p.Kind != "cd") {
-			return errors.New("流水线需要唯一 id、名称和 ci/cd 类型")
+			return errors.New("pipelines require a unique id, name, and ci/cd kind")
 		}
 		ids[p.ID] = true
 		if err := validateReviewCoverage(p.Coverage, p.ReviewEnvironment, p.ReviewTarget); err != nil {
@@ -157,18 +157,18 @@ func validatePipelines(pipelines []Pipeline) error {
 			p.TimeoutSeconds = 1800
 		}
 		if p.TimeoutSeconds < 1 || p.TimeoutSeconds > 7200 {
-			return errors.New("流水线超时应为 1–7200 秒")
+			return errors.New("pipeline timeout must be 1–7200 seconds")
 		}
 		if len(p.Steps) < 1 || len(p.Steps) > 32 {
-			return errors.New("每条流水线需要 1–32 个命令步骤")
+			return errors.New("each pipeline requires 1–32 command steps")
 		}
 		for _, step := range p.Steps {
 			if len(step) == 0 || strings.TrimSpace(step[0]) == "" {
-				return errors.New("命令步骤不能为空")
+				return errors.New("command steps cannot be empty")
 			}
 			for _, arg := range step {
 				if strings.ContainsRune(arg, 0) {
-					return errors.New("命令不能包含空字符")
+					return errors.New("commands cannot contain null characters")
 				}
 			}
 		}
@@ -218,18 +218,18 @@ func (s *Service) GitHubActions(path string) (ActionsOverview, error) {
 	}
 	remote, err := git(path, "remote", "get-url", "origin")
 	if err != nil {
-		return result, errors.New("未配置 origin 远程仓库；本地 CI/CD 仍可使用")
+		return result, errors.New("no origin remote configured; local CI/CD remains available")
 	}
 	result.Repository = githubRepo(remote)
 	if result.Repository == "" {
-		return result, errors.New("origin 不是 github.com 仓库；本地 CI/CD 仍可使用")
+		return result, errors.New("origin is not a github.com repository; local CI/CD remains available")
 	}
 	output, err := runGitHubCLI(path, "run", "list", "--repo", result.Repository, "--limit", "20", "--json", "databaseId,workflowName,displayTitle,status,conclusion,headBranch,headSha,createdAt,url")
 	if err != nil {
 		return result, err
 	}
 	if err := json.Unmarshal(output, &result.Runs); err != nil {
-		return result, fmt.Errorf("解析 GitHub Actions: %w", err)
+		return result, fmt.Errorf("parse GitHub Actions: %w", err)
 	}
 	if result.Runs == nil {
 		result.Runs = []ActionRun{}

@@ -205,7 +205,7 @@ func TestGitWorkspaceStalePreviewAndActiveProcess(t *testing.T) {
 		t.Fatal("stale preview deleted active tree")
 	}
 	for _, w := range f.view().Worktrees {
-		if w.Path == tree && (w.Eligible || !strings.Contains(strings.Join(w.Reasons, ""), "进程")) {
+		if w.Path == tree && (w.Eligible || !strings.Contains(strings.Join(w.Reasons, ""), "process")) {
 			t.Fatalf("active tree not protected: %+v", w)
 		}
 	}
@@ -273,7 +273,7 @@ func TestGitWorkspaceRecentCheckoutAndCodexOwnership(t *testing.T) {
 		if w.Eligible {
 			t.Fatalf("protected tree eligible: %+v", w)
 		}
-		if w.Path == recent && !strings.Contains(strings.Join(w.Reasons, ""), "未满保留期") {
+		if w.Path == recent && !strings.Contains(strings.Join(w.Reasons, ""), "within retention") {
 			t.Fatalf("recent checkout not detected: %+v", w)
 		}
 		if w.Path == codex && !strings.Contains(strings.Join(w.Reasons, ""), "Codex") {

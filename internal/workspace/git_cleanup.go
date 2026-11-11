@@ -30,10 +30,10 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 		return record, err
 	}
 	if !view.Git {
-		return record, errors.New("当前目录不是 Git 仓库")
+		return record, errors.New("current folder is not a Git repository")
 	}
 	if view.Version != version {
-		return record, errors.New("工作树、分支或清理设置已变化，请重新预览")
+		return record, errors.New("worktrees, branches, or cleanup settings changed; preview again")
 	}
 	dir, _, err := s.gitState(path)
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 	s.taskMu.Lock()
 	defer s.taskMu.Unlock()
 	if s.closing {
-		return record, errors.New("应用正在退出")
+		return record, errors.New("the app is shutting down")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -67,12 +67,12 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 		return record, err
 	}
 	if !slices.ContainsFunc(projects, func(p Project) bool { return p.Path == path }) {
-		return record, errors.New("项目已移除登记")
+		return record, errors.New("project registration removed")
 	}
 	file := filepath.Join(dir, "history", record.ID+".json")
 	stashes, err := readGitStashes(path)
 	if err != nil || len(stashes.Entries) > 0 {
-		return record, errors.New("stash 状态已变化或仍有 stash 待处理，请重新检查")
+		return record, errors.New("stash state changed or pending stashes remain; check again")
 	}
 	for i := range record.Items {
 		item := &record.Items[i]
@@ -94,11 +94,11 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 		if item.Kind == "worktree" {
 			info, e := os.Lstat(item.Target)
 			if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-				operationErr = errors.New("工作树目录已变化")
+				operationErr = errors.New("worktree folder changed")
 			}
 			for _, p := range projects {
 				if pathsOverlap(p.Path, item.Target) {
-					operationErr = errors.New("工作树已登记，保留目录")
+					operationErr = errors.New("worktree is registered; folder preserved")
 					break
 				}
 			}
@@ -108,17 +108,17 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 			if operationErr == nil {
 				status, e := git(item.Target, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching")
 				if e != nil || status != "" {
-					operationErr = errors.New("文件状态已变化，保留工作树")
+					operationErr = errors.New("file state changed; worktree preserved")
 				}
 			}
 			if operationErr == nil {
 				head, e := git(item.Target, "rev-parse", "HEAD")
 				if e != nil || strings.TrimSpace(head) != item.Commit {
-					operationErr = errors.New("工作树提交已变化")
+					operationErr = errors.New("worktree commit changed")
 				}
 				branch, e := git(item.Target, "symbolic-ref", "--short", "HEAD")
 				if e != nil || strings.TrimSpace(branch) != item.Branch {
-					operationErr = errors.New("工作树分支已变化")
+					operationErr = errors.New("worktree branch changed")
 				}
 			}
 			if operationErr == nil {
@@ -127,7 +127,7 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 		} else {
 			current, e := git(path, "rev-parse", "--verify", "refs/heads/"+item.Branch)
 			if e != nil || strings.TrimSpace(current) != item.Commit || !gitAncestor(path, item.Commit, "refs/heads/"+view.Policy.BaseBranch) {
-				operationErr = errors.New("分支提交或合并状态已变化")
+				operationErr = errors.New("branch commit or merge state changed")
 			}
 			if operationErr == nil {
 				_, operationErr = git(path, "-c", "core.hooksPath=/dev/null", "branch", "-d", "--", item.Branch)
@@ -139,7 +139,7 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 			item.Status = "removed"
 		}
 		if err := saveJSON(file, record); err != nil {
-			return record, fmt.Errorf("清理结果保存失败；请检查记录 %s 与 Git 实际状态: %w", record.ID, err)
+			return record, fmt.Errorf("failed to save cleanup results; compare record %s with actual Git state: %w", record.ID, err)
 		}
 	}
 	return record, nil
@@ -154,7 +154,7 @@ func (s *Service) RestoreGitCleanup(path, id string) (GitCleanupRecord, error) {
 		return record, err
 	}
 	if id == "" || filepath.Base(id) != id || strings.ContainsAny(id, "/\\") {
-		return record, errors.New("无效清理记录编号")
+		return record, errors.New("invalid cleanup record ID")
 	}
 	dir, state, err := s.gitState(path)
 	if err != nil {
@@ -169,12 +169,12 @@ func (s *Service) RestoreGitCleanup(path, id string) (GitCleanupRecord, error) {
 		return record, err
 	}
 	if record.ID != id || record.RestoredAt != "" {
-		return record, errors.New("记录已恢复或编号不匹配")
+		return record, errors.New("record already restored or ID does not match")
 	}
 	s.taskMu.Lock()
 	defer s.taskMu.Unlock()
 	if s.closing {
-		return record, errors.New("应用正在退出")
+		return record, errors.New("the app is shutting down")
 	}
 	// Restored items receive a fresh retention period even before the next scan.
 	for _, item := range record.Items {
@@ -191,13 +191,13 @@ func (s *Service) RestoreGitCleanup(path, id string) (GitCleanupRecord, error) {
 		ref := fmt.Sprintf("refs/repsync/cleanup/%s/%d", id, i)
 		commit, e := git(path, "rev-parse", "--verify", ref+"^{commit}")
 		if e != nil || strings.TrimSpace(commit) != item.Commit {
-			return record, errors.New("恢复提交不可用，未覆盖现有内容")
+			return record, errors.New("recovery commit unavailable; existing content preserved")
 		}
 		current, e := git(path, "show-ref", "--verify", "--hash", "refs/heads/"+item.Branch)
 		created := e != nil
 		if e == nil {
 			if strings.TrimSpace(current) != item.Commit {
-				return record, errors.New("同名分支已有新提交，未覆盖")
+				return record, errors.New("branch with the same name has new commits; preserved")
 			}
 		} else if _, e = git(path, "-c", "core.hooksPath=/dev/null", "branch", "--", item.Branch, item.Commit); e != nil {
 			return record, e
@@ -211,7 +211,7 @@ func (s *Service) RestoreGitCleanup(path, id string) (GitCleanupRecord, error) {
 		}
 		if item.Kind == "worktree" {
 			if _, e = os.Lstat(item.Target); !errors.Is(e, os.ErrNotExist) {
-				return record, errors.New("工作树原路径已存在或无法确认，未覆盖")
+				return record, errors.New("original worktree path exists or cannot be verified; preserved")
 			}
 			if _, e = git(path, "-c", "core.hooksPath=/dev/null", "worktree", "add", "--", item.Target, item.Branch); e != nil {
 				return record, e
@@ -243,7 +243,7 @@ func gitBranchSettings(path, branch string) ([]GitBranchSetting, error) {
 		}
 		key, value, ok := strings.Cut(field, "\n")
 		if !ok {
-			return settings, errors.New("无法完整备份分支设置")
+			return settings, errors.New("could not fully back up branch settings")
 		}
 		settings = append(settings, GitBranchSetting{Key: key, Value: value})
 	}
@@ -306,7 +306,7 @@ func (s *Service) StartGitCleanup() {
 				return
 			case <-timer.C:
 				if _, err := s.RunAutomaticGitCleanup(); err != nil {
-					log.Printf("自动清理未完成: %v", err)
+					log.Printf("Automatic cleanup incomplete: %v", err)
 				}
 				timer.Reset(time.Hour)
 			}

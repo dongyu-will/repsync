@@ -64,7 +64,7 @@ func TestAIResourcesInventoryPreservesSourcesAndProjectIntent(t *testing.T) {
 	}) {
 		t.Fatal("declared missing skill hidden")
 	}
-	if !strings.Contains(strings.Join(report.Issues, " "), "同名资源") {
+	if !strings.Contains(strings.Join(report.Issues, " "), "Resource named") {
 		t.Fatal("missing ambiguity warning")
 	}
 	if after, err := os.ReadFile(filepath.Join(project, ".repsync.json")); err != nil || string(after) != config {

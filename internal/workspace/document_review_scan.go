@@ -47,12 +47,12 @@ type reviewDocument struct {
 
 // ScanDocumentReview finds Markdown passages that refer to changed source terms.
 func (s *Service) ScanDocumentReview(path, scope, keywords string) (DocumentReview, error) {
-	result := DocumentReview{Findings: []DocumentFinding{}, Warnings: []string{}, Graph: "未查询"}
+	result := DocumentReview{Findings: []DocumentFinding{}, Warnings: []string{}, Graph: "Not queried"}
 	if _, err := s.registeredProject(path); err != nil {
 		return result, err
 	}
 	if len(keywords) > 1024 {
-		return result, errors.New("补充关键词超过长度限制")
+		return result, errors.New("additional keywords exceed the length limit")
 	}
 	diff, basis, memories, warning, err := s.documentReviewContext(path, scope)
 	if err != nil {
@@ -64,16 +64,16 @@ func (s *Service) ScanDocumentReview(path, scope, keywords string) (DocumentRevi
 	}
 	terms, memoryByTerm := addReviewMemoryTerms(documentReviewTerms(diff, keywords), memories)
 	if len(terms) == 0 {
-		result.Warnings = append(result.Warnings, "未从所选变更提取到可查的旧名称，可以补充关键词")
+		result.Warnings = append(result.Warnings, "No searchable old names extracted from the changes; add keywords if needed")
 		return result, nil
 	}
 	if len(terms) > maxReviewTerms {
 		terms = terms[:maxReviewTerms]
-		result.Warnings = append(result.Warnings, "关键词超过上限，本次仅检查前 64 项")
+		result.Warnings = append(result.Warnings, "Keyword limit exceeded; only the first 64 are checked")
 	}
 	rg, err := reviewTool("rg")
 	if err != nil {
-		return result, errors.New("找不到 rg，请安装 ripgrep 后重新扫描")
+		return result, errors.New("rg not found; install ripgrep and rescan")
 	}
 	documents, input, warnings, err := readReviewDocuments(path)
 	if err != nil {
@@ -93,7 +93,7 @@ func (s *Service) ScanDocumentReview(path, scope, keywords string) (DocumentRevi
 		result.Graph = addDocumentGraphEvidence(ctx, path, terms, result.Findings)
 	}
 	if _, current, _, _, err := s.documentReviewContext(path, scope); err != nil || current != basis {
-		return result, errors.New("扫描期间 Git 变更或已确认记忆发生变化，请重新扫描")
+		return result, errors.New("Git changes or confirmed memories changed during scanning; rescan")
 	}
 	return result, nil
 }
@@ -105,7 +105,7 @@ func (s *Service) documentReviewContext(path, scope string) (diff, basis string,
 	}
 	memories, memoryErr := s.ConfirmedProjectMemories(path)
 	if memoryErr != nil {
-		warning = "项目记忆读取失败，本次仅检查代码和补充关键词"
+		warning = "Could not read project memory; checking code and additional keywords only"
 	}
 	return diff, gitDigest([]any{gitBasis, memories, warning}), memories, warning, nil
 }
@@ -148,15 +148,15 @@ func addReviewMemoryEvidence(findings []DocumentFinding, byTerm map[string][]Pro
 					detail = item.Environment + " · " + detail
 				}
 				finding.Evidence = append(finding.Evidence, DocumentReviewEvidence{
-					Source: "已确认项目记忆", Path: item.Source, Detail: detail, MemoryID: item.ID,
+					Source: "Confirmed project memories", Path: item.Source, Detail: detail, MemoryID: item.ID,
 				})
 			}
 		}
 		if len(seen) > 0 {
 			if hasOtherEvidence {
-				finding.Suggestion += "同时核对记忆的来源和适用环境。"
+				finding.Suggestion += "Also verify the memory's source and applicable environment."
 			} else {
-				finding.Suggestion = "核对引用记忆的来源和适用环境，再决定改写、保留或删除本段。"
+				finding.Suggestion = "Verify the cited memory's source and environment before rewriting, keeping, or deleting this paragraph."
 			}
 		}
 	}
@@ -167,7 +167,7 @@ func documentReviewDiff(path, scope string) (string, string, error) {
 		"--ignore-submodules=all", "--relative", "--src-prefix=a/", "--dst-prefix=b/", "--unified=0"}
 	head, err := git(path, "rev-parse", "--verify", "HEAD")
 	if err != nil {
-		return "", "", errors.New("文档核对需要已有提交的 Git 仓库")
+		return "", "", errors.New("document review requires a Git repository with commits")
 	}
 	switch scope {
 	case "worktree":
@@ -175,16 +175,16 @@ func documentReviewDiff(path, scope string) (string, string, error) {
 	case "commit":
 		args = append(args, "HEAD^1", "HEAD")
 	default:
-		return "", "", errors.New("请选择要核对的 Git 变更")
+		return "", "", errors.New("select Git changes to review")
 	}
 	// Document edits do not change the source evidence for other findings.
 	args = append(args, "--", ".", ":(exclude,glob,icase)**/*.md", ":(exclude,glob,icase)**/*.markdown")
 	diff, err := git(path, args...)
 	if err != nil {
-		return "", "", fmt.Errorf("读取所选 Git 变更: %w", err)
+		return "", "", fmt.Errorf("read selected Git changes: %w", err)
 	}
-	if strings.HasSuffix(diff, "[输出超过 1 MiB，已截断]") {
-		return "", "", errors.New("Git 变更超过 1 MiB，请缩小变更范围后再扫描")
+	if strings.HasSuffix(diff, "[output exceeds 1 MiB; truncated]") {
+		return "", "", errors.New("Git changes exceed 1 MiB; narrow the scope before scanning")
 	}
 	return diff, gitDigest([]string{scope, head, diff}), nil
 }
@@ -201,7 +201,7 @@ func documentReviewTerms(diff, keywords string) []reviewTerm {
 	}
 	for term := range strings.FieldsFuncSeq(keywords, func(r rune) bool { return strings.ContainsRune(",，\n", r) }) {
 		term = strings.TrimSpace(term)
-		add(term, "", "", DocumentReviewEvidence{Source: "补充关键词", Detail: term})
+		add(term, "", "", DocumentReviewEvidence{Source: "Additional keywords", Detail: term})
 	}
 	var name string
 	var oldLine int
@@ -232,7 +232,7 @@ func documentReviewTerms(diff, keywords string) []reviewTerm {
 				if strings.Contains(current, strings.ToLower(token)) {
 					continue
 				}
-				evidence := DocumentReviewEvidence{Source: "Git diff", Path: name, Line: line.line, Detail: "移除 " + token}
+				evidence := DocumentReviewEvidence{Source: "Git diff", Path: name, Line: line.line, Detail: "Removed " + token}
 				var symbol string
 				camel := reviewCamel.MatchString(token)
 				if (camel || strings.Contains(token, "_")) && reviewSymbol.MatchString(token) {
@@ -265,7 +265,7 @@ func documentReviewTerms(diff, keywords string) []reviewTerm {
 		if deleted {
 			base := strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
 			if strings.ContainsAny(base, "-_") {
-				evidence := DocumentReviewEvidence{Source: "Git diff", Path: name, Detail: "删除文件 " + filepath.Base(name)}
+				evidence := DocumentReviewEvidence{Source: "Git diff", Path: name, Detail: "Deleted file " + filepath.Base(name)}
 				add(base, "", "", evidence)
 				add(strings.NewReplacer("-", " ", "_", " ").Replace(base), "", "", evidence)
 			}
@@ -338,18 +338,18 @@ func readReviewDocuments(path string) ([]reviewDocument, string, []string, error
 		}
 		seen[name] = true
 		if len(documents) == maxReviewFiles {
-			warnings = append(warnings, "达到 128 个文档的扫描上限")
+			warnings = append(warnings, "Reached the scan limit of 128 documents")
 			break
 		}
 		content, err := readReviewDocument(root, name)
 		if err != nil {
 			if len(warnings) < 5 && !errors.Is(err, os.ErrNotExist) {
-				warnings = append(warnings, "跳过 "+name+"："+err.Error())
+				warnings = append(warnings, "Skipped "+name+": "+err.Error())
 			}
 			continue
 		}
 		if input.Len()+len(content)+1 > maxReviewBytes {
-			warnings = append(warnings, "达到 4 MiB 文档扫描上限")
+			warnings = append(warnings, "Reached the 4 MiB document scan limit")
 			break
 		}
 		lines := reviewDocumentLines(content)
@@ -363,8 +363,8 @@ func readReviewDocuments(path string) ([]reviewDocument, string, []string, error
 		}
 		line += len(lines)
 	}
-	if strings.HasSuffix(list, "[输出超过 1 MiB，已截断]") {
-		warnings = append(warnings, "Git 文件清单被截断，部分文档未检查")
+	if strings.HasSuffix(list, "[output exceeds 1 MiB; truncated]") {
+		warnings = append(warnings, "Git file list truncated; some documents not checked")
 	}
 	return documents, input.String(), warnings, nil
 }
@@ -393,7 +393,7 @@ func matchReviewDocuments(ctx context.Context, rg string, terms []reviewTerm, do
 	cmd.Stdout, cmd.Stderr = &output, &stderr
 	var exit *exec.ExitError
 	if err := cmd.Run(); err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 1 && ctx.Err() == nil) {
-		return nil, nil, fmt.Errorf("rg 查找文档: %w %s", err, strings.TrimSpace(stderr.String()))
+		return nil, nil, fmt.Errorf("rg document search: %w %s", err, strings.TrimSpace(stderr.String()))
 	}
 	var warnings []string
 	index := map[[2]int]int{}
@@ -428,13 +428,13 @@ func matchReviewDocuments(ctx context.Context, rg string, terms []reviewTerm, do
 		itemIndex, exists := index[key]
 		if !exists {
 			if len(findings) == maxReviewFindings {
-				warnings = append(warnings, "仅显示前 50 个段落，请缩小扫描范围后再检查其余内容")
+				warnings = append(warnings, "Showing the first 50 paragraphs; narrow the scope to review the rest")
 				break
 			}
 			original := strings.Join(doc.lines[start:end], "")
 			if len(original) > 8192 {
-				if !slices.Contains(warnings, "部分段落超过 8 KiB，已跳过") {
-					warnings = append(warnings, "部分段落超过 8 KiB，已跳过")
+				if !slices.Contains(warnings, "Some paragraphs exceed 8 KiB and were skipped") {
+					warnings = append(warnings, "Some paragraphs exceed 8 KiB and were skipped")
 				}
 				continue
 			}
@@ -453,7 +453,7 @@ func matchReviewDocuments(ctx context.Context, rg string, terms []reviewTerm, do
 			}
 			item.Terms = append(item.Terms, term.text)
 			if term.successor != "" && item.Suggestion == "" {
-				item.Suggestion = fmt.Sprintf("核实 %s 的实际配置后，改写本段的启动、连接或运维步骤。旧说明若仍用于恢复，可保留在恢复指南。", term.successor)
+				item.Suggestion = fmt.Sprintf("Verify the actual %s configuration, then rewrite startup, connection, or operational steps. Keep old instructions in recovery guides if still needed.", term.successor)
 			}
 			if term.evidence.Source != "" && !slices.Contains(item.Evidence, term.evidence) {
 				item.Evidence = append(item.Evidence, term.evidence)
@@ -461,12 +461,12 @@ func matchReviewDocuments(ctx context.Context, rg string, terms []reviewTerm, do
 		}
 	}
 	if output.overflow {
-		warnings = append(warnings, "rg 输出达到上限，结果仅覆盖部分段落")
+		warnings = append(warnings, "rg output reached the limit; results cover only some paragraphs")
 	}
 	for i := range findings {
 		item := &findings[i]
 		if item.Suggestion == "" {
-			item.Suggestion = "核对 " + strings.Join(item.Terms, "、") + " 的现行入口。确认已下线且无保留用途后，删除对应说明和链接。"
+			item.Suggestion = "Verify " + strings.Join(item.Terms, ", ") + " current entry points. Remove instructions and links only after confirming retirement and no remaining use."
 		}
 	}
 	return findings, warnings, nil
@@ -539,7 +539,7 @@ func runDocumentGraph(ctx context.Context, binary, path string, args ...string) 
 		return nil, err
 	}
 	if output.overflow {
-		return nil, errors.New("CodeGraph 输出超过 1 MiB")
+		return nil, errors.New("CodeGraph output exceeds 1 MiB")
 	}
 	return output.Bytes(), nil
 }
@@ -547,7 +547,7 @@ func runDocumentGraph(ctx context.Context, binary, path string, args ...string) 
 func addDocumentGraphEvidence(ctx context.Context, path string, terms []reviewTerm, findings []DocumentFinding) string {
 	binary, err := reviewTool("codegraph")
 	if err != nil {
-		return "未找到 CodeGraph"
+		return "CodeGraph not found"
 	}
 	var status struct {
 		Initialized bool
@@ -555,13 +555,13 @@ func addDocumentGraphEvidence(ctx context.Context, path string, terms []reviewTe
 	}
 	data, err := runDocumentGraph(ctx, binary, path, "status", "--json", ".")
 	if err != nil || json.Unmarshal(data, &status) != nil {
-		return "CodeGraph 状态读取失败"
+		return "Failed to read CodeGraph status"
 	}
 	if !status.Initialized || status.ProjectPath != path {
-		return "当前目录尚未建立 CodeGraph 索引"
+		return "No CodeGraph index for this folder"
 	}
 	if _, err := runDocumentGraph(ctx, binary, path, "sync", "."); err != nil {
-		return "CodeGraph 索引同步失败"
+		return "CodeGraph index sync failed"
 	}
 	symbols := map[string]string{}
 	for _, term := range terms {
@@ -594,11 +594,11 @@ func addDocumentGraphEvidence(ctx context.Context, path string, terms []reviewTe
 	}
 	switch {
 	case partial:
-		return "CodeGraph 仅核对了部分符号"
+		return "CodeGraph checked only some symbols"
 	case len(cache) == 0:
-		return "CodeGraph 索引已同步，未提取到可查符号"
+		return "CodeGraph index synced; no queryable symbols extracted"
 	default:
-		return "CodeGraph 已核对可查符号"
+		return "CodeGraph checked queryable symbols"
 	}
 }
 
@@ -613,7 +613,7 @@ func documentGraphCallers(ctx context.Context, binary, path, symbol string) ([]D
 		return nil, err
 	}
 	if !slices.ContainsFunc(matches, func(match queryMatch) bool { return match.Node.Name == symbol }) {
-		return []DocumentReviewEvidence{{Source: "CodeGraph", Detail: "索引查询未匹配 " + symbol}}, nil
+		return []DocumentReviewEvidence{{Source: "CodeGraph", Detail: "No index match for " + symbol}}, nil
 	}
 	data, err = runDocumentGraph(ctx, binary, path, "callers", "--json", "--limit", "3", "--", symbol)
 	if err != nil {
@@ -635,11 +635,11 @@ func documentGraphCallers(ctx context.Context, binary, path, symbol string) ([]D
 		return nil, err
 	}
 	if len(graph.Targets) == 0 {
-		return nil, errors.New("CodeGraph 未返回匹配的符号定义")
+		return nil, errors.New("CodeGraph returned no matching symbol definitions")
 	}
-	evidence := []DocumentReviewEvidence{{Source: "CodeGraph", Path: graph.Targets[0].FilePath, Line: graph.Targets[0].StartLine, Detail: "当前索引仍找到 " + symbol}}
+	evidence := []DocumentReviewEvidence{{Source: "CodeGraph", Path: graph.Targets[0].FilePath, Line: graph.Targets[0].StartLine, Detail: "Current index still contains " + symbol}}
 	for _, caller := range graph.Callers {
-		evidence = append(evidence, DocumentReviewEvidence{Source: "CodeGraph", Path: caller.FilePath, Line: caller.StartLine, Detail: "引用 " + symbol + "：" + caller.Name})
+		evidence = append(evidence, DocumentReviewEvidence{Source: "CodeGraph", Path: caller.FilePath, Line: caller.StartLine, Detail: "Reference " + symbol + ": " + caller.Name})
 	}
 	return evidence, nil
 }

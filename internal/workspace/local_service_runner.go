@@ -40,11 +40,11 @@ func (s *Service) StartLocalService(path, id, version string) (LocalServiceState
 		return LocalServiceState{}, err
 	}
 	if config.version != version {
-		return LocalServiceState{}, errors.New("服务配置已改变，请刷新并核对命令后启动")
+		return LocalServiceState{}, errors.New("service configuration changed; refresh and review commands before starting")
 	}
 	index := slices.IndexFunc(config.services, func(d LocalServiceDefinition) bool { return d.ID == id })
 	if index < 0 {
-		return LocalServiceState{}, errors.New("服务配置已移除，请刷新")
+		return LocalServiceState{}, errors.New("service configuration removed; refresh")
 	}
 	definition := config.services[index]
 	if len(definition.EnvFrom) > 0 {
@@ -52,7 +52,7 @@ func (s *Service) StartLocalService(path, id, version string) (LocalServiceState
 		for _, item := range batch.Services {
 			if item.Path == path && item.ServiceID == id {
 				if item.Status == "already_running" && err == nil {
-					return item.State, errors.New("此服务已启动")
+					return item.State, errors.New("this service is already running")
 				}
 				return item.State, err
 			}
@@ -64,7 +64,7 @@ func (s *Service) StartLocalService(path, id, version string) (LocalServiceState
 	s.taskMu.Lock()
 	defer s.taskMu.Unlock()
 	if s.closing {
-		return LocalServiceState{}, errors.New("应用正在退出")
+		return LocalServiceState{}, errors.New("the app is shutting down")
 	}
 	if _, err := s.registeredProject(path); err != nil {
 		return LocalServiceState{}, err
@@ -75,11 +75,11 @@ func (s *Service) StartLocalService(path, id, version string) (LocalServiceState
 		running := localServiceRunning(active.state.Status)
 		active.mu.Unlock()
 		if running {
-			return LocalServiceState{}, errors.New("此服务已启动")
+			return LocalServiceState{}, errors.New("this service is already running")
 		}
 	}
 	if count >= 16 {
-		return LocalServiceState{}, errors.New("最多同时运行 16 个本地服务")
+		return LocalServiceState{}, errors.New("up to 16 local services can run concurrently")
 	}
 	resolved, reservation, err := reserveServicePort(definition, ports)
 	if err != nil {
@@ -104,7 +104,7 @@ func (s *Service) startLocalServiceLocked(path string, configured, definition Lo
 	}
 	file, err := os.OpenFile(s.localServiceFile(path, id, ".log"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
-		state.Status, state.Error = "failure", "创建服务日志失败: "+err.Error()
+		state.Status, state.Error = "failure", "Failed to create service log: "+err.Error()
 		_ = saveJSON(statePath, state)
 		return LocalServiceState{}, err
 	}
@@ -131,7 +131,7 @@ func (s *Service) startLocalServiceLocked(path string, configured, definition Lo
 		active.log.Close()
 		state.Status, state.Error, state.EndedAt = "failure", err.Error(), time.Now().UTC().Format(time.RFC3339)
 		_ = saveJSON(statePath, state)
-		return state, fmt.Errorf("启动 %s 失败: %w", definition.Name, err)
+		return state, fmt.Errorf("failed to start %s: %w", definition.Name, err)
 	}
 	active.state.PID = cmd.Process.Pid
 	if err := saveJSON(statePath, active.state); err != nil {
@@ -139,7 +139,7 @@ func (s *Service) startLocalServiceLocked(path string, configured, definition Lo
 		_ = cmd.Wait()
 		_ = killCommandGroup(cmd, syscall.SIGKILL)
 		active.log.Close()
-		return LocalServiceState{}, fmt.Errorf("保存服务状态失败，已停止启动进程: %w", err)
+		return LocalServiceState{}, fmt.Errorf("failed to save service state; started process stopped: %w", err)
 	}
 	if s.activeLocalServices == nil {
 		s.activeLocalServices = map[string]map[string]*activeLocalService{}
@@ -202,12 +202,12 @@ func (s *Service) waitLocalService(ctx context.Context, path string, active *act
 		active.state.Status, active.state.Error = "stopped", ""
 	}
 	if err := active.log.Close(); err != nil {
-		active.state.Error += " 保存日志失败: " + err.Error()
+		active.state.Error += " Failed to save logs: " + err.Error()
 	}
 	active.state.PID, active.state.EndedAt = 0, time.Now().UTC().Format(time.RFC3339)
 	active.state.PortState = "unknown"
 	if err := saveJSON(s.localServiceFile(path, active.state.Definition.ID, ".json"), active.state); err != nil {
-		active.state.Error += " 保存记录失败: " + err.Error()
+		active.state.Error += " Failed to save record: " + err.Error()
 	}
 	id := active.state.Definition.ID
 	active.mu.Unlock()
@@ -227,12 +227,12 @@ func (s *Service) StopLocalService(path, id, runID string) error {
 	active := s.activeLocalServices[path][id]
 	s.taskMu.Unlock()
 	if active == nil {
-		return errors.New("服务已经停止或不属于本次应用")
+		return errors.New("service stopped or is not owned by this app instance")
 	}
 	active.mu.Lock()
 	if active.state.RunID != runID {
 		active.mu.Unlock()
-		return errors.New("服务已经重新启动，请刷新后操作")
+		return errors.New("service restarted; refresh before continuing")
 	}
 	if !localServiceRunning(active.state.Status) {
 		active.mu.Unlock()
@@ -257,7 +257,7 @@ func (s *Service) LocalServiceLog(path, id, runID string) (LocalServiceOutput, e
 		state := active.state
 		active.mu.Unlock()
 		if state.RunID != runID {
-			return LocalServiceOutput{}, errors.New("服务已重新启动，请刷新日志")
+			return LocalServiceOutput{}, errors.New("service restarted; refresh the logs")
 		}
 		return LocalServiceOutput{State: state, Log: active.log.Text()}, nil
 	}
@@ -266,7 +266,7 @@ func (s *Service) LocalServiceLog(path, id, runID string) (LocalServiceOutput, e
 		return LocalServiceOutput{}, err
 	}
 	if state.RunID != runID {
-		return LocalServiceOutput{}, errors.New("服务已重新启动，请刷新日志")
+		return LocalServiceOutput{}, errors.New("service restarted; refresh the logs")
 	}
 	if localServiceRunning(state.Status) {
 		state.Status, state.PID = "interrupted", 0
@@ -285,7 +285,7 @@ func (s *Service) LocalServiceLog(path, id, runID string) (LocalServiceOutput, e
 		return LocalServiceOutput{}, err
 	}
 	if current.RunID != runID {
-		return LocalServiceOutput{}, errors.New("服务已重新启动，请刷新日志")
+		return LocalServiceOutput{}, errors.New("service restarted; refresh the logs")
 	}
 	return LocalServiceOutput{State: state, Log: strings.ToValidUTF8(string(data), "�")}, err
 }
@@ -302,7 +302,7 @@ func (s *Service) InspectLocalServicePort(path, id string) ([]LocalPortOwner, er
 	}
 	index := slices.IndexFunc(overview.Services, func(service LocalServiceState) bool { return service.Definition.ID == id })
 	if index < 0 || overview.Services[index].Definition.Port == 0 {
-		return nil, errors.New("此服务未配置端口")
+		return nil, errors.New("no port configured for this service")
 	}
 	return localPortOwners(overview.Services[index].Definition.Port)
 }
@@ -318,7 +318,7 @@ func localPortOwners(port int) ([]LocalPortOwner, error) {
 		if errors.As(err, &exit) && exit.ExitCode() == 1 && out.Len() == 0 && stderr.Len() == 0 {
 			return []LocalPortOwner{}, nil
 		}
-		return nil, fmt.Errorf("读取端口占用失败: %w %s", err, stderr.String())
+		return nil, fmt.Errorf("failed to read port usage: %w %s", err, stderr.String())
 	}
 	owners := []LocalPortOwner{}
 	for _, line := range strings.Split(out.String(), "\n") {

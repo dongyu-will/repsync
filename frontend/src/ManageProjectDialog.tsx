@@ -67,13 +67,14 @@ export default function ManageProjectDialog({
         }}
       >
         <h2 id="manage-project-title" className="text-xl font-semibold">
-          管理 {project.name}
+          Manage {project.name}
         </h2>
         <p className="text-sm leading-6 text-muted">
-          更换目录用于修复已移动的项目。移除仅取消登记，项目文件、日志和备份都会保留。
+          Update the path when a project moves. Removing a project keeps its
+          files, logs, and backups.
         </p>
         <label htmlFor="relocate-path" className="block text-sm font-medium">
-          项目目录
+          Project folder
         </label>
         <div className="flex gap-2">
           <input
@@ -89,11 +90,12 @@ export default function ManageProjectDialog({
             className="h-9 min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
           />
           <Button type="button" disabled={busy} onClick={browse}>
-            选择目录
+            Choose folder
           </Button>
         </div>
         <p className="text-xs leading-5 text-muted">
-          更换目录不搬动文件；历史按原路径保留。
+          Updating the path does not move files. History stays with the original
+          path.
         </p>
         {error && (
           <p
@@ -110,17 +112,17 @@ export default function ManageProjectDialog({
             disabled={busy}
             onClick={() => void change(true)}
           >
-            移除登记
+            Remove registration
           </Button>
           <Button type="button" disabled={busy} onClick={onClose}>
-            取消
+            Cancel
           </Button>
           <Button
             primary
             type="submit"
             disabled={busy || !path.trim() || path.trim() === project.path}
           >
-            {busy ? "正在处理…" : "保存目录"}
+            {busy ? "Working…" : "Save path"}
           </Button>
         </div>
       </form>

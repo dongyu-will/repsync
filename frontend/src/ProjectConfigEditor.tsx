@@ -50,7 +50,7 @@ export default function ProjectConfigEditor({
 }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
-  const title = `配置${section === "services" ? "服务" : "流水线"}`;
+  const title = `Configure ${section === "services" ? "services" : "pipelines"}`;
   return (
     <>
       <Button
@@ -76,7 +76,7 @@ export default function ProjectConfigEditor({
           title={title}
           onClose={() => setOpen(false)}
           onSaved={() => {
-            setNotice("已保存");
+            setNotice("Saved");
             onSaved();
             setOpen(false);
           }}
@@ -260,17 +260,18 @@ function CommandDialog({
         <div className="-mx-1 min-h-0 space-y-4 overflow-y-auto px-1 pb-1 pt-4">
           {loading ? (
             <p role="status" className="text-sm text-muted">
-              正在读取…
+              Loading…
             </p>
           ) : (
             config && (
               <fieldset disabled={busy} className="min-w-0 space-y-4">
                 <p className="text-sm leading-5 text-muted">
-                  可直接让 AI 配置项目已有的{services ? "启动" : "检查或发布"}
-                  命令，也可在这里手动调整。
+                  Ask AI to configure existing{" "}
+                  {services ? "start" : "check or release"} commands, or edit
+                  them here.
                 </p>
                 <label className="block space-y-1.5 text-sm font-medium">
-                  {services ? "服务" : "流水线"}
+                  {services ? "Service" : "Pipelines"}
                   <Select
                     autoFocus
                     className="w-full"
@@ -287,7 +288,7 @@ function CommandDialog({
                         kind !== (item && "kind" in item ? item.kind : "ci");
                       if (
                         !changed ||
-                        window.confirm("当前修改尚未保存，放弃修改并切换？")
+                        window.confirm("Discard unsaved changes and switch?")
                       )
                         selectItem(event.target.value, config);
                     }}
@@ -297,21 +298,27 @@ function CommandDialog({
                         {item.name}
                       </option>
                     ))}
-                    <option value="">添加{services ? "服务" : "流水线"}</option>
+                    <option value="">
+                      Add{services ? "Service" : "Pipelines"}
+                    </option>
                   </Select>
                 </label>
                 <label className="block space-y-1.5 text-sm font-medium">
-                  名称
+                  Name
                   <input
                     required
                     className={inputClass}
-                    placeholder={services ? "例如 前端开发" : "例如 项目检查"}
+                    placeholder={
+                      services
+                        ? "e.g. Frontend development"
+                        : "e.g. Project checks"
+                    }
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />
                 </label>
                 <label className="block space-y-1.5 text-sm font-medium">
-                  命令
+                  Command
                   <textarea
                     required
                     rows={3}
@@ -324,17 +331,17 @@ function CommandDialog({
                 </label>
                 <div className="mt-3 space-y-3">
                   <label className="block space-y-1.5 text-sm font-medium">
-                    工作目录
+                    Working directory
                     <input
                       className={inputClass}
-                      placeholder="留空使用项目根目录"
+                      placeholder="Leave blank for the project root"
                       value={cwd}
                       onChange={(event) => setCwd(event.target.value)}
                     />
                   </label>
                   {services ? (
                     <label className="block space-y-1.5 text-sm font-medium">
-                      页面地址
+                      Page URL
                       <input
                         type={
                           config?.services.find((entry) => entry.id === id)
@@ -343,21 +350,21 @@ function CommandDialog({
                             : "url"
                         }
                         className={inputClass}
-                        placeholder="可选，例如 http://localhost:5173"
+                        placeholder="Optional, e.g. http://localhost:5173"
                         value={url}
                         onChange={(event) => setUrl(event.target.value)}
                       />
                     </label>
                   ) : (
                     <label className="block space-y-1.5 text-sm font-medium">
-                      用途
+                      Purpose
                       <Select
                         className="w-full"
                         value={kind}
                         onChange={(event) => setKind(event.target.value)}
                       >
-                        <option value="ci">检查</option>
-                        <option value="cd">发布</option>
+                        <option value="ci">Check</option>
+                        <option value="cd">Release</option>
                       </Select>
                     </label>
                   )}
@@ -379,7 +386,7 @@ function CommandDialog({
                   setRevision((value) => value + 1);
                 }}
               >
-                重新载入
+                Reload
               </button>
             </div>
           )}
@@ -393,7 +400,7 @@ function CommandDialog({
                 disabled={!native || !config || busy || loading}
                 onClick={() => void save(true)}
               >
-                移除
+                Remove
               </button>
             )}
           </div>
@@ -403,7 +410,7 @@ function CommandDialog({
               disabled={busy}
               onClick={() => dialog.current?.close()}
             >
-              取消
+              Cancel
             </Button>
             <Button
               primary
@@ -417,7 +424,7 @@ function CommandDialog({
                 !command.trim()
               }
             >
-              {busy ? "保存中…" : "保存"}
+              {busy ? "Saving…" : "Save"}
             </Button>
           </div>
         </div>

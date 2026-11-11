@@ -134,17 +134,17 @@ export default function AddProjectDialog({
     >
       <form onSubmit={submit} className="space-y-4 p-5">
         <h2 id="add-project-title" className="text-xl font-semibold">
-          添加项目
+          Add project
         </h2>
         <div
           role="group"
-          aria-label="项目来源"
+          aria-label="Project source"
           className="flex gap-1 rounded-md bg-surface p-1"
         >
           {(
             [
-              ["local", "本地目录"],
-              ["remote", "远程仓库"],
+              ["local", "Local folder"],
+              ["remote", "Remote repository"],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -166,10 +166,10 @@ export default function AddProjectDialog({
         {mode === "local" ? (
           <>
             <p className="text-sm text-muted">
-              选择已有的项目目录，添加后直接打开。
+              Choose an existing project folder to add and open it.
             </p>
             <label className="block text-sm font-medium" htmlFor="project-path">
-              项目目录
+              Project folder
             </label>
             <div className="flex gap-2">
               <input
@@ -186,17 +186,18 @@ export default function AddProjectDialog({
                 className="h-9 min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
               />
               <Button type="button" disabled={busy} onClick={browse}>
-                选择目录
+                Choose folder
               </Button>
             </div>
           </>
         ) : (
           <>
             <p className="text-sm text-muted">
-              克隆到本机后自动添加，使用本机已有的 Git 凭据或 SSH 密钥。
+              Clone and register a repository using your existing Git
+              credentials or SSH keys.
             </p>
             <label className="block text-sm font-medium" htmlFor="clone-remote">
-              仓库地址
+              Repository URL
             </label>
             <input
               id="clone-remote"
@@ -207,11 +208,11 @@ export default function AddProjectDialog({
               disabled={busy}
               value={remote}
               onChange={(event) => setRemote(event.target.value)}
-              placeholder="https://github.com/owner/repo.git 或 git@…"
+              placeholder="https://github.com/owner/repo.git or git@…"
               className="h-9 w-full rounded-md border border-control px-3 text-sm"
             />
             <label className="block text-sm font-medium" htmlFor="clone-parent">
-              保存到
+              Save to
             </label>
             <div className="flex gap-2">
               <input
@@ -227,11 +228,11 @@ export default function AddProjectDialog({
                 className="h-9 min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
               />
               <Button type="button" disabled={busy} onClick={browse}>
-                选择目录
+                Choose folder
               </Button>
             </div>
             <label className="block text-sm font-medium" htmlFor="clone-name">
-              目录名称
+              Folder name
             </label>
             <input
               id="clone-name"
@@ -258,29 +259,29 @@ export default function AddProjectDialog({
           </p>
         )}
         {clone && (
-          <section aria-label="仓库克隆进度" className="space-y-2">
+          <section aria-label="Clone progress" className="space-y-2">
             <p role="status" className="text-sm">
               {running
                 ? stopping
-                  ? "正在停止克隆…"
-                  : "正在克隆仓库…"
+                  ? "Stopping clone…"
+                  : "Cloning repository…"
                 : clone.status === "success"
-                  ? "克隆完成"
-                  : "克隆未完成"}
+                  ? "Clone complete"
+                  : "Clone incomplete"}
             </p>
             {clone.log && (
               <pre
                 className="source-panel max-h-40"
                 tabIndex={0}
                 role="region"
-                aria-label="克隆输出"
+                aria-label="Clone output"
               >
                 {clone.log.replace(/\r/g, "\n")}
               </pre>
             )}
             {!running && (
               <p className="break-all text-xs text-muted">
-                目标目录：{clone.destination}
+                Destination: {clone.destination}
               </p>
             )}
             {!running && clone.cloned && (
@@ -293,18 +294,18 @@ export default function AddProjectDialog({
                   setError("");
                 }}
               >
-                登记已克隆目录
+                Register cloned folder
               </Button>
             )}
           </section>
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" disabled={busy} onClick={onClose}>
-            取消
+            Cancel
           </Button>
           {running ? (
             <Button type="button" disabled={stopping} onClick={stop}>
-              {stopping ? "正在停止…" : "停止克隆"}
+              {stopping ? "Stopping…" : "Stop cloning"}
             </Button>
           ) : (
             <Button
@@ -318,10 +319,10 @@ export default function AddProjectDialog({
               }
             >
               {saving
-                ? "正在处理…"
+                ? "Working…"
                 : mode === "local"
-                  ? "添加项目"
-                  : "克隆并添加"}
+                  ? "Add project"
+                  : "Clone and add"}
             </Button>
           )}
         </div>

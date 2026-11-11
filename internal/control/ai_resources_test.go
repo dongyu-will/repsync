@@ -22,7 +22,7 @@ func TestControlAICommandsGuardProjectScope(t *testing.T) {
 	for _, action := range []string{"ai-resources", "ai-usage"} {
 		t.Run(action, func(t *testing.T) {
 			response, code := cli(t, socket, action, t.TempDir())
-			if code != 1 || response.OK || !strings.Contains(response.Error, "登记") {
+			if code != 1 || response.OK || !strings.Contains(response.Error, "register") {
 				t.Fatalf("project scope guard bypassed: %d %+v", code, response)
 			}
 			_, code = cli(t, socket, action, "/one", "/two")

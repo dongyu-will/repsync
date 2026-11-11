@@ -69,7 +69,7 @@ func (s *Service) ApplyDocumentReview(path string, edit DocumentReviewEdit, toke
 		return err
 	}
 	if token != preview.Token {
-		return errors.New("修改已变化，请重新预览")
+		return errors.New("changes have changed; generate a new preview")
 	}
 	return s.saveDocument(path, edit.Path, original, updated)
 }
@@ -80,14 +80,14 @@ func (s *Service) prepareDocumentReviewEdit(path string, edit DocumentReviewEdit
 		return preview, "", "", err
 	}
 	if !reviewDocumentPath(edit.Path) || !utf8.ValidString(edit.Replacement) || len(edit.Replacement) > documentReviewMaxFile {
-		return preview, "", "", errors.New("请选择可核对的 Markdown 文件，并检查修改长度")
+		return preview, "", "", errors.New("select a reviewable Markdown file and check the edit length")
 	}
 	_, basis, _, _, err := s.documentReviewContext(path, edit.Scope)
 	if err != nil {
 		return preview, "", "", err
 	}
 	if basis != edit.Basis {
-		return preview, "", "", errors.New("Git 变更或已确认记忆已更新，请重新扫描文档")
+		return preview, "", "", errors.New("Git changes or confirmed memories changed; rescan documents")
 	}
 	root, err := os.OpenRoot(path)
 	if err != nil {
@@ -99,11 +99,11 @@ func (s *Service) prepareDocumentReviewEdit(path string, edit DocumentReviewEdit
 		return preview, "", "", err
 	}
 	if gitDigest(original) != edit.Version {
-		return preview, "", "", errors.New("文档已修改，请重新扫描后再预览")
+		return preview, "", "", errors.New("document changed; rescan before previewing")
 	}
 	lines := reviewDocumentLines(original)
 	if edit.StartLine < 1 || edit.EndLine < edit.StartLine || edit.EndLine > len(lines) {
-		return preview, "", "", errors.New("段落位置已失效，请重新扫描")
+		return preview, "", "", errors.New("paragraph location is stale; rescan")
 	}
 	before := strings.Join(lines[edit.StartLine-1:edit.EndLine], "")
 	after := strings.ReplaceAll(edit.Replacement, "\r\n", "\n")
@@ -115,10 +115,10 @@ func (s *Service) prepareDocumentReviewEdit(path string, edit DocumentReviewEdit
 	}
 	updated := strings.Join(lines[:edit.StartLine-1], "") + after + strings.Join(lines[edit.EndLine:], "")
 	if updated == original {
-		return preview, "", "", errors.New("段落内容未变化")
+		return preview, "", "", errors.New("paragraph content is unchanged")
 	}
 	if len(updated) > documentReviewMaxFile {
-		return preview, "", "", errors.New("修改后文件超过 256 KiB")
+		return preview, "", "", errors.New("edited file exceeds 256 KiB")
 	}
 	preview = DocumentReviewPreview{
 		Before: before, After: after, Token: gitDigest([]any{path, edit, before, after}),
@@ -156,7 +156,7 @@ func readReviewDocument(root *os.Root, name string) (string, error) {
 		return "", err
 	}
 	if !info.Mode().IsRegular() || info.Size() > documentReviewMaxFile {
-		return "", fmt.Errorf("%s 需要是 256 KiB 以内的普通文件", name)
+		return "", fmt.Errorf("%s must be a regular file no larger than 256 KiB", name)
 	}
 	file, err := root.Open(name)
 	if err != nil {
@@ -168,11 +168,11 @@ func readReviewDocument(root *os.Root, name string) (string, error) {
 		return "", err
 	}
 	if !os.SameFile(info, opened) {
-		return "", errors.New("文档在读取期间发生变化")
+		return "", errors.New("document changed while reading")
 	}
 	content, err := readLimitedText(file)
 	if err == nil && (!utf8.ValidString(content) || strings.ContainsRune(content, 0)) {
-		err = errors.New("文档需要是 UTF-8 文本")
+		err = errors.New("document must be UTF-8 text")
 	}
 	return content, err
 }

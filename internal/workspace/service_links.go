@@ -35,7 +35,7 @@ func endpointProject(path string, endpoint ServiceEndpoint) (string, error) {
 	}
 	canonical, err := filepath.EvalSymlinks(target)
 	if err != nil {
-		return "", fmt.Errorf("依赖项目不可访问: %w", err)
+		return "", fmt.Errorf("dependency project inaccessible: %w", err)
 	}
 	return canonical, nil
 }
@@ -65,10 +65,10 @@ func (s *Service) servicePlans(paths []string, selection map[string]string) ([]s
 			return index, nil
 		}
 		if visiting[key] {
-			return 0, fmt.Errorf("服务依赖存在循环: %s / %s", path, id)
+			return 0, fmt.Errorf("circular service dependency: %s / %s", path, id)
 		}
 		if len(visiting)+len(plans) >= 256 {
-			return 0, errors.New("依赖服务过多")
+			return 0, errors.New("too many service dependencies")
 		}
 		visiting[key] = true
 		config, err := load(path)
@@ -77,7 +77,7 @@ func (s *Service) servicePlans(paths []string, selection map[string]string) ([]s
 		}
 		index := slices.IndexFunc(config.services, func(d LocalServiceDefinition) bool { return d.ID == id })
 		if index < 0 {
-			return 0, fmt.Errorf("未找到依赖服务: %s / %s", path, id)
+			return 0, fmt.Errorf("dependency service not found: %s / %s", path, id)
 		}
 		plan := servicePlan{path: path, configured: config.services[index], config: config, dependencies: map[string]int{}}
 		names := slices.Sorted(maps.Keys(plan.configured.EnvFrom))
@@ -104,7 +104,7 @@ func (s *Service) servicePlans(paths []string, selection map[string]string) ([]s
 			return nil, err
 		}
 		if len(config.services) == 0 {
-			return nil, fmt.Errorf("%s 没有可启动的服务，请先由 AI 接入启动命令", path)
+			return nil, fmt.Errorf("%s has no startable services; ask AI to configure start commands first", path)
 		}
 		if id := selection[path]; id != "" {
 			if _, err := visit(path, id); err != nil {
@@ -133,7 +133,7 @@ func resolveServiceLinks(d LocalServiceDefinition, plan servicePlan, results []S
 		source := results[index]
 		endpoint := d.EnvFrom[name]
 		if source.Status == "blocked" {
-			return d, fmt.Errorf("依赖 %s 启动预检未通过", endpoint.Service)
+			return d, fmt.Errorf("dependency %s failed startup preflight", endpoint.Service)
 		}
 		definition := source.State.Definition
 		value := definition.URL
@@ -141,7 +141,7 @@ func resolveServiceLinks(d LocalServiceDefinition, plan servicePlan, results []S
 			value = strconv.Itoa(definition.Port)
 		}
 		if value == "" || definition.Port == 0 {
-			return d, fmt.Errorf("依赖 %s 缺少可用的 %s 或监听端口", endpoint.Service, endpoint.Field)
+			return d, fmt.Errorf("dependency %s has no available %s or listening port", endpoint.Service, endpoint.Field)
 		}
 		d.Env[name] = value
 	}
@@ -153,7 +153,7 @@ func (s *Service) waitServiceEndpoint(ctx context.Context, item ServiceStartResu
 	active := s.activeLocalServices[item.Path][item.ServiceID]
 	s.taskMu.Unlock()
 	if active == nil {
-		return fmt.Errorf("依赖服务 %s 已停止", item.ServiceID)
+		return fmt.Errorf("dependency service %s stopped", item.ServiceID)
 	}
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -162,19 +162,19 @@ func (s *Service) waitServiceEndpoint(ctx context.Context, item ServiceStartResu
 		state := active.state
 		active.mu.Unlock()
 		if state.RunID != item.State.RunID || !localServiceRunning(state.Status) || state.Status == "stopping" {
-			return fmt.Errorf("依赖服务 %s 已结束或正在停止", item.ServiceID)
+			return fmt.Errorf("dependency service %s exited or is stopping", item.ServiceID)
 		}
 		if servicePortConnects(state.Definition) {
 			owners, err := localPortOwners(state.Definition.Port)
 			if err != nil {
-				return fmt.Errorf("核对依赖服务 %s 的监听归属: %w", item.ServiceID, err)
+				return fmt.Errorf("verify listener ownership for dependency service %s: %w", item.ServiceID, err)
 			}
 			for _, owner := range owners {
 				group, err := syscall.Getpgid(owner.PID)
 				if err == nil && group == state.PID {
 					select {
 					case <-active.done:
-						return fmt.Errorf("依赖服务 %s 已结束", item.ServiceID)
+						return fmt.Errorf("dependency service %s exited", item.ServiceID)
 					default:
 					}
 					return nil
@@ -183,9 +183,9 @@ func (s *Service) waitServiceEndpoint(ctx context.Context, item ServiceStartResu
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("等待依赖服务 %s 端口就绪失败: %w", item.ServiceID, ctx.Err())
+			return fmt.Errorf("waiting for dependency service %s port failed: %w", item.ServiceID, ctx.Err())
 		case <-active.done:
-			return fmt.Errorf("依赖服务 %s 已结束", item.ServiceID)
+			return fmt.Errorf("dependency service %s exited", item.ServiceID)
 		case <-ticker.C:
 		}
 	}

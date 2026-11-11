@@ -72,10 +72,10 @@ func (s *Service) load() ([]Project, error) {
 		return projects, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("读取项目登记: %w", err)
+		return nil, fmt.Errorf("read project registry: %w", err)
 	}
 	if err := json.Unmarshal(data, &projects); err != nil {
-		return nil, fmt.Errorf("项目登记损坏: %w", err)
+		return nil, fmt.Errorf("invalid project registry: %w", err)
 	}
 	if projects == nil {
 		projects = []Project{}
@@ -86,18 +86,18 @@ func (s *Service) load() ([]Project, error) {
 // Add registers a directory. It never writes into that directory.
 func (s *Service) Add(path string) (Project, error) {
 	if !filepath.IsAbs(path) {
-		return Project{}, errors.New("请输入项目的绝对路径")
+		return Project{}, errors.New("enter the project's absolute path")
 	}
 	canonical, err := filepath.EvalSymlinks(filepath.Clean(path))
 	if err != nil {
-		return Project{}, fmt.Errorf("无法访问目录: %w", err)
+		return Project{}, fmt.Errorf("cannot access folder: %w", err)
 	}
 	info, err := os.Stat(canonical)
 	if err != nil {
 		return Project{}, err
 	}
 	if !info.IsDir() {
-		return Project{}, errors.New("请选择目录，而不是文件")
+		return Project{}, errors.New("select a folder rather than a file")
 	}
 	p := Project{Name: filepath.Base(canonical), Path: canonical}
 	s.mu.Lock()
@@ -125,7 +125,7 @@ func (s *Service) RemoveProject(path string) error {
 // RelocateProject repairs a registration after a directory move; it does not move files.
 func (s *Service) RelocateProject(path, destination string) (Project, error) {
 	if !filepath.IsAbs(destination) {
-		return Project{}, errors.New("请输入新目录的绝对路径")
+		return Project{}, errors.New("enter the new folder's absolute path")
 	}
 	canonical, err := filepath.EvalSymlinks(filepath.Clean(destination))
 	if err != nil {
@@ -133,7 +133,7 @@ func (s *Service) RelocateProject(path, destination string) (Project, error) {
 	}
 	info, err := os.Stat(canonical)
 	if err != nil || !info.IsDir() {
-		return Project{}, errors.New("新路径必须是可访问的目录")
+		return Project{}, errors.New("the new path must be an accessible folder")
 	}
 	return s.changeProject(path, canonical)
 }
@@ -147,7 +147,7 @@ func (s *Service) changeProject(path, destination string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closing {
-		return Project{}, errors.New("应用正在退出")
+		return Project{}, errors.New("the app is shutting down")
 	}
 	projects, err := s.load()
 	if err != nil {
@@ -155,14 +155,14 @@ func (s *Service) changeProject(path, destination string) (Project, error) {
 	}
 	index := slices.IndexFunc(projects, func(p Project) bool { return p.Path == path })
 	if index < 0 {
-		return Project{}, errors.New("请先登记项目目录")
+		return Project{}, errors.New("register the project folder first")
 	}
 	for _, active := range s.activeLocalServices[path] {
 		active.mu.Lock()
 		running := localServiceRunning(active.state.Status)
 		active.mu.Unlock()
 		if running {
-			return Project{}, errors.New("请先停止该项目的本地服务")
+			return Project{}, errors.New("stop this project's local services first")
 		}
 	}
 	if active := s.activePipelines[path]; active != nil {
@@ -170,18 +170,18 @@ func (s *Service) changeProject(path, destination string) (Project, error) {
 		running := active.run.Status == "running"
 		active.mu.Unlock()
 		if running {
-			return Project{}, errors.New("请先停止该项目的流水线")
+			return Project{}, errors.New("stop this project's pipelines first")
 		}
 	}
 	if s.activePolicyChecks[path] != nil {
-		return Project{}, errors.New("请等待该项目的规则检查结束")
+		return Project{}, errors.New("wait for this project's rule checks to finish")
 	}
 	updated := projects[index]
 	if destination == "" {
 		projects = slices.Delete(projects, index, index+1)
 	} else {
 		if destination != path && slices.ContainsFunc(projects, func(p Project) bool { return p.Path == destination }) {
-			return Project{}, errors.New("新目录已经登记")
+			return Project{}, errors.New("the new folder is already registered")
 		}
 		updated = Project{Name: filepath.Base(destination), Path: destination}
 		projects[index] = updated
@@ -204,7 +204,7 @@ func (s *Service) registeredProject(path string) (Project, error) {
 	}
 	index := slices.IndexFunc(projects, func(p Project) bool { return p.Path == path })
 	if index < 0 {
-		return Project{}, errors.New("请先登记项目目录")
+		return Project{}, errors.New("register the project folder first")
 	}
 	return projects[index], nil
 }
@@ -218,10 +218,10 @@ func (s *Service) Inspect(path string) (Inspection, error) {
 	result := Inspection{Project: project, Documents: []string{}, Scripts: map[string]string{}, Warnings: []string{}}
 	info, err := os.Stat(path)
 	if err != nil {
-		return result, fmt.Errorf("项目目录不可访问: %w", err)
+		return result, fmt.Errorf("project folder inaccessible: %w", err)
 	}
 	if !info.IsDir() {
-		return result, errors.New("项目路径已不再是目录")
+		return result, errors.New("the project path is no longer a folder")
 	}
 	branch, err := git(path, "rev-parse", "--abbrev-ref", "HEAD")
 	if err == nil {
@@ -234,7 +234,7 @@ func (s *Service) Inspect(path string) (Inspection, error) {
 			result.Branch, _ = git(path, "symbolic-ref", "--short", "HEAD")
 			result.Branch = strings.TrimSpace(result.Branch)
 		} else {
-			result.Warnings = append(result.Warnings, "未识别到可用 Git 仓库："+err.Error())
+			result.Warnings = append(result.Warnings, "No usable Git repository found: "+err.Error())
 		}
 	}
 	if result.Git {
@@ -251,7 +251,7 @@ func (s *Service) Inspect(path string) (Inspection, error) {
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		result.Warnings = append(result.Warnings, "读取文档列表："+err.Error())
+		result.Warnings = append(result.Warnings, "Read document list: "+err.Error())
 	} else {
 		for _, entry := range entries {
 			if !entry.IsDir() && markdownFile(entry.Name()) {
@@ -264,7 +264,7 @@ func (s *Service) Inspect(path string) (Inspection, error) {
 			Scripts map[string]string `json:"scripts"`
 		}
 		if err := json.Unmarshal([]byte(data), &pkg); err != nil {
-			result.Warnings = append(result.Warnings, "package.json 无法解析")
+			result.Warnings = append(result.Warnings, "Cannot parse package.json")
 		} else if pkg.Scripts != nil {
 			result.Scripts = pkg.Scripts
 		}
@@ -285,7 +285,7 @@ func (s *Service) ReadDocument(path, name string) (string, error) {
 		return "", err
 	}
 	if filepath.Base(name) != name || !markdownFile(name) {
-		return "", errors.New("请选择项目根目录中的 Markdown 文件")
+		return "", errors.New("select a Markdown file in the project root")
 	}
 	root, err := os.OpenRoot(path)
 	if err != nil {
@@ -297,7 +297,7 @@ func (s *Service) ReadDocument(path, name string) (string, error) {
 		return "", err
 	}
 	if !info.Mode().IsRegular() {
-		return "", errors.New("只能查看普通 Markdown 文件")
+		return "", errors.New("only regular Markdown files can be viewed")
 	}
 	f, err := root.Open(name)
 	if err != nil {
@@ -322,7 +322,7 @@ func readLimitedText(reader io.Reader) (string, error) {
 		return "", err
 	}
 	if len(data) > 256*1024 {
-		return "", errors.New("文件超过 256 KiB，暂不展示")
+		return "", errors.New("file exceeds the 256 KiB display limit")
 	}
 	return string(data), nil
 }
@@ -360,7 +360,7 @@ func git(path string, args ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %w %s", args[0], err, strings.TrimSpace(stderr.String()))
 	}
 	if out.overflow {
-		return out.String() + "\n[输出超过 1 MiB，已截断]", nil
+		return out.String() + "\n[output exceeds 1 MiB; truncated]", nil
 	}
 	return out.String(), nil
 }

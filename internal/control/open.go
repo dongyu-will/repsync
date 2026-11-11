@@ -45,18 +45,18 @@ func OpenDesktop(ctx context.Context, socket string) (DesktopStatus, error) {
 			return DesktopStatus{}, err
 		}
 		if !strings.Contains(executable, ".app/Contents/MacOS/") {
-			return DesktopStatus{}, errors.New("当前是 CLI 开发构建；请设置 REPSYNC_APP 为已打包应用的可执行文件，或运行 go tool mygo dev")
+			return DesktopStatus{}, errors.New("this is a development CLI build; set REPSYNC_APP to a packaged desktop executable or run go tool mygo dev")
 		}
 	}
 	if !filepath.IsAbs(executable) {
-		return DesktopStatus{}, errors.New("REPSYNC_APP 必须是应用可执行文件的绝对路径")
+		return DesktopStatus{}, errors.New("REPSYNC_APP must be the absolute path to the app executable")
 	}
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		return DesktopStatus{}, err
 	}
 	logPath := socket + ".startup.log"
 	if info, err := os.Lstat(logPath); err == nil && !info.Mode().IsRegular() {
-		return DesktopStatus{}, errors.New("启动日志路径必须是普通文件")
+		return DesktopStatus{}, errors.New("startup log path must be a regular file")
 	}
 	log, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
@@ -84,7 +84,7 @@ func OpenDesktop(ctx context.Context, socket string) (DesktopStatus, error) {
 		}
 		select {
 		case <-ctx.Done():
-			return result, fmt.Errorf("等待控制入口失败: %w；查看 %s，应用可能仍在启动", ctx.Err(), logPath)
+			return result, fmt.Errorf("waiting for control endpoint failed: %w; see %s; app may still be starting", ctx.Err(), logPath)
 		case err := <-finished:
 			// A concurrent launch may have acquired the single-owner lock first.
 			if response, callErr := Call(ctx, socket, Request{Action: "ping"}); callErr == nil && response.OK {
@@ -95,7 +95,7 @@ func OpenDesktop(ctx context.Context, socket string) (DesktopStatus, error) {
 				}
 				return result, nil
 			}
-			return result, fmt.Errorf("应用在控制入口就绪前退出: %v；查看 %s", err, logPath)
+			return result, fmt.Errorf("app exited before the control endpoint was ready: %v; see %s", err, logPath)
 		case <-ticker.C:
 		}
 	}

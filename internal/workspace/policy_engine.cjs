@@ -4,7 +4,7 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 
 const restriction = {
-  meta: { type: 'problem', schema: [], messages: { forbidden: '禁止使用 React useState；请使用 useReducer。' } },
+  meta: { type: 'problem', schema: [], messages: { forbidden: 'Do not use React useState; use useReducer.' } },
   create(context) {
     const source = context.sourceCode;
     const reported = new WeakSet();
@@ -70,7 +70,7 @@ const restriction = {
   const input = JSON.parse(fs.readFileSync(0, 'utf8'));
   const localRequire = createRequire(path.join(input.root, 'package.json'));
   const api = localRequire('eslint');
-  if (!api.loadESLint) throw new Error('需要项目已有的 ESLint 9+ 和 flat config');
+  if (!api.loadESLint) throw new Error('The project requires an existing ESLint 9+ installation and flat config');
   const ESLint = await api.loadESLint({useFlatConfig:true});
   const eslint = new ESLint({cwd: input.root, overrideConfig: {plugins: {'repsync-policy': {rules: {'no-use-state':restriction}}}, rules: {'repsync-policy/no-use-state':'error'}}});
   const output = {findings:[], errors:[], skipped:[]};
@@ -83,7 +83,7 @@ const restriction = {
         else if (message.fatal || message.ruleId === null) output.errors.push(`${file.path}: ${message.message}`);
       }
     }
-    if (output.findings.length >= 500) { output.errors.push('违规超过 500 条，检查结果不完整'); break; }
+    if (output.findings.length >= 500) { output.errors.push('More than 500 violations; check results are incomplete'); break; }
   }
   process.stdout.write(JSON.stringify(output));
-})().catch((error) => { process.stderr.write(`React 规则检查失败：${error.message}`); process.exitCode = 1; });
+})().catch((error) => { process.stderr.write(`React rule checks failed: ${error.message}`); process.exitCode = 1; });

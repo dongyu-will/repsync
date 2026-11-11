@@ -105,20 +105,20 @@ export default function ProjectStashes({
   if (error)
     return (
       <p role="alert" className="p-3 text-sm text-removed">
-        stash 读取失败：{error}。请刷新后重试。
+        stash Read failed: {error}.Refresh and try again.
       </p>
     );
   if (!list.entries.length)
     return (
-      <Empty icon="file" title="没有待处理的 stash">
-        这里显示同一仓库所有工作树共享的 stash。
+      <Empty icon="file" title="No pending stash">
+        These entries are shared by all worktrees in this repository: stash.
       </Empty>
     );
   return (
     <div className="space-y-4">
       <p className="text-xs leading-5 text-muted">
-        同一仓库的工作树共享这些 stash。查看内容后可恢复到当前工作树；原 stash
-        会继续保留。
+        All worktrees in the repository share these stash.Review the contents
+        before applying to this worktree. The original stash is preserved.
       </p>
       <div className="grouped-list">
         {list.entries.map((stash) => (
@@ -130,7 +130,7 @@ export default function ProjectStashes({
               <p className="break-words text-sm font-medium">{stash.subject}</p>
               <p className="mt-1 break-all text-xs text-muted">
                 {stash.selector} ·{" "}
-                {new Date(stash.createdAt).toLocaleString("zh-CN", {
+                {new Date(stash.createdAt).toLocaleString("en-US", {
                   hour12: false,
                 })}{" "}
                 · {stash.oid.slice(0, 8)}
@@ -140,7 +140,7 @@ export default function ProjectStashes({
               disabled={state.pending || state.loading}
               onClick={() => show(stash)}
             >
-              查看内容
+              View contents
             </Button>
           </div>
         ))}
@@ -155,7 +155,7 @@ export default function ProjectStashes({
       )}
       {state.loading && (
         <p role="status" className="text-sm text-muted">
-          正在读取 stash 改动…
+          Loading stash changes…
         </p>
       )}
       {state.notice && (
@@ -168,12 +168,12 @@ export default function ProjectStashes({
       )}
       {state.preview && (
         <section
-          aria-label="stash 内容"
+          aria-label="stash Content"
           className="space-y-3 border-t border-line pt-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">
-              {state.preview.stash.selector} · 改动内容
+              {state.preview.stash.selector} · Changes
             </h2>
             <Button
               disabled={
@@ -184,22 +184,24 @@ export default function ProjectStashes({
               }
               onClick={apply}
             >
-              {state.pending ? "正在恢复…" : "恢复到当前工作树"}
+              {state.pending ? "Restoring…" : "Apply to this worktree"}
             </Button>
           </div>
           <p className="break-all text-xs leading-5 text-muted">
-            恢复目标：{path} ·{" "}
-            {state.preview.branch || "分离 HEAD，需先切换分支"}
-            。当前工作树需干净；出现冲突时保留现场和原 stash，请在项目中处理。
+            Apply to: {path} ·{" "}
+            {state.preview.branch || "Detached HEAD, Switch branches first"}
+            .The current worktree must be clean. Conflicts preserve the worktree
+            and original stash, Resolve this in the project.
           </p>
           {state.preview.truncated && (
             <p role="status" className="text-xs text-removed">
-              改动超过 1 MiB，仅展示前部内容；请使用 Git 查看完整改动后再恢复。
+              Changes exceed 1 MiB, Only the beginning is shown. Use Git to
+              review the full diff before applying.
             </p>
           )}
           <pre
             tabIndex={0}
-            aria-label="stash 文件差异"
+            aria-label="stash File diff"
             className="source-panel max-h-80"
           >
             {state.preview.patch}

@@ -183,9 +183,9 @@ export default function DocumentFind({
       <button
         ref={trigger}
         type="button"
-        aria-label="查找正文"
+        aria-label="Find in document"
         aria-keyshortcuts="Meta+F Control+F"
-        title="查找正文（⌘F / Ctrl+F）"
+        title="Find in document (⌘F / Ctrl+F)"
         onClick={() => setQuery("")}
         className="icon-button text-muted"
       >
@@ -197,7 +197,7 @@ export default function DocumentFind({
   return (
     <div
       role="search"
-      aria-label="文档正文"
+      aria-label="Document body"
       className="flex max-w-full items-center gap-0.5 rounded-md border border-control has-[input:focus]:border-accent"
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing) return;
@@ -209,8 +209,8 @@ export default function DocumentFind({
     >
       <input
         ref={input}
-        aria-label="查找正文"
-        placeholder="查找正文"
+        aria-label="Find in document"
+        placeholder="Find in document"
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -230,13 +230,13 @@ export default function DocumentFind({
         >
           {count
             ? `${current + 1} / ${count}${result?.truncated ? "+" : ""}`
-            : "无匹配"}
+            : "No matches"}
         </span>
       )}
       <button
         type="button"
-        aria-label="上一处"
-        title="上一处（Shift+Enter）"
+        aria-label="Previous match"
+        title="Previous match (Shift+Enter)"
         disabled={!count}
         onClick={() => move(-1)}
         className="icon-button disabled:opacity-40"
@@ -247,8 +247,8 @@ export default function DocumentFind({
       </button>
       <button
         type="button"
-        aria-label="下一处"
-        title="下一处（Enter）"
+        aria-label="Next match"
+        title="Next match (Enter)"
         disabled={!count}
         onClick={() => move(1)}
         className="icon-button disabled:opacity-40"
@@ -259,8 +259,8 @@ export default function DocumentFind({
       </button>
       <button
         type="button"
-        aria-label="关闭查找"
-        title="关闭查找（Esc）"
+        aria-label="Close find"
+        title="Close find (Esc)"
         onClick={close}
         className="icon-button"
       >

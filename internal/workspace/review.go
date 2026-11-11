@@ -146,7 +146,7 @@ func readReviewData(path string) ([]byte, error) {
 		return nil, err
 	}
 	if len(data) > 1024*1024 {
-		return nil, errors.New("收尾记录超过 1 MiB")
+		return nil, errors.New("review record exceeds 1 MiB")
 	}
 	return data, nil
 }
@@ -157,7 +157,7 @@ func saveReviewRecord(path string, value any) error {
 		return err
 	}
 	if len(data) > 1024*1024 {
-		return errors.New("收尾记录超过 1 MiB，请缩短交接内容")
+		return errors.New("review record exceeds 1 MiB; shorten the handoff")
 	}
 	return saveJSON(path, value)
 }
@@ -179,7 +179,7 @@ func readReviewRecordsLimit[T any](directory string, limit int) ([]T, error) {
 	for _, entry := range entries {
 		if len(values) >= limit {
 			if limit > 20 {
-				return values, errors.New("记录超过本次读取上限，未能完成历史核对")
+				return values, errors.New("records exceed read limits; history review is incomplete")
 			}
 			break
 		}
@@ -192,7 +192,7 @@ func readReviewRecordsLimit[T any](directory string, limit int) ([]T, error) {
 		}
 		var value T
 		if err := json.Unmarshal(data, &value); err != nil {
-			return values, fmt.Errorf("收尾记录损坏: %w", err)
+			return values, fmt.Errorf("invalid review record: %w", err)
 		}
 		values = append(values, value)
 	}
@@ -228,36 +228,36 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 	if profileErr != nil {
 		issue("profile_unknown", "settings", profileErr.Error())
 	} else if !configured {
-		issue("profile_missing", "settings", "尚未声明前端、后端、数据库及交付阶段的适用项")
+		issue("profile_missing", "settings", "Frontend, backend, database, and delivery stage applicability not declared")
 	}
 	x := report.Snapshot
 	if x.Error != "" && profile.Kind != "notes" {
 		issue("git_unknown", "changes", x.Error)
 	} else {
 		if x.Untracked > 0 {
-			issue("untracked", "changes", fmt.Sprintf("%d 个未跟踪文件尚未纳入 Git", x.Untracked))
+			issue("untracked", "changes", fmt.Sprintf("%d untracked files not included in Git", x.Untracked))
 		}
 		if x.Staged > 0 || x.Unstaged > 0 {
-			issue("uncommitted", "changes", fmt.Sprintf("%d 个已暂存、%d 个未暂存文件待处理", x.Staged, x.Unstaged))
+			issue("uncommitted", "changes", fmt.Sprintf("%d staged and %d unstaged files pending", x.Staged, x.Unstaged))
 		}
 		if x.Conflicts > 0 {
-			issue("conflicts", "changes", fmt.Sprintf("%d 个文件仍有冲突", x.Conflicts))
+			issue("conflicts", "changes", fmt.Sprintf("%d files still have conflicts", x.Conflicts))
 		}
 		seenStashes := map[string]bool{}
 		for _, stash := range x.Stashes {
 			if !seenStashes[stash.OID] {
-				issue("stash_"+stash.OID, "changes", stash.Selector+" 需要核对："+stash.Subject)
+				issue("stash_"+stash.OID, "changes", stash.Selector+" needs review: "+stash.Subject)
 				seenStashes[stash.OID] = true
 			}
 		}
 		if !x.UpstreamKnown && (!configured || slices.Contains(profile.Stages, "push")) {
-			issue("upstream_unknown", "changes", "未配置或无法读取上游引用，推送状态未核验")
+			issue("upstream_unknown", "changes", "Upstream ref missing or unreadable; push status not verified")
 		} else {
 			if x.Ahead > 0 {
-				issue("ahead", "changes", fmt.Sprintf("%d 个本地提交需要核对是否已推送", x.Ahead))
+				issue("ahead", "changes", fmt.Sprintf("%d local commits need push verification", x.Ahead))
 			}
 			if x.Behind > 0 {
-				issue("behind", "changes", fmt.Sprintf("比本地上游引用少 %d 个提交", x.Behind))
+				issue("behind", "changes", fmt.Sprintf("%d commits behind the local upstream ref", x.Behind))
 			}
 		}
 	}
@@ -281,15 +281,15 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 			if run.Kind != "ci" {
 				continue
 			}
-			check := ReviewCheck{ID: run.ID, Command: run.Name, Status: run.Status, Scope: "流水线配置的检查范围", Evidence: "本地流水线日志：" + run.ID, Source: "pipeline", CreatedAt: run.StartedAt, Commit: run.Commit, Fingerprint: run.Fingerprint}
+			check := ReviewCheck{ID: run.ID, Command: run.Name, Status: run.Status, Scope: "Check scope declared by the pipeline", Evidence: "Local pipeline log: " + run.ID, Source: "pipeline", CreatedAt: run.StartedAt, Commit: run.Commit, Fingerprint: run.Fingerprint}
 			check.Coverage, check.Environment, check.Target = run.Coverage, run.ReviewEnvironment, run.ReviewTarget
 			check.Current, check.Reason = reviewCheckCurrent(run.Fingerprint, x.Fingerprint)
 			if run.FingerprintError != "" || run.EndFingerprint == "" {
-				check.Current, check.Reason = "unknown", "未完整记录运行前后的文件内容"
+				check.Current, check.Reason = "unknown", "File contents before and after execution were not fully recorded"
 			} else if run.Fingerprint != run.EndFingerprint {
-				check.Current, check.Reason = "stale", "运行期间文件内容发生变化"
+				check.Current, check.Reason = "stale", "File contents changed during execution"
 			} else if configErr != nil || run.ConfigVersion != config.Version {
-				check.Current, check.Reason = "stale", "检查命令配置已变化或无法核对"
+				check.Current, check.Reason = "stale", "Check command configuration changed or cannot be verified"
 			}
 			report.Checks = append(report.Checks, check)
 		}
@@ -303,9 +303,9 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		return strings.Compare(b.ID, a.ID)
 	})
 	if len(report.Checks) == 0 && !configured {
-		issue("no_checks", "checks", "没有可核对的检查记录")
+		issue("no_checks", "checks", "No check records available for verification")
 	} else if len(report.Checks) > 0 && (report.Checks[0].Status != "success" || report.Checks[0].Current != "current") && !configured {
-		issue("check_attention", "checks", "最近检查未通过、内容已变化或结果无法核对")
+		issue("check_attention", "checks", "Recent checks failed, content changed, or results cannot be verified")
 	}
 	report.Coverage = reviewCoverageStates(profile, report.Checks)
 	if len(report.Checks) > 20 {
@@ -313,12 +313,12 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 	}
 	for _, state := range report.Coverage {
 		if state.Status != "passed" && state.Status != "recorded" {
-			issue("coverage_"+state.Requirement.ID, "checks", state.Requirement.Name+"需要核验："+state.Reason)
+			issue("coverage_"+state.Requirement.ID, "checks", state.Requirement.Name+" needs verification: "+state.Reason)
 		}
 	}
 	for _, area := range profile.Areas {
 		if !slices.ContainsFunc(report.Coverage, func(c ReviewCoverageState) bool { return c.Requirement.Area == area }) {
-			issue("coverage_unspecified_"+area, "settings", "已启用 "+area+"，但尚未声明必需检查项")
+			issue("coverage_unspecified_"+area, "settings", "Enabled "+area+", but required checks have not been declared")
 		}
 	}
 	evidence, err := readReviewRecordsLimit[ReviewEvidence](filepath.Join(s.reviewDirectory(path), "evidence"), 1000)
@@ -330,15 +330,15 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		stage := &report.Delivery[i]
 		if !slices.Contains([]string{"working", "commit"}, stage.Stage) {
 			if configured && !slices.Contains(profile.Stages, stage.Stage) {
-				stage.Status, stage.Detail = "not_applicable", "按项目适用项设置，不要求此阶段"
+				stage.Status, stage.Detail = "not_applicable", "Not required by project applicability settings"
 			} else if !configured && stage.RecordedAt == "" {
-				stage.Status, stage.Detail = "unknown", "尚未声明此阶段是否适用"
+				stage.Status, stage.Detail = "unknown", "Applicability of this stage not declared"
 			}
 		}
 	}
 	for _, stage := range report.Delivery {
 		if configured && slices.Contains([]string{"deploy", "acceptance"}, stage.Stage) && stage.Status != "recorded" && stage.Status != "not_applicable" {
-			issue("delivery_"+stage.Stage, "delivery", stage.Name+"尚未核验或记录已过期")
+			issue("delivery_"+stage.Stage, "delivery", stage.Name+" is unverified or its record is stale")
 		}
 	}
 	resources, version, err := s.reviewResources(path)
@@ -347,7 +347,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 		issue("resources_unknown", "resources", err.Error())
 	} else {
 		if len(resources) == 0 && slices.Contains(profile.Areas, "database") {
-			issue("resources_missing", "resources", "尚未声明本地数据、备份和环境检查对象")
+			issue("resources_missing", "resources", "Local data, backup, and environment resources not declared")
 		}
 		for _, state := range resources {
 			result := ReviewResourceResult{State: state, Status: "pending"}
@@ -364,7 +364,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 				break
 			}
 			if result.Status != "success" && result.Status != "not_applicable" {
-				issue("resource_"+state.Definition.ID, "resources", state.Definition.Name+"需要核验")
+				issue("resource_"+state.Definition.ID, "resources", state.Definition.Name+" needs verification")
 			}
 			report.Resources = append(report.Resources, result)
 		}
@@ -384,7 +384,7 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 	}
 	for _, task := range report.Tasks {
 		if task.EndedAt == "" {
-			issue("task_"+task.ID, "handover", "任务尚未交接："+task.Title)
+			issue("task_"+task.ID, "handover", "Task not handed off: "+task.Title)
 		}
 	}
 	report.TaskWarnings = s.reviewTaskWarnings(path, report.Tasks)
@@ -411,30 +411,30 @@ func (s *Service) projectReview(path string) (ProjectReview, error) {
 
 func reviewCheckCurrent(record, current string) (string, string) {
 	if record == "" || current == "" {
-		return "unknown", "未记录内容或当前内容无法核对"
+		return "unknown", "Content not recorded or current content cannot be verified"
 	}
 	if record != current {
-		return "stale", "检查之后文件内容发生变化"
+		return "stale", "File contents changed after checks"
 	}
-	return "current", "与当前文件内容一致；不覆盖忽略的依赖、外部服务或环境变更"
+	return "current", "Matches current files; excludes ignored dependencies, external services, and environment changes"
 }
 
 func reviewDelivery(x ReviewSnapshot, checks []ReviewCheck, evidence []ReviewEvidence) []ReviewStage {
-	stages := []ReviewStage{{Stage: "working", Name: "本地改动", Status: "observed", Detail: "已读取当前文件状态"}, {Stage: "commit", Name: "提交", Status: "pending", Detail: "尚未找到提交"}, {Stage: "push", Name: "推送", Status: "pending", Detail: "仅凭本地信息无法证明远程现状"}, {Stage: "ci", Name: "CI / 检查", Status: "pending", Detail: "未核验完整检查范围"}, {Stage: "deploy", Name: "部署", Status: "pending", Detail: "打包或 CD 命令完成不等同线上部署"}, {Stage: "acceptance", Name: "线上验收", Status: "pending", Detail: "需要独立核验业务行为"}}
+	stages := []ReviewStage{{Stage: "working", Name: "Local changes", Status: "observed", Detail: "Current file state loaded"}, {Stage: "commit", Name: "Commit", Status: "pending", Detail: "No commit found"}, {Stage: "push", Name: "Push", Status: "pending", Detail: "Local information alone cannot verify remote state"}, {Stage: "ci", Name: "CI / checks", Status: "pending", Detail: "Full check coverage not verified"}, {Stage: "deploy", Name: "Deploy", Status: "pending", Detail: "Packaging or CD completion does not prove live deployment"}, {Stage: "acceptance", Name: "Live acceptance", Status: "pending", Detail: "Business behavior requires separate verification"}}
 	if x.Error != "" {
 		stages[0].Status, stages[0].Detail = "unknown", x.Error
 	}
 	if x.Head != "" {
 		stages[1].Status, stages[1].Detail = "observed", x.Head
 		if len(x.Files) > 0 {
-			stages[1].Detail += "；仍有未提交文件"
+			stages[1].Detail += "; uncommitted files remain"
 		}
 	}
 	if x.UpstreamKnown {
-		stages[2].Detail = fmt.Sprintf("相对本地上游引用：领先 %d / 落后 %d；未联网核验", x.Ahead, x.Behind)
+		stages[2].Detail = fmt.Sprintf("Local upstream ref: %d ahead / %d behind; not verified online", x.Ahead, x.Behind)
 	}
 	if len(checks) > 0 {
-		stages[3].Detail = "最近记录：" + checks[0].Command + "；" + checks[0].Reason
+		stages[3].Detail = "Latest record: " + checks[0].Command + "; " + checks[0].Reason
 	}
 	for i := range stages {
 		for _, entry := range evidence {
@@ -453,7 +453,7 @@ func reviewDelivery(x ReviewSnapshot, checks []ReviewCheck, evidence []ReviewEvi
 			} else {
 				stages[i].Status = "stale"
 			}
-			stages[i].Detail = "手工核验记录：" + entry.Note
+			stages[i].Detail = "Manual verification: " + entry.Note
 			break
 		}
 	}
@@ -466,7 +466,7 @@ func (s *Service) checkedReview(path, version string) (ProjectReview, error) {
 		return report, err
 	}
 	if report.Version != version {
-		return report, errors.New("项目状态或记录已变化，请重新检查后再保存")
+		return report, errors.New("project state or records changed; check again before saving")
 	}
 	return report, nil
 }
@@ -477,7 +477,7 @@ func (s *Service) RecordReviewCheck(path, version string, input ReviewCheckInput
 	defer s.reviewMu.Unlock()
 	check := ReviewCheck{}
 	if strings.TrimSpace(input.Command) == "" || len(input.Command) > 2000 || strings.TrimSpace(input.Scope) == "" || len(input.Scope) > 2000 || strings.TrimSpace(input.Evidence) == "" || len(input.Evidence) > 8192 || !slices.Contains([]string{"success", "failure"}, input.Status) {
-		return check, errors.New("请填写检查命令、范围、结果及说明，说明上限 8 KiB")
+		return check, errors.New("provide check command, scope, result, and notes (up to 8 KiB)")
 	}
 	if err := validateReviewCoverage(input.Coverage, input.Environment, input.Target); err != nil {
 		return check, err
@@ -497,7 +497,7 @@ func (s *Service) RecordReviewEvidence(path, version string, input ReviewEvidenc
 	defer s.reviewMu.Unlock()
 	record := ReviewEvidence{}
 	if !slices.Contains([]string{"push", "ci", "deploy", "acceptance", "resource"}, input.Stage) || !slices.Contains([]string{"success", "failure", "not_applicable"}, input.Status) || strings.TrimSpace(input.Note) == "" || len(input.Note) > 8192 {
-		return record, errors.New("请选择核验阶段、结果并填写说明，说明上限 8 KiB")
+		return record, errors.New("select a verification stage and result, and provide notes (up to 8 KiB)")
 	}
 	report, err := s.checkedReview(path, version)
 	if err != nil {
@@ -507,11 +507,11 @@ func (s *Service) RecordReviewEvidence(path, version string, input ReviewEvidenc
 	if input.Stage == "resource" {
 		index := slices.IndexFunc(report.Resources, func(r ReviewResourceResult) bool { return r.State.Definition.ID == input.Target })
 		if index < 0 {
-			return record, errors.New("未找到这项数据或环境检查")
+			return record, errors.New("data or environment check not found")
 		}
 		state := report.Resources[index].State
 		if input.Status == "success" && (state.Observed == "missing" || state.Error != "") {
-			return record, errors.New("检查对象缺失或读取失败，请先处理，或明确记录为不适用")
+			return record, errors.New("verification resource is missing or unreadable; resolve it or explicitly mark not applicable")
 		}
 		record.ResourceVersion = report.Resources[index].State.Version
 	}
@@ -557,7 +557,7 @@ func (s *Service) FinishReviewTask(path, id, version string, input ReviewFinishI
 	defer s.reviewMu.Unlock()
 	task := ReviewTask{}
 	if !pipelineRunID.MatchString(id) || strings.TrimSpace(input.Summary) == "" || len(input.Summary) > 8192 || len(input.Checks) > 8192 || len(input.Blockers) > 8192 {
-		return task, errors.New("请填写完成内容，交接各段最多 8 KiB")
+		return task, errors.New("describe completed work; each handoff section allows up to 8 KiB")
 	}
 	report, err := s.checkedReview(path, version)
 	if err != nil {
@@ -572,7 +572,7 @@ func (s *Service) FinishReviewTask(path, id, version string, input ReviewFinishI
 		return task, err
 	}
 	if task.ID != id || task.EndedAt != "" {
-		return task, errors.New("任务已交接或编号不匹配")
+		return task, errors.New("task already handed off or ID does not match")
 	}
 	task.End = reviewTaskPoint(report.Snapshot)
 	task.EndedAt = time.Now().UTC().Format(time.RFC3339)
@@ -596,33 +596,33 @@ func (s *Service) FinishReviewTask(path, id, version string, input ReviewFinishI
 
 func reviewHandover(report ProjectReview, task ReviewTask) string {
 	var text strings.Builder
-	fmt.Fprintf(&text, "# %s\n\n项目：%s\n工作树：%s\n任务：%s\n开始：%s\n交接：%s\n\n## 完成内容\n\n%s\n\n## Git 状态\n\n分支：%s\n起始提交：%s\n当前提交：%s\n已暂存 %d / 未暂存 %d / 未跟踪 %d / stash %d\n", task.Title, report.Project.Name, report.Project.Path, task.ID, task.StartedAt, task.EndedAt, task.Summary, task.End.Branch, task.Start.Head, task.End.Head, task.End.Staged, task.End.Unstaged, len(task.End.Untracked), len(task.End.Stashes))
-	fmt.Fprintf(&text, "\n任务填报人/会话：%s\n声明范围：%s\n路径：%s\n环境与目标：%s / %s\n", task.Owner, strings.Join(task.Areas, ", "), strings.Join(task.Paths, ", "), task.Environment, task.Target)
+	fmt.Fprintf(&text, "# %s\n\nProject: %s\nWorktree: %s\nTask: %s\nStarted: %s\nHandoff: %s\n\n## Completed work\n\n%s\n\n## Git state\n\nBranch: %s\nStarting commit: %s\nCurrent commit: %s\nStaged %d / unstaged %d / untracked %d / stash %d\n", task.Title, report.Project.Name, report.Project.Path, task.ID, task.StartedAt, task.EndedAt, task.Summary, task.End.Branch, task.Start.Head, task.End.Head, task.End.Staged, task.End.Unstaged, len(task.End.Untracked), len(task.End.Stashes))
+	fmt.Fprintf(&text, "\nTask reporter/session: %s\nDeclared scope: %s\nPaths: %s\nEnvironment and target: %s / %s\n", task.Owner, strings.Join(task.Areas, ", "), strings.Join(task.Paths, ", "), task.Environment, task.Target)
 	if !task.Start.Known || !task.End.Known {
-		text.WriteString("\n开始或结束状态不完整，无法可靠区分期间新增内容。\n")
+		text.WriteString("\nStart or end state is incomplete; additions during the task cannot be reliably identified.\n")
 	} else {
-		text.WriteString("\n期间新增 stash（不推定创建者）：\n")
+		text.WriteString("\nStashes added during the task (creator not inferred):\n")
 		for _, stash := range task.NewStashes {
 			fmt.Fprintf(&text, "- %s %s %s\n", stash.Selector, stash.OID, stash.Subject)
 		}
-		text.WriteString("\n期间新增未跟踪文件：\n")
+		text.WriteString("\nUntracked files added during the task:\n")
 		for _, name := range task.NewUntracked {
 			fmt.Fprintf(&text, "- %s\n", name)
 		}
 	}
-	fmt.Fprintf(&text, "\n## 检查说明（填报）\n\n%s\n\n", task.Checks)
+	fmt.Fprintf(&text, "\n## Check notes (reported)\n\n%s\n\n", task.Checks)
 	for _, item := range report.Coverage {
-		fmt.Fprintf(&text, "- %s [%s]：%s；环境 %s / 目标 %s；%s\n", item.Requirement.Name, item.Status, item.Reason, item.Environment, item.Target, item.Evidence)
+		fmt.Fprintf(&text, "- %s [%s]: %s; environment %s / target %s; %s\n", item.Requirement.Name, item.Status, item.Reason, item.Environment, item.Target, item.Evidence)
 	}
-	text.WriteString("\n## 已核对保留与稍后处理\n\n")
+	text.WriteString("\n## Reviewed: kept and deferred\n\n")
 	for _, item := range report.Acknowledged {
-		fmt.Fprintf(&text, "- %s [%s]：%s\n", item.Message, item.Acknowledgement.State, item.Acknowledgement.Reason)
+		fmt.Fprintf(&text, "- %s [%s]: %s\n", item.Message, item.Acknowledgement.State, item.Acknowledgement.Reason)
 	}
-	text.WriteString("\n## 交付状态\n\n")
+	text.WriteString("\n## Delivery state\n\n")
 	for _, stage := range report.Delivery {
-		fmt.Fprintf(&text, "- %s [%s]：%s\n", stage.Name, stage.Status, stage.Detail)
+		fmt.Fprintf(&text, "- %s [%s]: %s\n", stage.Name, stage.Status, stage.Detail)
 	}
-	fmt.Fprintf(&text, "\n## 遗留问题\n\n%s\n\n说明：此记录不代表提交、推送、部署或线上验收已经完成；手工核验与应用执行结果分开记录。\n", task.Blockers)
+	fmt.Fprintf(&text, "\n## Open issues\n\n%s\n\nThis record does not prove commit, push, deployment, or live acceptance completion. Manual verification and app execution are recorded separately.\n", task.Blockers)
 	return text.String()
 }
 
@@ -631,7 +631,7 @@ func (s *Service) ReviewHandover(path, id string) (string, error) {
 		return "", err
 	}
 	if !pipelineRunID.MatchString(id) {
-		return "", errors.New("交接记录编号无效")
+		return "", errors.New("invalid handoff record ID")
 	}
 	data, err := readReviewData(filepath.Join(s.reviewDirectory(path), "tasks", id+".json"))
 	if err != nil {
@@ -642,7 +642,7 @@ func (s *Service) ReviewHandover(path, id string) (string, error) {
 		return "", err
 	}
 	if task.EndedAt == "" {
-		return "", errors.New("任务尚未交接")
+		return "", errors.New("task has not been handed off")
 	}
 	return task.Handover, nil
 }

@@ -24,13 +24,16 @@ export default function ProjectDocuments({
   const selected = names.includes(choice) ? choice : names[0];
   if (!selected)
     return (
-      <Empty icon="file" title="没有发现 Markdown 文档">
-        当前仅查看项目根目录的 .md 和 .markdown 文件。
+      <Empty icon="file" title="No Markdown documents found">
+        Only .md and .markdown files in the project root are listed.
       </Empty>
     );
   return (
     <div className="grid h-full min-h-0 min-w-0 grid-cols-[144px_minmax(0,1fr)] gap-4">
-      <nav aria-label="项目文档" className="min-h-0 min-w-0 overflow-y-auto">
+      <nav
+        aria-label="Project documents"
+        className="min-h-0 min-w-0 overflow-y-auto"
+      >
         <ul className="space-y-1">
           {names.map((name) => (
             <li key={name}>
@@ -48,7 +51,7 @@ export default function ProjectDocuments({
       </nav>
       <section
         className="flex min-h-0 min-w-0 flex-col"
-        aria-label={`${selected} 文档`}
+        aria-label={`${selected} Documents`}
       >
         <DocumentContent
           key={`${path}:${selected}`}
@@ -92,7 +95,7 @@ function DocumentContent({
         const content = native
           ? await Service.readDocument(path, name)
           : previewDocuments[path]?.[name];
-        if (content === undefined) throw new Error("文档不存在");
+        if (content === undefined) throw new Error("Document not found");
         if (!active) return;
         let stored: DocumentDraft | null = null;
         try {
@@ -104,13 +107,15 @@ function DocumentContent({
           )
             stored = value;
         } catch {
-          setStorageError("无法读取会话草稿，切换文件前请保存或复制修改。");
+          setStorageError(
+            "Could not read the session draft. Save or copy your edits before switching files.",
+          );
         }
         setDraft(stored || { base: content, content });
         setLoadError("");
         if (stored && stored.base !== content)
           setSaveError(
-            "文件已在外部修改，草稿已保留；请复制需要的内容，再重新载入文件。",
+            "The file changed externally. Your draft is preserved; copy your edits before reloading.",
           );
       } catch (error) {
         if (active) setLoadError(message(error));
@@ -141,7 +146,9 @@ function DocumentContent({
       else sessionStorage.setItem(key, JSON.stringify(next));
       setStorageError("");
     } catch {
-      setStorageError("无法保存会话草稿，切换文件前请保存或复制修改。");
+      setStorageError(
+        "Could not store the draft. Save or copy your edits before switching files.",
+      );
     }
   }
 
@@ -158,9 +165,11 @@ function DocumentContent({
         if (stored === JSON.stringify(draft)) sessionStorage.removeItem(key);
         setStorageError("");
       } catch {
-        setStorageError("文件已保存，但会话草稿未能清除。");
+        setStorageError(
+          "File saved, but the session draft could not be cleared.",
+        );
       }
-      setNotice("已保存");
+      setNotice("Saved");
     } catch (error) {
       setSaveError(message(error));
     } finally {
@@ -169,11 +178,17 @@ function DocumentContent({
   }
 
   function reload() {
-    if (dirty && !window.confirm("放弃未保存的修改并重新载入文件？")) return;
+    if (
+      dirty &&
+      !window.confirm("Discard unsaved changes and reload the file?")
+    )
+      return;
     try {
       sessionStorage.removeItem(key);
     } catch {
-      setStorageError("无法清除会话草稿，请先复制修改并检查浏览器存储。");
+      setStorageError(
+        "Could not clear the draft. Copy your edits and check browser storage.",
+      );
       return;
     }
     setDraft(null);
@@ -188,12 +203,12 @@ function DocumentContent({
     return (
       <div role="alert" className="text-sm">
         <p className="mb-3 break-words text-removed">
-          无法读取 {name}：{loadError}
+          Could not read {name}: {loadError}
         </p>
-        <Button onClick={reload}>重试</Button>
+        <Button onClick={reload}>Retry</Button>
       </div>
     );
-  if (!draft) return <p role="status">正在读取 {name}…</p>;
+  if (!draft) return <p role="status">Loading {name}…</p>;
   return (
     <div
       className="flex min-h-0 flex-1 flex-col gap-3"
@@ -210,13 +225,13 @@ function DocumentContent({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div
           role="group"
-          aria-label="文档显示方式"
+          aria-label="Document view"
           className="flex gap-1 rounded-md bg-surface p-1"
         >
           {(
             [
-              ["preview", "预览"],
-              ["edit", "编辑"],
+              ["preview", "Preview"],
+              ["edit", "Edit"],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -231,13 +246,13 @@ function DocumentContent({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span role="status" className="text-xs text-muted">
-            {dirty ? "未保存" : notice}
+            {dirty ? "Unsaved" : notice}
           </span>
           {mode === "preview" && <DocumentFind reader={reader} />}
           <button
             className="icon-button"
-            aria-label="重新载入文档"
-            title="重新载入文档"
+            aria-label="Reload document"
+            title="Reload document"
             disabled={busy}
             onClick={reload}
           >
@@ -248,9 +263,13 @@ function DocumentContent({
               primary
               disabled={!native || !dirty || busy}
               onClick={() => void save()}
-              title={native ? "保存（⌘S / Ctrl+S）" : "当前环境无法写入文件"}
+              title={
+                native
+                  ? "Save (⌘S / Ctrl+S)"
+                  : "File writes require the desktop app"
+              }
             >
-              {busy ? "保存中…" : "保存"}
+              {busy ? "Saving…" : "Save"}
             </Button>
           )}
         </div>
@@ -262,7 +281,7 @@ function DocumentContent({
       )}
       {mode === "edit" ? (
         <textarea
-          aria-label={`${name} 编辑内容`}
+          aria-label={`${name} Editor`}
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
@@ -275,7 +294,7 @@ function DocumentContent({
         <div
           ref={reader}
           role="region"
-          aria-label={`${name} 预览`}
+          aria-label={`${name} Preview`}
           tabIndex={0}
           className="min-h-0 flex-1 overflow-auto rounded-md border border-line-subtle px-4 py-3"
         >
@@ -283,7 +302,7 @@ function DocumentContent({
             <Suspense
               fallback={
                 <p role="status" className="text-sm text-muted">
-                  正在生成预览…
+                  Generating preview…
                 </p>
               }
             >
@@ -296,7 +315,7 @@ function DocumentContent({
               </article>
             </Suspense>
           ) : (
-            <p className="text-sm text-muted">文件为空</p>
+            <p className="text-sm text-muted">Empty file</p>
           )}
         </div>
       )}

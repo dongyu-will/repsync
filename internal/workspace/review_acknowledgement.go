@@ -106,7 +106,7 @@ func (s *Service) SetReviewIssueState(path, version, key, state, reason string) 
 	defer s.reviewMu.Unlock()
 	entry := ReviewAcknowledgement{}
 	if !slices.Contains([]string{"retained", "later", "reopened"}, state) || len(reason) > 4096 || (state != "reopened" && strings.TrimSpace(reason) == "") {
-		return entry, errors.New("请选择处理状态并填写保留或稍后处理的理由")
+		return entry, errors.New("select a resolution status and provide a reason to keep or defer")
 	}
 	report, err := s.checkedReview(path, version)
 	if err != nil {
@@ -115,7 +115,7 @@ func (s *Service) SetReviewIssueState(path, version, key, state, reason string) 
 	issues := append(slices.Clone(report.Issues), report.Acknowledged...)
 	index := slices.IndexFunc(issues, func(i ReviewIssue) bool { return i.Key == key })
 	if index < 0 {
-		return entry, errors.New("该提醒已变化，请重新检查")
+		return entry, errors.New("reminder changed; check again")
 	}
 	entry = ReviewAcknowledgement{ID: reviewRecordID(), Key: key, Kind: issues[index].Kind, State: state, Reason: reason, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 	err = saveReviewRecord(filepath.Join(s.reviewDirectory(path), "acknowledgements", entry.ID+".json"), entry)

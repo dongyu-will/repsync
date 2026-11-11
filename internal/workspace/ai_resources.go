@@ -67,7 +67,7 @@ func aiProjectInfos(projects []Project, issues *[]string) []aiProjectInfo {
 			var guideErr error
 			info.guide, guideErr = readProjectConfig(root, "AGENTS.md")
 			if guideErr != nil && !errors.Is(guideErr, os.ErrNotExist) {
-				*issues = append(*issues, "AGENTS.md 无法读取，适配依据不完整: "+project.Path)
+				*issues = append(*issues, "AGENTS.md unreadable; project fit evidence incomplete: "+project.Path)
 			}
 			_, err := root.Stat("go.mod")
 			info.goProject = err == nil
@@ -81,14 +81,14 @@ func aiProjectInfos(projects []Project, issues *[]string) []aiProjectInfo {
 func currentAIPaths() (aiPaths, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return aiPaths{}, fmt.Errorf("读取用户目录: %w", err)
+		return aiPaths{}, fmt.Errorf("read user directory: %w", err)
 	}
 	codex := os.Getenv("CODEX_HOME")
 	if codex == "" {
 		codex = filepath.Join(home, ".codex")
 	}
 	if !filepath.IsAbs(codex) {
-		return aiPaths{}, errors.New("CODEX_HOME 必须是绝对路径")
+		return aiPaths{}, errors.New("CODEX_HOME must be an absolute path")
 	}
 	return aiPaths{home: home, codex: codex}, nil
 }
@@ -129,7 +129,7 @@ func (s *Service) AIResources(path string) (AIResourceReport, error) {
 	}
 	report := inventoryAIResources(paths, projects, path)
 	if truncated {
-		report.Issues = append(report.Issues, "仅盘点前 64 个已登记项目的项目资源")
+		report.Issues = append(report.Issues, "Only the first 64 registered projects are inventoried")
 	}
 	directory := paths.home
 	if path != "" {
@@ -159,12 +159,12 @@ func completeAIInventory(report *AIResourceReport, projects []Project) {
 				}
 			}
 			if len(matches) == 0 {
-				report.Resources = append(report.Resources, AIResource{ID: aiID(adoption.Kind, info.project.Path+":"+adoption.Name+":"+adoption.Source), Kind: adoption.Kind, Name: adoption.Name, Source: "项目 .repsync.json", Location: adoption.Source, Availability: "missing", Detail: "项目已声明，但本次盘点未找到匹配来源；请核对名称、来源或扫描缺口", Applicability: "adopted", Reason: adoption.Reason, Tasks: adoption.Tasks, Projects: []string{info.project.Path}})
+				report.Resources = append(report.Resources, AIResource{ID: aiID(adoption.Kind, info.project.Path+":"+adoption.Name+":"+adoption.Source), Kind: adoption.Kind, Name: adoption.Name, Source: "Project .repsync.json", Location: adoption.Source, Availability: "missing", Detail: "Declared by the project, but no matching source found; check the name, source, and scan gaps", Applicability: "adopted", Reason: adoption.Reason, Tasks: adoption.Tasks, Projects: []string{info.project.Path}})
 			}
 			if len(matches) > 1 && adoption.Source == "" {
-				report.Issues = append(report.Issues, "同名资源 "+adoption.Name+" 有多个来源；请在项目 aiResources 中用 source 明确选择")
+				report.Issues = append(report.Issues, "Resource named "+adoption.Name+" has multiple sources; specify source in the project's aiResources")
 				for _, i := range matches {
-					report.Resources[i].Applicability, report.Resources[i].Reason = "candidate", "同名资源来源待确认，不能确定项目采用哪一份"
+					report.Resources[i].Applicability, report.Resources[i].Reason = "candidate", "Same-name resource sources need review; project adoption is uncertain"
 					report.Resources[i].Projects = slices.DeleteFunc(report.Resources[i].Projects, func(path string) bool { return path == info.project.Path })
 				}
 			}
@@ -178,7 +178,7 @@ func completeAIInventory(report *AIResourceReport, projects []Project) {
 		encoded, err := json.Marshal(resource)
 		if err != nil || len(encoded) > budget {
 			report.Resources = report.Resources[:i]
-			report.Issues = append(report.Issues, "资源返回达到 3 MiB 上限，列表不完整")
+			report.Issues = append(report.Issues, "Resource response reached the 3 MiB limit; list incomplete")
 			break
 		}
 		budget -= len(encoded)
@@ -193,14 +193,14 @@ func inventoryAIResources(paths aiPaths, projects []Project, scope string) AIRes
 		depth       int
 	}
 	sources := []source{
-		{filepath.Join(paths.home, ".agents", "skills"), "用户 Skill", 3},
+		{filepath.Join(paths.home, ".agents", "skills"), "User Skill", 3},
 		{filepath.Join(paths.codex, "skills"), "Codex Skill", 3},
 		{filepath.Join(paths.home, ".claude", "skills"), "Claude Skill", 3},
-		{filepath.Join(paths.codex, "plugins", "cache"), "插件缓存（启用情况未知）", 9},
+		{filepath.Join(paths.codex, "plugins", "cache"), "Plugin cache (enabled state unknown)", 9},
 	}
 	for _, project := range projects {
 		for _, directory := range []string{".agents/skills", ".codex/skills", ".claude/skills"} {
-			sources = append(sources, source{filepath.Join(project.Path, directory), "项目 Skill", 3})
+			sources = append(sources, source{filepath.Join(project.Path, directory), "Project Skill", 3})
 		}
 	}
 	seen := map[string]bool{}
@@ -217,7 +217,7 @@ func inventoryAIResources(paths aiPaths, projects []Project, scope string) AIRes
 			}
 			entries, err := os.ReadDir(directory)
 			if err != nil {
-				report.Issues = append(report.Issues, "Skill 目录读取失败: "+directory)
+				report.Issues = append(report.Issues, "Failed to read Skill directory: "+directory)
 				return
 			}
 			for _, entry := range entries {
@@ -232,7 +232,7 @@ func inventoryAIResources(paths aiPaths, projects []Project, scope string) AIRes
 						continue
 					}
 					seen[canonical] = true
-					resource := AIResource{ID: skillID(canonical), Kind: "skill", Name: filepath.Base(filepath.Dir(location)), Source: source.label, Location: canonical, Availability: "discovered", Detail: "已发现文件；当前 AI 会话是否可见未知", Projects: []string{}}
+					resource := AIResource{ID: skillID(canonical), Kind: "skill", Name: filepath.Base(filepath.Dir(location)), Source: source.label, Location: canonical, Availability: "discovered", Detail: "File discovered; availability in the current AI session is unknown", Projects: []string{}}
 					content, err := readText(canonical)
 					if err != nil {
 						resource.Availability, resource.Detail = "error", err.Error()
@@ -242,7 +242,7 @@ func inventoryAIResources(paths aiPaths, projects []Project, scope string) AIRes
 							if len(name) <= 200 {
 								resource.Name = name
 							} else {
-								resource.Availability, resource.Detail = "error", "Skill 名称超过 200 字节上限"
+								resource.Availability, resource.Detail = "error", "Skill name exceeds the 200 byte limit"
 							}
 						}
 						resource.Description = truncateAIText(skillField(content, "description"), 2000)
@@ -265,7 +265,7 @@ func inventoryAIResources(paths aiPaths, projects []Project, scope string) AIRes
 		walk(source.path, 0)
 	}
 	if nodes >= 8000 || len(report.Resources) >= 600 || time.Now().After(deadline) {
-		report.Issues = append(report.Issues, "Skill 盘点达到 600 项、8000 个目录项或 4 秒上限，列表不完整")
+		report.Issues = append(report.Issues, "Skill inventory reached 600 resources, 8000 directory entries, or 4 seconds; list incomplete")
 	}
 	cliNames := []string{"codex", "git", "gh", "node", "npm", "pnpm", "go", "python3", "docker", "wrangler"}
 	for _, project := range infos {
@@ -282,11 +282,11 @@ func inventoryAIResources(paths aiPaths, projects []Project, scope string) AIRes
 		if scope != "" {
 			directory = scope
 		}
-		resource := AIResource{ID: "cli:" + name, Kind: "cli", Name: name, Source: "RepSync 执行环境", Availability: "missing", Detail: "未找到可执行文件", Projects: []string{}}
+		resource := AIResource{ID: "cli:" + name, Kind: "cli", Name: name, Source: "repsync execution environment", Availability: "missing", Detail: "Executable not found", Projects: []string{}}
 		if command, err := projectCommand(context.Background(), directory, "", nil, []string{name}, false); err == nil {
 			resource.Location, resource.Availability = command.Path, "available"
 			resource.ID = aiID("cli", command.Path)
-			resource.Detail = "已定位可执行文件；版本、登录和 AI 会话环境未核验"
+			resource.Detail = "Executable located; version, authentication, and AI session environment not verified"
 		}
 		applyAIIntent(&resource, infos, scope)
 		report.Resources = append(report.Resources, resource)
@@ -336,7 +336,7 @@ func readAIIntent(path string, issues *[]string) []AIResourceAdoption {
 	root, err := os.OpenRoot(path)
 	if err != nil {
 		if issues != nil {
-			*issues = append(*issues, "项目资源配置读取失败: "+path)
+			*issues = append(*issues, "Failed to read project resource configuration: "+path)
 		}
 		return nil
 	}
@@ -353,20 +353,20 @@ func readAIIntent(path string, issues *[]string) []AIResourceAdoption {
 	}
 	if err != nil || len(config.AIResources) > 128 {
 		if issues != nil {
-			*issues = append(*issues, "AI 资源配置无效或超过 128 项: "+path)
+			*issues = append(*issues, "Invalid AI resource configuration or more than 128 entries: "+path)
 		}
 		return nil
 	}
 	for i, adoption := range config.AIResources {
 		if !slices.Contains([]string{"skill", "mcp", "cli"}, adoption.Kind) || strings.TrimSpace(adoption.Name) == "" || len(adoption.Name) > 200 || len(adoption.Reason) > 2000 || len(adoption.Tasks) > 2000 || adoption.Source != "" && !filepath.IsAbs(adoption.Source) {
 			if issues != nil {
-				*issues = append(*issues, "AI 资源声明须包含有效 kind/name，source 如提供须为绝对路径: "+path)
+				*issues = append(*issues, "AI resource declarations require valid kind/name; source must be absolute when provided: "+path)
 			}
 			return nil
 		}
 		if adoption.Kind == "cli" && !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`).MatchString(adoption.Name) {
 			if issues != nil {
-				*issues = append(*issues, "CLI name 必须是命令名称，不包含路径或参数: "+path)
+				*issues = append(*issues, "CLI name must be a command name without paths or arguments: "+path)
 			}
 			return nil
 		}
@@ -383,7 +383,7 @@ func readAIIntent(path string, issues *[]string) []AIResourceAdoption {
 }
 
 func applyAIIntent(resource *AIResource, projects []aiProjectInfo, scope string) {
-	resource.Applicability, resource.Reason = "unassigned", "尚无项目适配依据，按具体任务选择"
+	resource.Applicability, resource.Reason = "unassigned", "No project fit evidence yet; choose per task"
 	for _, project := range projects {
 		adopted := false
 		for _, adoption := range project.adoptions {
@@ -395,7 +395,7 @@ func applyAIIntent(resource *AIResource, projects []aiProjectInfo, scope string)
 			}
 			resource.Applicability, resource.Reason, resource.Tasks = "adopted", adoption.Reason, adoption.Tasks
 			if resource.Reason == "" {
-				resource.Reason = ".repsync.json 明确采用；适配理由待补充"
+				resource.Reason = "Explicitly adopted in .repsync.json; fit rationale not provided"
 			}
 			adopted = true
 		}
@@ -403,7 +403,7 @@ func applyAIIntent(resource *AIResource, projects []aiProjectInfo, scope string)
 			pattern := `(^|[^A-Za-z0-9_-])` + regexp.QuoteMeta(resource.Name) + `($|[^A-Za-z0-9_-])`
 			if regexp.MustCompile(pattern).Match(project.guide) {
 				if !adopted {
-					resource.Applicability, resource.Reason = "recommended", "项目 AGENTS.md 明确提及；遵循其中的任务触发条件"
+					resource.Applicability, resource.Reason = "recommended", "Explicitly mentioned in project AGENTS.md; follow its task conditions"
 				}
 				adopted = true
 			}
@@ -413,7 +413,7 @@ func applyAIIntent(resource *AIResource, projects []aiProjectInfo, scope string)
 		}
 		if !adopted && scope != "" && resource.Applicability == "unassigned" {
 			if project.goProject && (strings.HasPrefix(resource.Name, "golang-") || resource.Kind == "cli" && resource.Name == "go") {
-				resource.Applicability, resource.Reason, resource.Tasks = "candidate", "检测到 go.mod；技术栈候选，尚未声明采用", "仅在相应 Go 任务中选择"
+				resource.Applicability, resource.Reason, resource.Tasks = "candidate", "go.mod detected; stack-based candidate, not declared as adopted", "Choose only for relevant Go tasks"
 			}
 		}
 	}
@@ -435,16 +435,16 @@ func readCodexMCP(directory string) ([]AIResource, error) {
 	defer cancel()
 	cmd, err := projectCommand(ctx, directory, "", nil, []string{"codex", "mcp", "list", "--json"}, false)
 	if err != nil {
-		return nil, errors.New("未找到 Codex CLI；MCP 配置未盘点，连接和会话可见性未知")
+		return nil, errors.New("Codex CLI not found; MCP configuration not inventoried; connection and session visibility unknown")
 	}
 	var stdout, stderr limitedBuffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	configureCommandProcess(cmd, false)
 	if err := cmd.Run(); err != nil {
-		return nil, errors.New("读取 Codex MCP 配置失败或超时；未启动任何 MCP 服务器")
+		return nil, errors.New("Codex MCP configuration request failed or timed out; no MCP servers started")
 	}
 	if stdout.overflow {
-		return nil, errors.New("Codex MCP 配置响应超过大小上限")
+		return nil, errors.New("Codex MCP configuration response exceeds size limits")
 	}
 	var servers []struct {
 		Name      string `json:"name"`
@@ -455,16 +455,16 @@ func readCodexMCP(directory string) ([]AIResource, error) {
 		} `json:"transport"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &servers); err != nil {
-		return nil, errors.New("无法识别当前 Codex CLI 的 MCP 配置格式")
+		return nil, errors.New("unrecognized MCP configuration format from the current Codex CLI")
 	}
 	if len(servers) > 128 {
-		return nil, errors.New("MCP 配置超过 128 项上限")
+		return nil, errors.New("MCP configuration exceeds 128 entries")
 	}
 	resources := []AIResource{}
 	for _, server := range servers {
-		resource := AIResource{ID: "mcp:codex:" + server.Name, Kind: "mcp", Name: server.Name, Source: "Codex CLI 当前配置", Availability: "configured", Detail: "配置已启用；连接、认证与当前 AI 会话可见性未核验", Location: "Codex MCP / " + server.Name, Projects: []string{}}
+		resource := AIResource{ID: "mcp:codex:" + server.Name, Kind: "mcp", Name: server.Name, Source: "Current Codex CLI configuration", Availability: "configured", Detail: "Enabled in configuration; connection, authentication, and current AI session visibility not verified", Location: "Codex MCP / " + server.Name, Projects: []string{}}
 		if !server.Enabled {
-			resource.Availability, resource.Detail = "disabled", "CLI 配置已禁用；桌面插件与历史会话状态可能不同"
+			resource.Availability, resource.Detail = "disabled", "Disabled in CLI configuration; desktop plugins and historical sessions may differ"
 		}
 		resources = append(resources, resource)
 	}

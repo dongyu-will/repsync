@@ -24,7 +24,7 @@ func sharedParts(content string) (block, project string, err error) {
 	}
 	start, end := strings.Index(content, sharedStart), strings.Index(content, sharedEnd)
 	if starts != 1 || ends != 1 || end < start {
-		return "", "", errors.New("公共区块标记不完整或重复，请先修复 AGENTS.md")
+		return "", "", errors.New("shared block markers are incomplete or duplicated; fix AGENTS.md first")
 	}
 	return content[start : end+len(sharedEnd)], content[:start] + content[end+len(sharedEnd):], nil
 }

@@ -186,7 +186,7 @@ func TestLocalPipelineTimeoutAndBoundedLog(t *testing.T) {
 			t.Fatal(err)
 		}
 		output := waitPipeline(t, s, project, run.ID)
-		if output.Run.Status != "success" || len(output.Log) > 256*1024+256 || !strings.Contains(output.Log, "后续输出已省略") {
+		if output.Run.Status != "success" || len(output.Log) > 256*1024+256 || !strings.Contains(output.Log, "further output omitted") {
 			t.Fatalf("wrong bounded log: status %s, length %d", output.Run.Status, len(output.Log))
 		}
 	})

@@ -158,7 +158,7 @@ func (s *Service) ApplyCodexResource(path string, change CodexResourceChange, ve
 		return err
 	}
 	if plan.preview.Version != version {
-		return errors.New("来源或目标已变化，请重新预览")
+		return errors.New("source or target changed; preview again")
 	}
 	if plan.userDirectory != "" {
 		return replaceUpdateTarget(plan.userDirectory, "config.toml", plan.before, plan.after)
@@ -185,22 +185,22 @@ func (s *Service) ApplyCodexResource(path string, change CodexResourceChange, ve
 		case errors.Is(err, os.ErrNotExist):
 			// A manually removed link only needs its placement record cleared.
 		default:
-			return errors.New("项目 Skill 已变化，请核对原位置")
+			return errors.New("project Skill changed; check the original location")
 		}
 		return os.Remove(recordPath)
 	}
 	if err := root.Symlink(plan.link.Source, plan.preview.Target); err != nil {
-		return fmt.Errorf("建立项目 Skill 链接: %w", err)
+		return fmt.Errorf("create project Skill link: %w", err)
 	}
 	current, err := readCodexSkillLink(root, plan.preview.Target)
 	if err != nil || current.Source != plan.link.Source {
-		return errors.New("项目 Skill 链接无法核验，请检查目标")
+		return errors.New("cannot verify the project Skill link; check the target")
 	}
 	if err := saveJSON(recordPath, current); err != nil {
 		if link, check := readCodexSkillLink(root, plan.preview.Target); check == nil && link == current {
 			err = errors.Join(err, root.Remove(plan.preview.Target))
 		}
-		return fmt.Errorf("保存 Skill 接入记录: %w", err)
+		return fmt.Errorf("save Skill setup record: %w", err)
 	}
 	return nil
 }
@@ -208,15 +208,15 @@ func (s *Service) ApplyCodexResource(path string, change CodexResourceChange, ve
 func (s *Service) planCodexResource(path string, change CodexResourceChange) (codexPlacementPlan, error) {
 	var plan codexPlacementPlan
 	if !codexResourceName.MatchString(change.Name) {
-		return plan, errors.New("请输入 1–64 位字母、数字、下划线或连字符作为名称")
+		return plan, errors.New("enter a name of 1–64 letters, digits, underscores, or hyphens")
 	}
 	if !slices.Contains([]string{"add", "remove", "enable", "disable"}, change.Action) ||
 		(change.Kind != "mcp" && (change.Action == "enable" || change.Action == "disable")) {
-		return plan, errors.New("请选择有效的接入操作")
+		return plan, errors.New("select a valid setup operation")
 	}
 	if path == "" {
 		if change.Kind != "mcp" || (change.Action != "enable" && change.Action != "disable") {
-			return plan, errors.New("用户默认值仅支持启停已有 MCP")
+			return plan, errors.New("user defaults can only enable or disable existing MCPs")
 		}
 		paths, err := currentAIPaths()
 		if err != nil {
@@ -245,10 +245,10 @@ func (s *Service) planCodexResource(path string, change CodexResourceChange) (co
 		current, linkErr := readCodexSkillLink(root, target)
 		if change.Action == "remove" {
 			if recordErr != nil {
-				return plan, errors.New("没有此 Skill 的接入记录")
+				return plan, errors.New("no setup record for this Skill")
 			}
 			if !errors.Is(linkErr, os.ErrNotExist) && (linkErr != nil || current != record) {
-				return plan, errors.New("项目 Skill 不是原先创建的链接，请核对目标")
+				return plan, errors.New("project Skill is not the original link; check its target")
 			}
 			plan.link = record
 			plan.preview.Before = record.Source
@@ -256,14 +256,14 @@ func (s *Service) planCodexResource(path string, change CodexResourceChange) (co
 			return plan, nil
 		}
 		if !errors.Is(recordErr, os.ErrNotExist) || !errors.Is(linkErr, os.ErrNotExist) {
-			return plan, errors.New("已有同名项目 Skill 或接入记录，请先核对")
+			return plan, errors.New("a project Skill or setup record with this name already exists; review it first")
 		}
 		source, version, err := codexSkillSource(change.Source, change.Name)
 		if err != nil {
 			return plan, err
 		}
 		if filepath.Clean(filepath.Join(path, target)) == source {
-			return plan, errors.New("Skill 已位于项目目标位置")
+			return plan, errors.New("Skill is already at the project destination")
 		}
 		plan.link.Source = source
 		plan.preview.After = source
@@ -280,7 +280,7 @@ func (s *Service) planCodexResource(path string, change CodexResourceChange) (co
 		}
 		return planCodexMCP(path, root, userDirectory, change)
 	default:
-		return plan, errors.New("仅支持项目 Skill 和 MCP")
+		return plan, errors.New("only project Skills and MCPs are supported")
 	}
 }
 
@@ -290,7 +290,7 @@ func codexSkillTarget(name string) string {
 
 func codexSkillSource(path, name string) (string, string, error) {
 	if !filepath.IsAbs(path) || filepath.Base(path) != "SKILL.md" {
-		return "", "", errors.New("请选择已盘点的 SKILL.md")
+		return "", "", errors.New("select an inventoried SKILL.md")
 	}
 	path, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -301,14 +301,14 @@ func codexSkillSource(path, name string) (string, string, error) {
 		return "", "", err
 	}
 	if !info.Mode().IsRegular() || filepath.Base(path) != "SKILL.md" {
-		return "", "", errors.New("Skill 来源需要是普通 SKILL.md 文件")
+		return "", "", errors.New("Skill source must be a regular SKILL.md file")
 	}
 	content, err := readText(path)
 	if err != nil {
 		return "", "", err
 	}
 	if skillField(content, "name") != name {
-		return "", "", errors.New("Skill 名称已变化，请重新盘点")
+		return "", "", errors.New("Skill name changed; rescan")
 	}
 	return filepath.Dir(path), digest(content), nil
 }
@@ -328,7 +328,7 @@ func readCodexSkillLink(root *os.Root, target string) (codexSkillRecord, error) 
 	}
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || info.Mode()&os.ModeSymlink == 0 {
-		return codexSkillRecord{}, errors.New("同名项目 Skill 已存在")
+		return codexSkillRecord{}, errors.New("a project Skill with this name already exists")
 	}
 	link, err := root.Readlink(target)
 	return codexSkillRecord{Source: link, Device: int32(stat.Dev), Inode: stat.Ino, Mtime: info.ModTime().UnixNano()}, err
@@ -352,7 +352,7 @@ func codexResourceParents(root *os.Root, target string, create bool) error {
 			return err
 		}
 		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("%s 需要是普通目录", current)
+			return fmt.Errorf("%s must be a regular folder", current)
 		}
 	}
 	return nil
@@ -373,7 +373,7 @@ func codexMCPEntries(text string) (map[string]any, error) {
 		MCP map[string]any `toml:"mcp_servers"`
 	}
 	if err := toml.Unmarshal([]byte(text), &config); err != nil {
-		return nil, errors.New("项目 Codex 配置无法解析，请先修复 TOML")
+		return nil, errors.New("cannot parse project Codex configuration; fix the TOML first")
 	}
 	return config.MCP, nil
 }
@@ -394,7 +394,7 @@ func managedCodexMCP(path, name, text string) (string, bool, error) {
 	body, tail, found := strings.Cut(rest, end+"\n")
 	if !ok || !found || (offset > 0 && text[offset-1] != '\n') || strings.Contains(tail, prefix) ||
 		strings.TrimPrefix(startLine, prefix) != digest(body) {
-		return "", true, errors.New("MCP 接入区块已被修改，请核对项目配置")
+		return "", true, errors.New("MCP setup block was modified; review project configuration")
 	}
 	return startLine + "\n" + body + end + "\n", true, nil
 }
@@ -406,7 +406,7 @@ func planCodexMCP(path string, root *os.Root, userDirectory string, change Codex
 		return plan, err
 	}
 	if before.Exists && before.Mode&0222 == 0 {
-		return plan, errors.New("项目 Codex 配置为只读")
+		return plan, errors.New("project Codex configuration is read-only")
 	}
 	tables, err := codexMCPEntries(before.Content)
 	if err != nil {
@@ -421,7 +421,7 @@ func planCodexMCP(path string, root *os.Root, userDirectory string, change Codex
 	var sourceVersion string
 	if change.Action == "remove" {
 		if !owned {
-			return plan, errors.New("只撤回由 RepSync 接入的项目 MCP")
+			return plan, errors.New("only project MCPs added by repsync can be removed")
 		}
 		plan.preview.Before = block
 		plan.after.Content = strings.Replace(before.Content, block, "", 1)
@@ -429,7 +429,7 @@ func planCodexMCP(path string, root *os.Root, userDirectory string, change Codex
 		value, exists := tables[change.Name]
 		switching := owned && codexMCPOverride(value) && (change.Action == "enable" || change.Action == "disable")
 		if (exists || owned) && !switching {
-			return plan, errors.New("项目已有同名 MCP，请先核对现有配置")
+			return plan, errors.New("a project MCP with this name already exists; review its configuration first")
 		}
 		settings, version, err := codexMCPSettings(userDirectory, change)
 		if err != nil {
@@ -461,16 +461,16 @@ func planCodexMCP(path string, root *os.Root, userDirectory string, change Codex
 		return plan, err
 	}
 	if _, exists := entries[change.Name]; exists != (change.Action != "remove") {
-		return plan, errors.New("无法确认指定的 MCP 表已更新")
+		return plan, errors.New("cannot confirm the specified MCP table was updated")
 	}
 	if !reflect.DeepEqual(codexConfigWithoutServer(before.Content, change.Name), codexConfigWithoutServer(plan.after.Content, change.Name)) {
-		return plan, errors.New("修改会影响其他 Codex 配置，请先核对区块附近的内容")
+		return plan, errors.New("this edit would affect other Codex configuration; review the surrounding content first")
 	}
 	if len(plan.after.Content) > 256*1024 {
-		return plan, errors.New("项目 Codex 配置超过 256 KiB")
+		return plan, errors.New("project Codex configuration exceeds 256 KiB")
 	}
 	if sameSnapshot(plan.before, plan.after) {
-		return plan, errors.New("项目已使用此设置")
+		return plan, errors.New("project already uses this setting")
 	}
 	plan.preview.Version = gitDigest([]any{path, change, sourceVersion, plan.before, plan.after})
 	return plan, nil
@@ -499,43 +499,43 @@ func codexMCPSettings(userDirectory string, change CodexResourceChange) (map[str
 	if change.Action == "enable" || change.Action == "disable" {
 		content, err := readText(filepath.Join(userDirectory, "config.toml"))
 		if err != nil {
-			return nil, "", errors.New("无法读取 Codex 用户配置")
+			return nil, "", errors.New("cannot read Codex user configuration")
 		}
 		entries, err := codexMCPEntries(content)
 		if err != nil {
-			return nil, "", errors.New("Codex 用户配置无法解析，请先修复 TOML")
+			return nil, "", errors.New("cannot parse Codex user configuration; fix the TOML first")
 		}
 		server, _ := entries[change.Name].(map[string]any)
 		if server["command"] == nil && server["url"] == nil {
-			return nil, "", errors.New("用户配置中没有此 MCP 的连接定义")
+			return nil, "", errors.New("no connection definition for this MCP in user configuration")
 		}
 		return map[string]any{"enabled": change.Action == "enable"}, digest(content), nil
 	}
 	if change.URL != "" && change.Command != "" {
-		return nil, "", errors.New("请选择 HTTP 或标准输入输出其中一种连接方式")
+		return nil, "", errors.New("select either HTTP or standard input/output transport")
 	}
 	if change.URL != "" {
 		endpoint, err := url.Parse(change.URL)
 		if err != nil || len(change.URL) > 2048 || endpoint.Hostname() == "" ||
 			(endpoint.Scheme != "https" && endpoint.Scheme != "http") ||
 			endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.ForceQuery {
-			return nil, "", errors.New("请输入无账号和查询参数的 HTTP(S) 地址，令牌使用环境变量")
+			return nil, "", errors.New("enter an HTTP(S) URL without credentials or query parameters; use an environment variable for tokens")
 		}
 		settings := map[string]any{"url": change.URL}
 		if change.TokenEnv != "" {
 			if !codexEnvName.MatchString(change.TokenEnv) {
-				return nil, "", errors.New("请输入令牌的环境变量名称")
+				return nil, "", errors.New("enter the token environment variable name")
 			}
 			settings["bearer_token_env_var"] = change.TokenEnv
 		}
 		return settings, "", nil
 	}
 	if strings.TrimSpace(change.Command) == "" || len(change.Command) > 1024 || len(change.Args) > 64 || change.TokenEnv != "" {
-		return nil, "", errors.New("请输入启动程序，参数最多 64 项")
+		return nil, "", errors.New("enter an executable with up to 64 arguments")
 	}
 	for _, arg := range change.Args {
 		if len(arg) > 2048 {
-			return nil, "", errors.New("单个 MCP 参数超过长度限制")
+			return nil, "", errors.New("an MCP argument exceeds the length limit")
 		}
 	}
 	return map[string]any{"command": change.Command, "args": change.Args}, "", nil

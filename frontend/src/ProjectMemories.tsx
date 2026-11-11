@@ -12,17 +12,17 @@ const memoryTools = [
 const memoryToolName = (value: string) =>
   memoryTools.find(([id]) => id === value)?.[1] || "Codex";
 const tabs = [
-  ["confirmed", "已确认"],
-  ["pending", "待确认"],
-  ["archived", "已归档"],
+  ["confirmed", "Confirmed"],
+  ["pending", "Pending confirmation"],
+  ["archived", "Archived"],
 ] as const;
 type Status = (typeof tabs)[number][0];
 
 const demo: ProjectMemory = {
   id: "example-db",
-  statement: "生产数据库已完成 PostgreSQL 切换。",
-  source: "部署记录 #42 · 数据库迁移验收",
-  environment: "生产",
+  statement: "The production database has migrated to PostgreSQL.",
+  source: "Deployment record #42 · Database migration verification",
+  environment: "Production",
   keywords: ["MySQL"],
   origin: "user",
   status: "confirmed",
@@ -47,7 +47,7 @@ const field = "grid gap-1 text-xs text-muted";
 const control =
   "w-full min-h-9 rounded-md border border-line bg-white px-2 py-1.5 text-sm text-ink";
 const date = (value: string) =>
-  new Date(value).toLocaleString("zh-CN", { hour12: false });
+  new Date(value).toLocaleString("en-US", { hour12: false });
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
@@ -93,7 +93,7 @@ export default function ProjectMemories({ path }: { path: string }) {
         source: get("source"),
         environment: get("environment"),
         keywords: get("keywords")
-          .split(/[,，\n]/)
+          .split(/[,, \n]/)
           .map((keyword) => keyword.trim())
           .filter(Boolean),
       });
@@ -102,8 +102,8 @@ export default function ProjectMemories({ path }: { path: string }) {
         filter: item.status as Status,
         notice:
           item.status === "archived"
-            ? "相同记录已归档，可撤销归档。"
-            : "已保存项目记忆",
+            ? "A matching memory is archived. You can unarchive it."
+            : "Project memory saved",
       });
       form.reset();
       const details = form.closest("details");
@@ -131,9 +131,9 @@ export default function ProjectMemories({ path }: { path: string }) {
       update({
         items: [result, ...items.filter((existing) => existing.id !== item.id)],
         notice: {
-          confirm: "已确认记忆",
-          archive: "已归档记忆",
-          restore: "已撤销归档",
+          confirm: "Confirmed memories",
+          archive: "Archived memories",
+          restore: "Unarchived",
         }[action],
         undo: action === "archive" ? result : null,
         ...(action === "restore" ? { filter: result.status as Status } : {}),
@@ -147,11 +147,11 @@ export default function ProjectMemories({ path }: { path: string }) {
 
   const visible = items.filter((item) => item.status === filter);
   return (
-    <section aria-label="项目记忆" className="space-y-3">
+    <section aria-label="Project memory" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           role="group"
-          aria-label="记忆状态"
+          aria-label="Memory status"
           className="flex flex-wrap gap-1 rounded-lg bg-sidebar p-1"
         >
           {tabs.map(([id, title]) => (
@@ -178,7 +178,7 @@ export default function ProjectMemories({ path }: { path: string }) {
             })
           }
         >
-          重新读取
+          Reload
         </Button>
       </div>
       {error && (
@@ -196,7 +196,7 @@ export default function ProjectMemories({ path }: { path: string }) {
               disabled={busy}
               onClick={() => void change(undo, "restore")}
             >
-              撤销归档
+              Unarchive
             </Button>
           )}
         </div>
@@ -212,7 +212,7 @@ export default function ProjectMemories({ path }: { path: string }) {
         }
       />
       <ActionDialog
-        title="添加记忆"
+        title="Add memory"
         busy={busy}
         error={state.error}
         notice={state.notice}
@@ -222,7 +222,7 @@ export default function ProjectMemories({ path }: { path: string }) {
           onSubmit={record}
         >
           <label className={field}>
-            记忆内容
+            Memory statement
             <textarea
               name="statement"
               className={control}
@@ -233,19 +233,19 @@ export default function ProjectMemories({ path }: { path: string }) {
             />
           </label>
           <label className={field}>
-            来源
+            Source
             <input
               name="source"
               className={control}
               required
               maxLength={1024}
-              placeholder="链接、文件位置或会话引用"
+              placeholder="Link, file location, or session reference"
               disabled={!native || busy}
             />
           </label>
           <div className="grid gap-3 md:grid-cols-2">
             <label className={field}>
-              适用环境（可选）
+              Environment (optional)
               <input
                 name="environment"
                 className={control}
@@ -254,19 +254,19 @@ export default function ProjectMemories({ path }: { path: string }) {
               />
             </label>
             <label className={field}>
-              文档核对关键词（可选）
+              Document review keywords (optional)
               <input
                 name="keywords"
                 className={control}
                 maxLength={1000}
-                placeholder="旧名称，用逗号分隔"
+                placeholder="Old names, separated by commas"
                 disabled={!native || busy}
               />
             </label>
           </div>
           <div className="flex justify-end">
             <Button type="submit" primary disabled={!native || busy}>
-              保存为已确认
+              Save as confirmed
             </Button>
           </div>
         </form>
@@ -283,33 +283,33 @@ export default function ProjectMemories({ path }: { path: string }) {
               </p>
               <dl className="space-y-1 break-words text-xs text-muted">
                 <div className="flex flex-wrap gap-x-2">
-                  <dt>来源</dt>
+                  <dt>Source</dt>
                   <dd className="min-w-0 break-all">{item.source}</dd>
                 </div>
                 {item.environment && (
                   <div className="flex flex-wrap gap-x-2">
-                    <dt>适用环境</dt>
+                    <dt>Environment</dt>
                     <dd>{item.environment}</dd>
                   </div>
                 )}
                 {item.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-x-2">
-                    <dt>文档关键词</dt>
-                    <dd>{item.keywords.join("、")}</dd>
+                    <dt>Document keywords</dt>
+                    <dd>{item.keywords.join(", ")}</dd>
                   </div>
                 )}
               </dl>
               {item.session && (
                 <section className="space-y-2 text-xs">
                   <h3 className="break-words text-sm font-medium">
-                    原会话与用户原话
+                    Original session and user quote
                   </h3>
                   <p className="break-all text-muted">
                     {item.session.file}:{item.session.line}
                   </p>
                   {item.session.extractor && (
                     <p className="text-muted">
-                      由 {memoryToolName(item.session.extractor)} 提炼
+                      by {memoryToolName(item.session.extractor)} Extract
                     </p>
                   )}
                   <blockquote className="whitespace-pre-wrap break-words border-l-2 border-line pl-2">
@@ -319,7 +319,7 @@ export default function ProjectMemories({ path }: { path: string }) {
               )}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted">
-                  {item.origin === "ai" ? "AI 推断" : "手动记录"} ·{" "}
+                  {item.origin === "ai" ? "AI Inferred" : "Manual entry"} ·{" "}
                   {date(item.updatedAt)}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -329,7 +329,7 @@ export default function ProjectMemories({ path }: { path: string }) {
                       disabled={!native || busy}
                       onClick={() => void change(item, "confirm")}
                     >
-                      确认记忆
+                      Confirm memory
                     </Button>
                   )}
                   {item.status === "archived" ? (
@@ -337,14 +337,14 @@ export default function ProjectMemories({ path }: { path: string }) {
                       disabled={!native || busy}
                       onClick={() => void change(item, "restore")}
                     >
-                      撤销归档
+                      Unarchive
                     </Button>
                   ) : (
                     <Button
                       disabled={!native || busy}
                       onClick={() => void change(item, "archive")}
                     >
-                      归档
+                      Archive
                     </Button>
                   )}
                 </div>
@@ -355,11 +355,11 @@ export default function ProjectMemories({ path }: { path: string }) {
       ) : (
         <p role="status" className="py-3 text-muted">
           {busy
-            ? "正在读取项目记忆…"
+            ? "Loading project memories…"
             : {
-                confirmed: "暂无已确认记忆",
-                pending: "暂无待确认记忆",
-                archived: "暂无归档记忆",
+                confirmed: "No confirmed memories yet",
+                pending: "No memories awaiting confirmation",
+                archived: "No archived memories",
               }[filter]}
         </p>
       )}
@@ -437,12 +437,18 @@ function ProjectMemoryExtract({
       );
       const details = [
         result.added.length
-          ? `新增 ${result.added.length} 条待确认记忆`
-          : "没有新增待确认记忆",
-        result.messages === 0 ? "会话中没有可提炼的已结束轮次" : "",
-        result.existing ? `${result.existing} 条已存在` : "",
-        result.rejected ? `${result.rejected} 条未通过原话核对或字段校验` : "",
-        result.partial ? "只处理了读取范围内的消息" : "",
+          ? `New ${result.added.length}  memories awaiting confirmation`
+          : "No new memories awaiting confirmation",
+        result.messages === 0
+          ? "No completed turns to extract in this session"
+          : "",
+        result.existing ? `${result.existing}  already exist` : "",
+        result.rejected
+          ? `${result.rejected}  records failed quote or field validation`
+          : "",
+        result.partial
+          ? "Only messages within the read limits were processed"
+          : "",
       ].filter(Boolean);
       update({ notice: details.join(" · ") });
       if (result.added.length > 0) onAdded();
@@ -455,7 +461,7 @@ function ProjectMemoryExtract({
 
   return (
     <ActionDialog
-      title="从 AI 会话提炼"
+      title="Extract from AI sessions"
       onOpen={() => {
         if (!state.report && !state.error) void load();
       }}
@@ -466,13 +472,13 @@ function ProjectMemoryExtract({
         onSubmit={extract}
       >
         <p className="text-xs leading-5 text-muted">
-          将所选会话中已结束轮次的用户文字发送给
+          Send user messages from completed turns in the selected session to
           {memoryToolName(state.extractor)}
-          的默认模型，提炼结果进入待确认。
+          's default model. Extracted memories await confirmation.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <label className={field}>
-            会话来源
+            Session source
             <Select
               className="w-full"
               value={state.provider}
@@ -497,7 +503,7 @@ function ProjectMemoryExtract({
             </Select>
           </label>
           <label className={field}>
-            提炼工具
+            Extraction tool
             <Select
               className="w-full"
               value={state.extractor}
@@ -515,7 +521,7 @@ function ProjectMemoryExtract({
           </label>
         </div>
         <label className={field}>
-          最近修改的项目会话
+          Recently modified project sessions
           <Select
             className="w-full"
             disabled={!native || !!state.busy}
@@ -525,7 +531,7 @@ function ProjectMemoryExtract({
             }
           >
             <option value="">
-              {state.busy === "list" ? "正在读取会话…" : "选择一个会话"}
+              {state.busy === "list" ? "Loading sessions…" : "Choose a session"}
             </option>
             {state.report?.sessions.map((session) => (
               <option key={session.file} value={session.file}>
@@ -538,8 +544,9 @@ function ProjectMemoryExtract({
         {state.report && (
           <p role="status" className="text-xs text-muted">
             {state.report.sessions.length === 0 &&
-              `最近 30 天未找到当前项目的 ${memoryToolName(state.provider)} 会话。`}
-            {state.report.partial && " 部分会话超出扫描范围或无法读取。"}
+              `Recent 30  days: no sessions found for this project from ${memoryToolName(state.provider)}  sessions.`}
+            {state.report.partial &&
+              " Some sessions exceed scan limits or could not be read."}
           </p>
         )}
         {state.error && (
@@ -558,14 +565,16 @@ function ProjectMemoryExtract({
             disabled={!native || !!state.busy}
             onClick={() => void load()}
           >
-            刷新会话
+            Refresh sessions
           </Button>
           <Button
             type="submit"
             primary
             disabled={!native || !!state.busy || !state.selected}
           >
-            {state.busy === "extract" ? "正在提炼…" : "提炼并加入待确认"}
+            {state.busy === "extract"
+              ? "Extracting…"
+              : "Extract for confirmation"}
           </Button>
         </div>
       </form>

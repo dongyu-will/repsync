@@ -19,37 +19,37 @@ func planCodexUserMCP(directory string, change CodexResourceChange) (codexPlacem
 		return plan, err
 	}
 	if !before.Exists || before.Mode&0222 == 0 {
-		return plan, errors.New("Codex 用户配置不存在或为只读")
+		return plan, errors.New("Codex user configuration is missing or read-only")
 	}
 	var config map[string]any
 	if err := toml.Unmarshal([]byte(before.Content), &config); err != nil {
-		return plan, errors.New("Codex 用户配置无法解析，请先修复 TOML")
+		return plan, errors.New("cannot parse Codex user configuration; fix the TOML first")
 	}
 	servers, _ := config["mcp_servers"].(map[string]any)
 	server, _ := servers[change.Name].(map[string]any)
 	if server["command"] == nil && server["url"] == nil {
-		return plan, errors.New("Codex 用户配置中没有此 MCP 的连接定义")
+		return plan, errors.New("no connection definition for this MCP in Codex user configuration")
 	}
 	enabled := change.Action == "enable"
 	old, explicit := server["enabled"]
 	previous, valid := old.(bool)
 	if explicit && !valid {
-		return plan, errors.New("Codex 用户配置的 enabled 值需要是布尔值")
+		return plan, errors.New("enabled in Codex user configuration must be a boolean")
 	}
 	if (!explicit && enabled) || (explicit && previous == enabled) {
-		return plan, errors.New("用户默认值已是此设置")
+		return plan, errors.New("user defaults already match this setting")
 	}
 	next, err := setCodexMCPEnabled(before.Content, change.Name, enabled)
 	if err != nil {
 		return plan, err
 	}
 	if len(next) > 256*1024 {
-		return plan, errors.New("Codex 用户配置超过 256 KiB")
+		return plan, errors.New("Codex user configuration exceeds 256 KiB")
 	}
 	server["enabled"] = enabled
 	var actual map[string]any
 	if err := toml.Unmarshal([]byte(next), &actual); err != nil || !reflect.DeepEqual(config, actual) {
-		return plan, errors.New("无法单独修改此 MCP 的启停设置")
+		return plan, errors.New("cannot independently change this MCP's enabled setting")
 	}
 	after := before
 	after.Content = next
@@ -63,7 +63,7 @@ func planCodexUserMCP(directory string, change CodexResourceChange) (codexPlacem
 	if explicit {
 		plan.preview.Before = "enabled = " + strconv.FormatBool(previous)
 	} else {
-		plan.preview.Before = "默认启用"
+		plan.preview.Before = "Enabled by default"
 	}
 	return plan, nil
 }
@@ -112,7 +112,7 @@ func setCodexMCPEnabled(text, name string, enabled bool) (string, error) {
 		}
 	}
 	if err := parser.Error(); err != nil {
-		return "", errors.New("无法定位 Codex 用户配置中的 MCP")
+		return "", errors.New("cannot locate MCP in Codex user configuration")
 	}
 	if tableEnd >= 0 {
 		if offset := strings.IndexByte(text[tableEnd:], '\n'); offset >= 0 {
@@ -136,7 +136,7 @@ func setCodexMCPEnabled(text, name string, enabled bool) (string, error) {
 		}
 		return text[:firstTable] + prefix + "mcp_servers." + name + ".enabled = " + value + eol + text[firstTable:], nil
 	}
-	return "", errors.New("无法定位此 MCP 的启停设置")
+	return "", errors.New("cannot locate this MCP's enabled setting")
 }
 
 func codexTOMLKey(node *unstable.Node) []string {

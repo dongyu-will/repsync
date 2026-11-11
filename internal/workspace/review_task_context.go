@@ -18,16 +18,16 @@ type ReviewTaskContext struct {
 
 func validateReviewTaskContext(input ReviewTaskContext) error {
 	if strings.TrimSpace(input.Title) == "" || len(input.Title) > 500 || len(input.Owner) > 300 || len(input.Paths) > 128 || len(input.Areas) > 3 {
-		return errors.New("任务名称、负责人或范围超出限制")
+		return errors.New("task name, owner, or scope exceeds limits")
 	}
 	for _, area := range input.Areas {
 		if !slices.Contains([]string{"frontend", "backend", "database"}, area) {
-			return errors.New("任务范围无效")
+			return errors.New("invalid task scope")
 		}
 	}
 	for _, path := range input.Paths {
 		if !filepath.IsLocal(path) || len(path) > 1024 || strings.ContainsRune(path, 0) {
-			return errors.New("任务文件范围需为项目内相对路径")
+			return errors.New("task file scope must use project-relative paths")
 		}
 	}
 	coverage := []ReviewCoverage{}
@@ -59,7 +59,7 @@ func (s *Service) reviewTaskWarnings(path string, current []ReviewTask) []string
 	warnings := []string{}
 	projects, err := s.List()
 	if err != nil {
-		return []string{"无法核对其他项目的进行中任务"}
+		return []string{"Cannot review active tasks in other projects"}
 	}
 	type entry struct {
 		task    ReviewTask
@@ -72,7 +72,7 @@ func (s *Service) reviewTaskWarnings(path string, current []ReviewTask) []string
 		if p.Path != path {
 			tasks, err = s.reviewTaskHistory(p.Path)
 			if err != nil {
-				warnings = append(warnings, p.Name+" 的任务历史无法完整读取")
+				warnings = append(warnings, p.Name+" task history could not be fully read")
 				continue
 			}
 		}
@@ -80,13 +80,13 @@ func (s *Service) reviewTaskWarnings(path string, current []ReviewTask) []string
 			if task.EndedAt == "" {
 				active = append(active, entry{task: task, path: p.Path, current: p.Path == path})
 				if p.Path != path && pathsOverlap(path, p.Path) {
-					warnings = append(warnings, "目录已有进行中任务："+task.Title)
+					warnings = append(warnings, "Folder already has an active task: "+task.Title)
 				}
 			}
 		}
 	}
 	if len(active) > 128 {
-		return append(warnings, "进行中任务超过 128 项，未完成范围冲突核对")
+		return append(warnings, "More than 128 active tasks; scope conflict review incomplete")
 	}
 	seen := map[string]bool{}
 	comparisons := 0
@@ -97,18 +97,18 @@ func (s *Service) reviewTaskWarnings(path string, current []ReviewTask) []string
 			}
 			messages := []string{}
 			if slices.Contains(a.task.Areas, "database") && slices.Contains(b.task.Areas, "database") && a.task.Environment != "" && a.task.Environment == b.task.Environment && a.task.Target != "" && a.task.Target == b.task.Target {
-				messages = append(messages, "填写了相同数据库环境和目标，操作前需协调")
+				messages = append(messages, "Same database environment and target declared; coordinate before acting")
 			}
 			if pathsOverlap(a.path, b.path) {
 				if len(a.task.Paths) == 0 || len(b.task.Paths) == 0 {
-					messages = append(messages, "范围未完整声明，无法排除同时修改同一文件")
+					messages = append(messages, "Scope not fully declared; concurrent edits to the same file cannot be ruled out")
 				} else {
 					overlap := false
 					for _, ap := range a.task.Paths {
 						for _, bp := range b.task.Paths {
 							comparisons++
 							if comparisons > 10000 {
-								return append(warnings, "任务路径比较超过本次上限，未完成范围冲突核对")
+								return append(warnings, "Task path comparisons exceeded limits; scope conflict review incomplete")
 							}
 							if pathsOverlap(filepath.Join(a.path, ap), filepath.Join(b.path, bp)) {
 								overlap = true
@@ -120,12 +120,12 @@ func (s *Service) reviewTaskWarnings(path string, current []ReviewTask) []string
 						}
 					}
 					if overlap {
-						messages = append(messages, "声明的文件范围重叠，需协调修改")
+						messages = append(messages, "Declared file scopes overlap; coordinate edits")
 					}
 				}
 			}
 			if len(messages) > 0 {
-				text := a.task.Title + " / " + b.task.Title + "：" + strings.Join(messages, "；")
+				text := a.task.Title + " / " + b.task.Title + ": " + strings.Join(messages, "; ")
 				if !seen[text] {
 					warnings = append(warnings, text)
 					seen[text] = true

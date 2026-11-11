@@ -59,11 +59,11 @@ func (s *Service) StartPipeline(path, pipelineID, version string) (PipelineRun, 
 		return PipelineRun{}, err
 	}
 	if config.Version != version {
-		return PipelineRun{}, errors.New("流水线配置已改变，请刷新并核对命令后再运行")
+		return PipelineRun{}, errors.New("pipeline configuration changed; refresh and review commands before running")
 	}
 	index := slices.IndexFunc(config.Pipelines, func(p Pipeline) bool { return p.ID == pipelineID })
 	if index < 0 {
-		return PipelineRun{}, errors.New("未找到这条流水线，请刷新")
+		return PipelineRun{}, errors.New("pipeline not found; refresh")
 	}
 	commit, _ := git(path, "rev-parse", "HEAD")
 	fingerprint, fingerprintErr := reviewFingerprint(path)
@@ -77,7 +77,7 @@ func (s *Service) StartPipeline(path, pipelineID, version string) (PipelineRun, 
 	s.taskMu.Lock()
 	defer s.taskMu.Unlock()
 	if s.closing {
-		return PipelineRun{}, errors.New("应用正在退出")
+		return PipelineRun{}, errors.New("the app is shutting down")
 	}
 	if _, err := s.registeredProject(path); err != nil {
 		return PipelineRun{}, err
@@ -90,12 +90,12 @@ func (s *Service) StartPipeline(path, pipelineID, version string) (PipelineRun, 
 		if busy {
 			running++
 			if project == path {
-				return PipelineRun{}, errors.New("当前项目已有流水线运行中")
+				return PipelineRun{}, errors.New("a pipeline is already running for this project")
 			}
 		}
 	}
 	if running >= 4 {
-		return PipelineRun{}, errors.New("最多同时运行 4 个项目的流水线")
+		return PipelineRun{}, errors.New("pipelines can run for up to 4 projects concurrently")
 	}
 	pipeline := config.Pipelines[index]
 	run := PipelineRun{ID: fmt.Sprintf("%019d-%s", time.Now().UnixMilli(), rand.Text()), PipelineID: pipeline.ID, Name: pipeline.Name, Kind: pipeline.Kind, Status: "running", StartedAt: time.Now().UTC().Format(time.RFC3339Nano), Commit: strings.TrimSpace(commit), Worktree: worktree, ExitCode: -1}
@@ -133,16 +133,16 @@ func (s *Service) executePipeline(ctx context.Context, path string, pipeline Pip
 	if pipeline.Kind == "ci" {
 		report, err := checkPolicies(ctx, path, s.path)
 		if err != nil {
-			status, exitCode, detail = "failure", 1, "项目规则检查未完成："+err.Error()
+			status, exitCode, detail = "failure", 1, "Project rule checks incomplete: "+err.Error()
 		} else {
 			for _, finding := range report.Findings {
-				fmt.Fprintf(active.log, "[规则/%s/%s] %s:%d:%d %s\n", finding.Level, finding.Kind, finding.Path, finding.Line, finding.Column, finding.Message)
+				fmt.Fprintf(active.log, "[rules/%s/%s] %s:%d:%d %s\n", finding.Level, finding.Kind, finding.Path, finding.Line, finding.Column, finding.Message)
 			}
 			for _, problem := range report.Errors {
-				fmt.Fprintln(active.log, "[规则检查未完成] "+problem)
+				fmt.Fprintln(active.log, "[rule checks incomplete] "+problem)
 			}
 			if !report.Passed {
-				status, exitCode, detail = "failure", 1, "项目规则检查失败，未运行后续命令"
+				status, exitCode, detail = "failure", 1, "Project rule checks failed; subsequent commands were not run"
 			}
 		}
 		if status != "success" {
@@ -158,7 +158,7 @@ func (s *Service) executePipeline(ctx context.Context, path string, pipeline Pip
 		active.mu.Unlock()
 		_, err := fmt.Fprintf(active.log, "\n[%d/%d] %q\n", i+1, len(pipeline.Steps), args)
 		if err != nil {
-			status, exitCode, detail = "failure", -1, "写入日志失败: "+err.Error()
+			status, exitCode, detail = "failure", -1, "Failed to write log: "+err.Error()
 			break
 		}
 		cmd, err := projectCommand(ctx, path, pipeline.Cwd, pipeline.Env, args, true)
@@ -179,9 +179,9 @@ func (s *Service) executePipeline(ctx context.Context, path string, pipeline Pip
 	}
 	if ctx.Err() != nil {
 		status, exitCode = "cancelled", -1
-		detail = "已停止运行"
+		detail = "Run stopped"
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			status, detail = "timed_out", "流水线超过配置的运行时限"
+			status, detail = "timed_out", "Pipeline exceeded the configured timeout"
 		}
 	}
 	endFingerprint, fingerprintErr := reviewFingerprint(path)
@@ -192,12 +192,12 @@ func (s *Service) executePipeline(ctx context.Context, path string, pipeline Pip
 		active.run.FingerprintError = fingerprintErr.Error()
 	}
 	if err := active.log.Close(); err != nil {
-		status, detail = "failure", "保存日志失败: "+err.Error()
+		status, detail = "failure", "Failed to save logs: "+err.Error()
 	}
 	active.run.Status, active.run.ExitCode, active.run.Error = status, exitCode, detail
 	active.run.EndedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := saveJSON(filepath.Join(s.pipelineDirectory(path), active.run.ID+".json"), active.run); err != nil {
-		active.run.Error += " 保存运行记录失败: " + err.Error()
+		active.run.Error += " Failed to save run record: " + err.Error()
 	}
 }
 
@@ -249,12 +249,12 @@ func (s *Service) StopPipeline(path, id string) error {
 	active := s.activePipelines[path]
 	s.taskMu.Unlock()
 	if active == nil {
-		return errors.New("这条流水线已不在运行")
+		return errors.New("this pipeline is no longer running")
 	}
 	active.mu.Lock()
 	defer active.mu.Unlock()
 	if active.run.ID != id || active.run.Status != "running" {
-		return errors.New("这条流水线已不在运行")
+		return errors.New("this pipeline is no longer running")
 	}
 	active.cancel()
 	return nil
@@ -307,7 +307,7 @@ func (s *Service) PipelineRuns(path string) ([]PipelineRun, error) {
 		}
 		var run PipelineRun
 		if err := readPipelineJSON(filepath.Join(s.pipelineDirectory(path), entry.Name()), &run); err != nil {
-			return nil, fmt.Errorf("读取运行记录: %w", err)
+			return nil, fmt.Errorf("read run history: %w", err)
 		}
 		if active != nil {
 			active.mu.Lock()
@@ -317,7 +317,7 @@ func (s *Service) PipelineRuns(path string) ([]PipelineRun, error) {
 			active.mu.Unlock()
 		}
 		if run.Status == "running" && (active == nil || active.run.ID != run.ID) {
-			run.Status, run.Error = "interrupted", "上次应用退出前运行未完成，结果未知"
+			run.Status, run.Error = "interrupted", "Run did not finish before the previous app exit; result unknown"
 		}
 		runs = append(runs, run)
 	}
@@ -331,7 +331,7 @@ func (s *Service) PipelineLog(path, id string) (PipelineOutput, error) {
 		return PipelineOutput{}, err
 	}
 	if !pipelineRunID.MatchString(id) {
-		return PipelineOutput{}, errors.New("运行记录编号无效")
+		return PipelineOutput{}, errors.New("invalid run record ID")
 	}
 	s.taskMu.Lock()
 	active := s.activePipelines[path]
@@ -351,7 +351,7 @@ func (s *Service) PipelineLog(path, id string) (PipelineOutput, error) {
 		return PipelineOutput{}, err
 	}
 	if run.Status == "running" {
-		run.Status, run.Error = "interrupted", "上次应用退出前运行未完成，结果未知"
+		run.Status, run.Error = "interrupted", "Run did not finish before the previous app exit; result unknown"
 	}
 	f, err := os.Open(filepath.Join(dir, id+".log"))
 	if err != nil {
@@ -365,7 +365,7 @@ func (s *Service) PipelineLog(path, id string) (PipelineOutput, error) {
 
 func runGitHubCLI(path string, args ...string) ([]byte, error) {
 	if _, err := exec.LookPath("gh"); err != nil {
-		return nil, errors.New("未找到 GitHub CLI，请安装 gh 并运行 gh auth login；本地 CI/CD 不受影响")
+		return nil, errors.New("GitHub CLI not found; install gh and run gh auth login; local CI/CD remains available")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -376,12 +376,12 @@ func runGitHubCLI(path string, args ...string) ([]byte, error) {
 	configureCommandProcess(cmd, false)
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {
-			return nil, errors.New("读取 GitHub Actions 超时，请稍后刷新")
+			return nil, errors.New("GitHub Actions request timed out; refresh later")
 		}
-		return nil, fmt.Errorf("读取 GitHub Actions 失败，请检查 gh 登录与仓库权限: %s", strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("failed to read GitHub Actions; check gh authentication and repository permissions: %s", strings.TrimSpace(stderr.String()))
 	}
 	if stdout.overflow {
-		return nil, errors.New("GitHub Actions 响应过大")
+		return nil, errors.New("GitHub Actions response exceeds limits")
 	}
 	return stdout.Bytes(), nil
 }

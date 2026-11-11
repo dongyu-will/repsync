@@ -43,16 +43,16 @@ func updateTarget(record updateRecord) string {
 
 func validateUpdatePath(root *os.Root, target string) error {
 	if !filepath.IsLocal(target) || target == "." || filepath.Clean(target) != target {
-		return errors.New("目标必须是项目内的相对文件路径")
+		return errors.New("destination must be a project-relative file path")
 	}
 	parent := filepath.Dir(target)
 	for parent != "." {
 		info, err := root.Lstat(parent)
 		if err != nil {
-			return fmt.Errorf("目标父目录不可用，请先创建或修复 %s: %w", parent, err)
+			return fmt.Errorf("destination parent folder unavailable; create or repair %s first: %w", parent, err)
 		}
 		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return errors.New("目标父目录不能是符号链接或普通文件")
+			return errors.New("destination parent must not be a symbolic link or regular file")
 		}
 		parent = filepath.Dir(parent)
 	}
@@ -61,15 +61,15 @@ func validateUpdatePath(root *os.Root, target string) error {
 
 func resourceTarget(target string) error {
 	if !filepath.IsLocal(target) || filepath.Clean(target) != target || target == "." {
-		return errors.New("资源目标必须是项目内的相对文件路径")
+		return errors.New("resource destination must be a project-relative file path")
 	}
 	for _, part := range strings.Split(filepath.ToSlash(target), "/") {
 		if strings.EqualFold(part, ".git") {
-			return errors.New("资源不能写入 .git")
+			return errors.New("resources cannot write to .git")
 		}
 	}
 	if strings.EqualFold(target, "AGENTS.md") || strings.EqualFold(target, ".repsync.json") {
-		return errors.New("AGENTS.md 使用区块同步，.repsync.json 由项目配置维护")
+		return errors.New("AGENTS.md uses block sync; .repsync.json is managed by project configuration")
 	}
 	return nil
 }
@@ -84,18 +84,18 @@ func (s *Service) resourceCatalog() ([]SharedResource, error) {
 		return nil, err
 	}
 	if len(data) > 256*1024 {
-		return nil, errors.New("共享资源登记超过 256 KiB")
+		return nil, errors.New("shared resource registration exceeds 256 KiB")
 	}
 	if err := json.Unmarshal(data, &items); err != nil {
 		return nil, err
 	}
 	if len(items) > 64 {
-		return nil, errors.New("共享资源登记超过 64 项")
+		return nil, errors.New("shared resource registration exceeds 64 entries")
 	}
 	seen := map[string]bool{}
 	for _, item := range items {
 		if item.ID == "" || seen[item.ID] || !filepath.IsAbs(item.Path) {
-			return nil, errors.New("共享资源登记无效或 id 重复")
+			return nil, errors.New("invalid shared resource registration or duplicate id")
 		}
 		if err := resourceTarget(item.Target); err != nil {
 			return nil, err
@@ -120,13 +120,13 @@ func (s *Service) ConnectResource(id, path, target string) (SharedResource, erro
 
 func (s *Service) connectResource(id, path, target string) (SharedResource, error) {
 	if id == "" || len(id) > 80 || strings.ContainsAny(id, "/\\\x00") {
-		return SharedResource{}, errors.New("资源需要有效 id")
+		return SharedResource{}, errors.New("resource requires a valid id")
 	}
 	if err := resourceTarget(target); err != nil {
 		return SharedResource{}, err
 	}
 	if !filepath.IsAbs(path) {
-		return SharedResource{}, errors.New("资源来源需要绝对路径")
+		return SharedResource{}, errors.New("resource source requires an absolute path")
 	}
 	canonical, err := filepath.EvalSymlinks(path)
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *Service) connectResource(id, path, target string) (SharedResource, erro
 		items[index] = item
 	}
 	if len(items) > 64 {
-		return SharedResource{}, errors.New("最多登记 64 个共享文件资源")
+		return SharedResource{}, errors.New("up to 64 shared file resources can be registered")
 	}
 	if err := saveJSON(filepath.Join(s.syncDir(), "resources.json"), items); err != nil {
 		return SharedResource{}, err
@@ -169,14 +169,14 @@ func readResourceSource(item SharedResource) (ResourceSource, error) {
 		return ResourceSource{}, err
 	}
 	if !info.Mode().IsRegular() {
-		return ResourceSource{}, errors.New("共享资源来源必须是普通文本文件")
+		return ResourceSource{}, errors.New("shared resource source must be a regular text file")
 	}
 	content, err := readText(item.Path)
 	if err != nil {
 		return ResourceSource{}, err
 	}
 	if !utf8.ValidString(content) {
-		return ResourceSource{}, errors.New("共享资源必须是 UTF-8 文本")
+		return ResourceSource{}, errors.New("shared resources must be UTF-8 text")
 	}
 	return ResourceSource{SharedResource: item, Version: digest(content), Content: content, Mode: uint32(info.Mode().Perm())}, nil
 }
@@ -194,16 +194,16 @@ func projectResourceIDs(path string) ([]string, error) {
 	ids := []string{}
 	if data := file.fields["resources"]; len(data) > 0 {
 		if err := json.Unmarshal(data, &ids); err != nil {
-			return nil, errors.New("resources 需要是资源 id 数组")
+			return nil, errors.New("resources must be an array of resource ids")
 		}
 	}
 	if len(ids) > 64 {
-		return nil, errors.New("每项目最多采用 64 个共享资源")
+		return nil, errors.New("each project can adopt up to 64 shared resources")
 	}
 	seen := map[string]bool{}
 	for _, id := range ids {
 		if id == "" || seen[id] {
-			return nil, errors.New("resources 包含空或重复 id")
+			return nil, errors.New("resources contains empty or duplicate ids")
 		}
 		seen[id] = true
 	}
@@ -216,7 +216,7 @@ func (s *Service) projectResource(path, id string) (ResourceSource, error) {
 		return ResourceSource{}, err
 	}
 	if !slices.Contains(ids, id) {
-		return ResourceSource{}, errors.New("项目尚未采用此资源，请由 AI 在 .repsync.json 的 resources 中登记 id")
+		return ResourceSource{}, errors.New("project has not adopted this resource; ask AI to register its id in .repsync.json resources")
 	}
 	items, err := s.resourceCatalog()
 	if err != nil {
@@ -224,7 +224,7 @@ func (s *Service) projectResource(path, id string) (ResourceSource, error) {
 	}
 	index := slices.IndexFunc(items, func(item SharedResource) bool { return item.ID == id })
 	if index < 0 {
-		return ResourceSource{}, fmt.Errorf("未登记共享资源 %s", id)
+		return ResourceSource{}, fmt.Errorf("shared resource %s is not registered", id)
 	}
 	return readResourceSource(items[index])
 }
@@ -242,7 +242,7 @@ func (s *Service) resourceAdoption(path, id string) (ResourceAdoption, ResourceS
 		return item, source, target, err
 	}
 	if source.Path == filepath.Join(path, source.Target) {
-		return item, source, target, errors.New("资源来源与项目目标不能是同一个文件")
+		return item, source, target, errors.New("resource source and project destination cannot be the same file")
 	}
 	if !target.Exists {
 		item.Status = "missing"
@@ -289,10 +289,10 @@ func (s *Service) validateResourceAdoption(path string) error {
 	for _, id := range ids {
 		index := slices.IndexFunc(items, func(item SharedResource) bool { return item.ID == id })
 		if index < 0 {
-			return fmt.Errorf("未登记共享资源 %s", id)
+			return fmt.Errorf("shared resource %s is not registered", id)
 		}
 		if targets[items[index].Target] {
-			return errors.New("多个资源不能写入同一目标")
+			return errors.New("multiple resources cannot write to the same destination")
 		}
 		targets[items[index].Target] = true
 	}
@@ -321,7 +321,7 @@ func (s *Service) resourceStatus(path string) ([]ResourceAdoption, error) {
 			item.Status, item.Error = "error", err.Error()
 		}
 		if item.Target != "" && targets[item.Target] {
-			item.Status, item.Error = "error", "多个资源不能写入同一目标"
+			item.Status, item.Error = "error", "multiple resources cannot write to the same destination"
 		}
 		targets[item.Target] = true
 		result = append(result, item)
@@ -360,7 +360,7 @@ func (s *Service) PreviewResource(path, id string) (UpdatePreview, error) {
 		}
 	}
 	if len(s.previews) >= 32 {
-		return UpdatePreview{}, errors.New("待处理预览过多，请稍后重试")
+		return UpdatePreview{}, errors.New("too many pending previews; try again later")
 	}
 	if s.previews == nil {
 		s.previews = map[string]pendingUpdate{}
@@ -385,7 +385,7 @@ func (s *Service) removeResource(id string) error {
 	}
 	index := slices.IndexFunc(items, func(item SharedResource) bool { return item.ID == id })
 	if index < 0 {
-		return errors.New("未登记此资源")
+		return errors.New("resource not registered")
 	}
 	items = slices.Delete(items, index, index+1)
 	if err := saveJSON(filepath.Join(s.syncDir(), "resources.json"), items); err != nil {

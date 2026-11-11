@@ -49,10 +49,10 @@ func readGitStashes(path string) (GitStashList, error) {
 	list := GitStashList{Entries: []GitStash{}}
 	raw, err := git(path, "stash", "list", "--format=%H%x00%gd%x00%cI%x00%gs")
 	if err != nil {
-		return list, fmt.Errorf("读取 stash: %w", err)
+		return list, fmt.Errorf("read stash: %w", err)
 	}
-	if strings.Contains(raw, "[输出超过 1 MiB") {
-		return list, errors.New("stash 列表超过读取上限，无法确认完整状态")
+	if strings.Contains(raw, "[output exceeds 1 MiB") {
+		return list, errors.New("stash list exceeds read limits; full state cannot be verified")
 	}
 	for _, line := range strings.Split(strings.TrimSuffix(raw, "\n"), "\n") {
 		if line == "" {
@@ -60,14 +60,14 @@ func readGitStashes(path string) (GitStashList, error) {
 		}
 		fields := strings.SplitN(line, "\x00", 4)
 		if len(fields) != 4 {
-			return list, errors.New("无法完整解析 stash 列表")
+			return list, errors.New("could not fully parse the stash list")
 		}
 		list.Entries = append(list.Entries, GitStash{OID: fields[0], Selector: fields[1], CreatedAt: fields[2], Subject: fields[3]})
 	}
 	// An unborn repository can have no HEAD and no stash; listing it is still useful.
 	head, err := git(path, "rev-parse", "--verify", "HEAD")
 	if err != nil && len(list.Entries) > 0 {
-		return list, fmt.Errorf("读取恢复目标提交: %w", err)
+		return list, fmt.Errorf("read restore target commit: %w", err)
 	}
 	list.Head = strings.TrimSpace(head)
 	branch, _ := git(path, "symbolic-ref", "--short", "HEAD")
@@ -93,13 +93,13 @@ func (s *Service) GitStashChanges(path, oid string) (GitStashPreview, error) {
 	}
 	index := slices.IndexFunc(list.Entries, func(item GitStash) bool { return item.OID == oid })
 	if index < 0 {
-		return preview, errors.New("stash 已变化或不存在，请刷新列表")
+		return preview, errors.New("stash changed or no longer exists; refresh the list")
 	}
 	preview.Stash, preview.Version, preview.Branch = list.Entries[index], list.Version, list.Branch
 	preview.Patch, err = git(path, "-c", "core.hooksPath=/dev/null", "stash", "show", "--no-ext-diff", "--no-textconv", "--include-untracked", "--stat", "--patch", oid)
-	preview.Truncated = strings.Contains(preview.Patch, "[输出超过 1 MiB")
+	preview.Truncated = strings.Contains(preview.Patch, "[output exceeds 1 MiB")
 	if preview.Patch == "" && err == nil {
-		preview.Patch = "此 stash 没有可显示的文件改动。"
+		preview.Patch = "This stash has no displayable file changes."
 	}
 	return preview, err
 }
@@ -117,14 +117,14 @@ func (s *Service) ApplyGitStash(path, oid, version string) (GitStashApplyResult,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closing {
-		return result, errors.New("应用正在退出")
+		return result, errors.New("the app is shutting down")
 	}
 	projects, err := s.load()
 	if err != nil {
 		return result, err
 	}
 	if !slices.ContainsFunc(projects, func(p Project) bool { return p.Path == path }) {
-		return result, errors.New("请先登记项目目录")
+		return result, errors.New("register the project folder first")
 	}
 	top, err := git(path, "rev-parse", "--show-toplevel")
 	if err != nil {
@@ -132,14 +132,14 @@ func (s *Service) ApplyGitStash(path, oid, version string) (GitStashApplyResult,
 	}
 	root, err := filepath.EvalSymlinks(strings.TrimSpace(top))
 	if err != nil || root != path {
-		return result, errors.New("恢复 stash 会影响整个工作树，请先登记并打开该工作树的根目录")
+		return result, errors.New("applying a stash affects the entire worktree; register and open its root first")
 	}
 	for _, active := range s.activeLocalServices[path] {
 		active.mu.Lock()
 		running := localServiceRunning(active.state.Status)
 		active.mu.Unlock()
 		if running {
-			return result, errors.New("请先停止本项目的本地服务再恢复 stash")
+			return result, errors.New("stop this project's local services before applying a stash")
 		}
 	}
 	if active := s.activePipelines[path]; active != nil {
@@ -147,21 +147,21 @@ func (s *Service) ApplyGitStash(path, oid, version string) (GitStashApplyResult,
 		running := active.run.Status == "running"
 		active.mu.Unlock()
 		if running {
-			return result, errors.New("请先等待或停止本项目的流水线")
+			return result, errors.New("wait for or stop this project's pipeline first")
 		}
 	}
 	if s.activePolicyChecks[path] != nil {
-		return result, errors.New("请等待项目规则检查结束")
+		return result, errors.New("wait for project rule checks to finish")
 	}
 	list, err := readGitStashes(path)
 	if err != nil {
 		return result, err
 	}
 	if list.Version != version || !slices.ContainsFunc(list.Entries, func(item GitStash) bool { return item.OID == oid }) {
-		return result, errors.New("stash 列表、目标分支或提交已变化，请重新查看内容")
+		return result, errors.New("stash list, target branch, or commit changed; review the contents again")
 	}
 	if list.Branch == "" {
-		return result, errors.New("当前为分离 HEAD，请先在 Git 中切换到目标分支")
+		return result, errors.New("HEAD is detached; switch to the target branch in Git first")
 	}
 	if err := gitOperationIdle(path); err != nil {
 		return result, err
@@ -171,14 +171,14 @@ func (s *Service) ApplyGitStash(path, oid, version string) (GitStashApplyResult,
 		return result, err
 	}
 	if status != "" {
-		return result, errors.New("当前工作树有修改或未跟踪文件，请先保存并处理，stash 已保留")
+		return result, errors.New("the worktree has modified or untracked files; resolve them first; stash preserved")
 	}
 	_, err = git(path, "-c", "core.hooksPath=/dev/null", "stash", "apply", "--index", oid)
 	if err != nil {
-		result.Message = "恢复未完成，可能已有部分改动或冲突。原 stash 已保留，请检查当前工作树后继续处理。"
+		result.Message = "Apply incomplete; partial changes or conflicts may remain. Original stash preserved. Review the worktree before continuing."
 		return result, nil
 	}
 	result.Applied = true
-	result.Message = "已恢复到当前工作树并保留原 stash，请检查文件、暂存区和未跟踪内容。"
+	result.Message = "Applied to this worktree; original stash preserved. Review files, index, and untracked content."
 	return result, nil
 }

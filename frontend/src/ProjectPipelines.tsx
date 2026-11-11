@@ -18,23 +18,23 @@ const native = isMyGo();
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 const labels: Record<string, string> = {
-  running: "运行中",
-  in_progress: "运行中",
-  queued: "排队中",
-  waiting: "等待中",
-  pending: "等待中",
-  requested: "等待中",
-  success: "通过",
-  failure: "失败",
-  cancelled: "已停止",
-  timed_out: "超时",
-  interrupted: "已中断",
-  skipped: "已跳过",
-  neutral: "无结论",
-  action_required: "需要处理",
-  stale: "已过期",
-  startup_failure: "启动失败",
-  unknown: "待核对",
+  running: "Running",
+  in_progress: "Running",
+  queued: "Queued",
+  waiting: "Waiting",
+  pending: "Waiting",
+  requested: "Waiting",
+  success: "Passed",
+  failure: "Failed",
+  cancelled: "Stopped",
+  timed_out: "Timed out",
+  interrupted: "Interrupted",
+  skipped: "Skipped",
+  neutral: "No conclusion",
+  action_required: "Needs attention",
+  stale: "Stale",
+  startup_failure: "Failed to start",
+  unknown: "Needs review",
 };
 function Status({ status }: { status: string }) {
   const color =
@@ -45,12 +45,12 @@ function Status({ status }: { status: string }) {
         : "text-muted";
   return (
     <span className={`shrink-0 text-xs font-medium ${color}`}>
-      {labels[status] || status || "结果未知"}
+      {labels[status] || status || "Result unknown"}
     </span>
   );
 }
 function timestamp(value: string) {
-  return new Date(value).toLocaleString("zh-CN", {
+  return new Date(value).toLocaleString("en-US", {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -65,10 +65,10 @@ export default function ProjectPipelines({ path }: { path: string }) {
     <div
       className="flex gap-1 rounded-lg bg-sidebar p-1"
       role="group"
-      aria-label="流水线运行位置"
+      aria-label="Pipeline location"
     >
       {[
-        ["local", "本地"],
+        ["local", "Local"],
         ["github", "GitHub Actions"],
       ].map(([id, name]) => (
         <button
@@ -174,7 +174,7 @@ function LocalPipelines({
               log: data.logs[selected] || "",
             };
         if (!active) return;
-        if (!value.run) throw new Error("未找到这次运行的记录，请重新选择。");
+        if (!value.run) throw new Error("Run not found. Select another run.");
         setOutput({ run: value.run, log: value.log });
         setLogError("");
         if (native && value.run.status === "running") {
@@ -252,7 +252,7 @@ function LocalPipelines({
           {native && (
             <button
               className="icon-button"
-              aria-label="刷新本地流水线"
+              aria-label="Refresh pipelines"
               onClick={() => setRevision((value) => value + 1)}
             >
               <Icon name="refresh" size={16} />
@@ -267,20 +267,21 @@ function LocalPipelines({
       )}
       {configError && (
         <p role="alert" className="break-words text-sm text-removed">
-          配置读取失败：{configError}
-          。可通过「配置流水线」修正，页面会自动重试。
+          Could not load configuration: {configError}
+          .Fix this in Configure pipelines. This page retries automatically.
         </p>
       )}
       {runsError && (
         <p role="alert" className="break-words text-sm text-removed">
-          运行状态读取失败：{runsError}
-          。下方记录保留上次读取的内容，当前步骤待核对；页面会自动重试。
+          Could not load run status: {runsError}
+          .Showing the last loaded records. Current steps need verification;
+          this page retries automatically.
         </p>
       )}
       {!config ? (
         !configError && (
           <p role="status" className="text-sm text-muted">
-            正在读取流水线…
+            Loading pipelines…
           </p>
         )
       ) : config.pipelines.length ? (
@@ -307,14 +308,14 @@ function LocalPipelines({
                       disabled={
                         !native || pending || !!running || configInvalid
                       }
-                      aria-label={`运行${pipeline.name}`}
+                      aria-label={`Run ${pipeline.name}`}
                       onClick={() => void run(pipeline)}
                     >
                       {running?.pipelineId === pipeline.id
                         ? runsKnown
-                          ? "运行中…"
-                          : "运行待核对"
-                        : "运行"}
+                          ? "Running…"
+                          : "Run needs review"
+                        : "Run"}
                     </Button>
                   </div>
                   <PipelineFlow
@@ -337,16 +338,17 @@ function LocalPipelines({
           </div>
         </>
       ) : (
-        <Empty icon="file" title="还没有本地流水线">
-          让 AI 接入项目已有的检查或发布命令，或通过「配置流水线」手动添加。
+        <Empty icon="file" title="No local pipelines yet">
+          Ask AI to connect existing check or release commands, or add them in
+          Configure pipelines.
         </Empty>
       )}
-      <section aria-label="本地运行记录">
+      <section aria-label="Local run history">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">最近运行</h3>
+          <h3 className="text-sm font-semibold">Recent runs</h3>
           {running && (
             <Button disabled={!native || pending} onClick={() => void stop()}>
-              停止运行
+              Stop run
             </Button>
           )}
         </div>
@@ -370,20 +372,20 @@ function LocalPipelines({
                   </strong>
                   <span className="mt-1 block text-xs text-muted">
                     {timestamp(run.startedAt)} ·{" "}
-                    {run.commit ? run.commit.slice(0, 7) : "无 Git 提交"}
+                    {run.commit ? run.commit.slice(0, 7) : "No Git commit"}
                     {run.worktree === "dirty"
-                      ? "（含本地改动）"
+                      ? "(includes local edits)"
                       : run.commit && run.worktree !== "clean"
-                        ? "（工作区状态未知）"
+                        ? "(workspace status unknown)"
                         : ""}{" "}
                     ·{" "}
                     {run.status === "running"
                       ? run.step > 0
-                        ? `步骤 ${run.step}`
-                        : "准备中"
+                        ? `Step ${run.step}`
+                        : "Preparing"
                       : run.exitCode >= 0
-                        ? `退出码 ${run.exitCode}`
-                        : "无退出码"}
+                        ? `Exit code ${run.exitCode}`
+                        : "No exit code"}
                   </span>
                 </span>
                 <Status
@@ -404,17 +406,17 @@ function LocalPipelines({
         ) : (
           <p className="text-sm text-muted">
             {runsKnown
-              ? "尚未从 repsync 运行过此项目的流水线。"
+              ? "Not run from repsync  to run this project's pipelines yet."
               : runsError
-                ? "运行记录尚未读取，无法确认是否已有执行。"
-                : "正在读取运行记录…"}
+                ? "Run history is unavailable. Existing runs cannot be confirmed."
+                : "Loading run history…"}
           </p>
         )}
       </section>
       {selected && (
-        <section ref={logSection} tabIndex={-1} aria-label="流水线日志">
+        <section ref={logSection} tabIndex={-1} aria-label="Pipeline logs">
           <h3 className="mb-3 text-sm font-semibold">
-            运行日志 ·{" "}
+            Run logs ·{" "}
             {runs.find((run) => run.id === selected)?.name || selected}
           </h3>
           {logError ? (
@@ -429,7 +431,7 @@ function LocalPipelines({
                   setLogRevision((value) => value + 1);
                 }}
               >
-                重新读取日志
+                Reload logs
               </Button>
             </div>
           ) : output && output.run.id === selected ? (
@@ -442,14 +444,14 @@ function LocalPipelines({
               <pre
                 className="source-panel max-h-64"
                 tabIndex={0}
-                aria-label="运行日志内容"
+                aria-label="Run log content"
               >
-                {output.log || "暂无输出"}
+                {output.log || "No output yet"}
               </pre>
             </>
           ) : (
             <p role="status" className="text-sm text-muted">
-              正在读取日志…
+              Loading logs…
             </p>
           )}
         </section>
@@ -496,16 +498,16 @@ function RemotePipelines({
             }}
             disabled={!result}
           >
-            刷新
+            Refresh
           </Button>
         )}
       </div>
       <p className="text-sm text-muted">
-        {result?.data?.repository || "尚未连接远程仓库。"}
+        {result?.data?.repository || "No remote repository connected."}
       </p>
       {!result ? (
         <p role="status" className="text-sm text-muted">
-          正在读取 GitHub Actions…
+          Loading GitHub Actions…
         </p>
       ) : result.error ? (
         <p role="alert" className="break-words text-sm text-removed">
@@ -538,9 +540,9 @@ function RemotePipelines({
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex min-h-9 items-center gap-1 text-sm text-accent"
-                  aria-label={`查看 ${run.workflowName || "Workflow"} 的日志`}
+                  aria-label={`View ${run.workflowName || "Workflow"}  logs`}
                 >
-                  日志
+                  Logs
                   <Icon name="arrow" size={14} />
                 </a>
               )}
@@ -548,12 +550,13 @@ function RemotePipelines({
           ))}
         </div>
       ) : (
-        <Empty icon="branch" title="没有远程运行记录">
-          此仓库尚无可读取的 GitHub Actions 记录。
+        <Empty icon="branch" title="No remote runs">
+          No readable runs for this repository on GitHub Actions records.
         </Empty>
       )}
       <p className="text-xs leading-5 text-muted">
-        远程状态与本地结果分别记录。日志和远程操作在 GitHub 中完成。
+        Remote status and local results are tracked separately. Open logs and
+        manage remote runs on GitHub .
       </p>
     </div>
   );

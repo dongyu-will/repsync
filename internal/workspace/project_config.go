@@ -41,14 +41,14 @@ func loadProjectConfigFile(root *os.Root) (projectConfigFile, error) {
 		return file, err
 	}
 	if !info.Mode().IsRegular() {
-		return file, errors.New(".repsync.json 必须是普通文件，不能是符号链接")
+		return file, errors.New(".repsync.json must be a regular file, not a symbolic link")
 	}
 	data, err := readProjectConfig(root, ".repsync.json")
 	if err != nil {
 		return file, err
 	}
 	if err := json.Unmarshal(data, &file.fields); err != nil || file.fields == nil {
-		return file, errors.New(".repsync.json 需要是有效的 JSON 对象")
+		return file, errors.New(".repsync.json must be a valid JSON object")
 	}
 	file.mode = info.Mode().Perm()
 	file.version = fmt.Sprintf("%x", sha256.Sum256(append([]byte(fmt.Sprint(file.mode)+":"), data...)))
@@ -79,22 +79,22 @@ func (s *Service) ProjectConfiguration(path string) (ProjectConfig, error) {
 	if config.ServicesAutomatic {
 		services, err := s.localServiceConfig(path)
 		if err != nil {
-			config.Warnings = append(config.Warnings, "服务自动识别失败："+err.Error())
+			config.Warnings = append(config.Warnings, "Service detection failed: "+err.Error())
 		} else {
 			config.Services = services.services
 		}
 	} else if err := json.Unmarshal(file.fields["services"], &config.Services); err != nil {
-		return ProjectConfig{}, fmt.Errorf("services 格式无效: %w", err)
+		return ProjectConfig{}, fmt.Errorf("invalid services format: %w", err)
 	}
 	if config.PipelinesAutomatic {
 		pipelines, err := s.Pipelines(path)
 		if err != nil {
-			config.Warnings = append(config.Warnings, "流水线自动识别失败："+err.Error())
+			config.Warnings = append(config.Warnings, "Pipeline detection failed: "+err.Error())
 		} else {
 			config.Pipelines = pipelines.Pipelines
 		}
 	} else if err := json.Unmarshal(file.fields["pipelines"], &config.Pipelines); err != nil {
-		return ProjectConfig{}, fmt.Errorf("pipelines 格式无效: %w", err)
+		return ProjectConfig{}, fmt.Errorf("invalid pipelines format: %w", err)
 	}
 	for i := range config.Pipelines {
 		if config.Pipelines[i].TimeoutSeconds == 0 {
@@ -156,7 +156,7 @@ func (s *Service) saveProjectSection(path, version, section string, automatic bo
 		return err
 	}
 	if file.version != version {
-		return errors.New("配置已被其他操作修改，请重新载入后再保存")
+		return errors.New("configuration changed externally; reload before saving")
 	}
 	if automatic {
 		delete(file.fields, section)
@@ -213,7 +213,7 @@ func (s *Service) saveProjectSection(path, version, section string, automatic bo
 	}
 	data = append(data, '\n')
 	if len(data) > 256*1024 {
-		return errors.New("配置超过 256 KiB")
+		return errors.New("configuration exceeds 256 KiB")
 	}
 	name := ".repsync-config-" + rand.Text()
 	temp, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
@@ -239,7 +239,7 @@ func (s *Service) saveProjectSection(path, version, section string, automatic bo
 		return err
 	}
 	if current.version != version {
-		return errors.New("配置在保存期间发生变化，请重新载入")
+		return errors.New("configuration changed while saving; reload")
 	}
 	return root.Rename(name, ".repsync.json")
 }
@@ -248,15 +248,15 @@ var environmentName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func validateCommandOptions(cwd string, env map[string]string) error {
 	if strings.ContainsRune(cwd, 0) || filepath.IsAbs(cwd) || !filepath.IsLocal(filepath.Clean(cwd)) {
-		return errors.New("工作目录需要是项目内的相对目录，留空使用项目根目录")
+		return errors.New("working directory must be project-relative; leave blank for the project root")
 	}
 	for name, value := range env {
 		if !environmentName.MatchString(name) || strings.ContainsRune(value, 0) {
-			return errors.New("环境变量需要有效名称，值不能包含空字符")
+			return errors.New("environment variables require valid names; values cannot contain null characters")
 		}
 		switch name {
 		case "PWD", "CI", "NO_COLOR", "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES":
-			return fmt.Errorf("环境变量 %s 由运行器管理", name)
+			return fmt.Errorf("environment variable %s is managed by the runner", name)
 		}
 	}
 	return nil
@@ -272,18 +272,18 @@ func commandDirectory(path, cwd string) (string, error) {
 	}
 	directory, err := filepath.EvalSymlinks(filepath.Join(base, cwd))
 	if err != nil {
-		return "", fmt.Errorf("工作目录不可访问: %w", err)
+		return "", fmt.Errorf("working directory inaccessible: %w", err)
 	}
 	relative, err := filepath.Rel(base, directory)
 	if err != nil || !filepath.IsLocal(relative) {
-		return "", errors.New("工作目录不能指向项目目录之外")
+		return "", errors.New("working directory cannot point outside the project")
 	}
 	info, err := os.Stat(directory)
 	if err != nil {
 		return "", err
 	}
 	if !info.IsDir() {
-		return "", errors.New("工作目录必须是目录")
+		return "", errors.New("working directory must be a folder")
 	}
 	return directory, nil
 }
@@ -332,7 +332,7 @@ func projectCommand(ctx context.Context, path, cwd string, env map[string]string
 			}
 		}
 		if binary == "" {
-			return nil, fmt.Errorf("找不到可执行文件 %s，请检查 PATH 或填写绝对路径", args[0])
+			return nil, fmt.Errorf("executable %s not found; check PATH or use an absolute path", args[0])
 		}
 	}
 	if strings.ContainsRune(binary, os.PathSeparator) {
@@ -341,10 +341,10 @@ func projectCommand(ctx context.Context, path, cwd string, env map[string]string
 		}
 		info, err := os.Stat(binary)
 		if err != nil {
-			return nil, fmt.Errorf("可执行文件不可访问: %w", err)
+			return nil, fmt.Errorf("executable inaccessible: %w", err)
 		}
 		if !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
-			return nil, fmt.Errorf("%s 不是可执行文件", binary)
+			return nil, fmt.Errorf("%s is not executable", binary)
 		}
 	}
 	cmd := exec.CommandContext(ctx, binary, args[1:]...)

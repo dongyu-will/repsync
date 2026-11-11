@@ -15,37 +15,37 @@ import ProjectDocumentReview from "./ProjectDocumentReview";
 
 const native = isMyGo();
 const sections = [
-  ["changes", "改动"],
-  ["checks", "检查"],
-  ["delivery", "交付"],
-  ["resources", "数据与环境"],
-  ["handover", "交接"],
-  ["settings", "适用项"],
+  ["changes", "Changes"],
+  ["checks", "Check"],
+  ["delivery", "Delivery"],
+  ["resources", "Data and environment"],
+  ["handover", "Handoff"],
+  ["settings", "Applicability"],
 ] as const;
 type Section = (typeof sections)[number][0];
 const status: Record<string, string> = {
-  pending: "待核验",
-  passed: "命令通过",
-  unknown: "未知",
-  observed: "已读取本地状态",
-  recorded: "已记录核验",
-  success: "通过",
-  failure: "未通过",
-  failed: "未通过",
-  stale: "已变化",
-  current: "内容一致",
-  not_applicable: "不适用",
-  exists: "存在",
-  missing: "缺失",
-  set: "已定义",
-  needs_confirmation: "需人工核验",
-  tracked: "Git 已跟踪",
-  ignored: "被 Git 忽略",
-  untracked: "未纳入 Git",
+  pending: "Unverified",
+  passed: "Command passed",
+  unknown: "Unknown",
+  observed: "Local state loaded",
+  recorded: "Verification recorded",
+  success: "Passed",
+  failure: "Failed",
+  failed: "Failed",
+  stale: "Changed",
+  current: "Content matches",
+  not_applicable: "Not applicable",
+  exists: "Exists",
+  missing: "Missing",
+  set: "Defined",
+  needs_confirmation: "Manual verification required",
+  tracked: "Git Tracked",
+  ignored: "Ignored by Git",
+  untracked: "Not included Git",
   not_applicable_tracking: "",
 };
 const date = (value: string) =>
-  new Date(value).toLocaleString("zh-CN", { hour12: false });
+  new Date(value).toLocaleString("en-US", { hour12: false });
 type State = {
   report: ProjectReview | null;
   section: Section;
@@ -123,18 +123,18 @@ export default function ProjectReviewPanel({
   };
   return (
     <section
-      aria-label="项目待处理"
+      aria-label="Pending project items"
       className="mt-5 space-y-3 border-t border-line pt-5"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className="text-base font-semibold">
-            待处理{report ? ` · ${report.issues.length}` : ""}
+            Pending{report ? ` · ${report.issues.length}` : ""}
           </h2>
           <span className="text-xs text-muted">{workspaceStatus}</span>
         </div>
         <Button disabled={!native || pending} onClick={refresh}>
-          {pending ? "正在检查…" : "检查当前状态"}
+          {pending ? "Checking…" : "Check current state"}
         </Button>
       </div>
       {state.error && (
@@ -157,7 +157,7 @@ export default function ProjectReviewPanel({
               role="status"
               className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
             >
-              <p>还有 {stashCount} 条 stash 待处理</p>
+              <p>More {stashCount} records stash Pending</p>
               <button
                 className="rounded px-2 py-1 underline underline-offset-2"
                 onClick={() => {
@@ -165,7 +165,7 @@ export default function ProjectReviewPanel({
                   onGit();
                 }}
               >
-                查看 stash
+                View stash
               </button>
             </div>
           )}
@@ -188,23 +188,23 @@ export default function ProjectReviewPanel({
                         : select(issue.section)
                     }
                   >
-                    查看
+                    View
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
             <p role="status" className="text-sm">
-              未发现已声明范围内的待处理项。
+              No pending items in the declared scope.
             </p>
           )}
           <ActionDialog
-            title="项目检查与记录"
+            title="Project checks and records"
             trigger={
               <>
                 {report.issues.length > 3
-                  ? `查看全部 ${report.issues.length} 项与记录`
-                  : "查看详情与记录"}
+                  ? `View all ${report.issues.length}  items and records`
+                  : "View details and history"}
               </>
             }
             open={state.expanded}
@@ -215,11 +215,12 @@ export default function ProjectReviewPanel({
           >
             <div className="mt-3 space-y-4">
               <p className="text-xs text-muted">
-                读取于 {date(report.checkedAt)} · 不代表提交、推送或发布已完成
+                Loaded at {date(report.checkedAt)} · Does not confirm commit,
+                push, or release completion
               </p>
               <div
                 role="group"
-                aria-label="收尾检查分区"
+                aria-label="Review sections"
                 className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg bg-sidebar p-1"
               >
                 {sections.map(([id, label]) => (
@@ -236,7 +237,7 @@ export default function ProjectReviewPanel({
               {report.issues.some((i) => i.section === state.section) && (
                 <section>
                   <h3 className="break-words text-sm font-medium">
-                    核对与处理提醒 ·{" "}
+                    Review and resolve reminders ·{" "}
                     {
                       report.issues.filter((i) => i.section === state.section)
                         .length
@@ -258,7 +259,7 @@ export default function ProjectReviewPanel({
                               next,
                               reason,
                             ),
-                          "已更新提醒处理状态",
+                          "Reminder status updated",
                         )
                       }
                     />
@@ -268,7 +269,7 @@ export default function ProjectReviewPanel({
               {report.acknowledged.some((i) => i.section === state.section) && (
                 <section>
                   <h3 className="break-words text-sm font-medium">
-                    已核对保留 / 稍后处理
+                    Reviewed; kept / Defer
                   </h3>
                   <IssueList
                     issues={report.acknowledged.filter(
@@ -285,7 +286,7 @@ export default function ProjectReviewPanel({
                             next,
                             reason,
                           ),
-                        "提醒已重新打开",
+                        "Reminder reopened",
                       )
                     }
                   />
@@ -305,16 +306,16 @@ export default function ProjectReviewPanel({
                           requirements: data.getAll("requirements").map(String),
                           stages: data.getAll("stages").map(String),
                         }),
-                      "项目适用项已保存",
+                      "Project applicability saved",
                     )
                   }
                 >
                   <p className="text-xs leading-5 text-muted">
-                    由 AI
-                    按项目指南配置；这里可以调整。只提醒所选范围，保存后不执行检查。
+                    Configure according to the project guide. Only selected
+                    scopes generate reminders. Saving does not run checks.
                   </p>
                   <label className="block space-y-1">
-                    <span className="text-xs text-muted">项目类型</span>
+                    <span className="text-xs text-muted">Project type</span>
                     <Select
                       name="kind"
                       defaultValue={
@@ -323,12 +324,12 @@ export default function ProjectReviewPanel({
                           : report.profile.kind
                       }
                     >
-                      <option value="web">Web 应用</option>
-                      <option value="backend">后端服务</option>
-                      <option value="desktop">桌面应用</option>
-                      <option value="library">库 / 工具</option>
-                      <option value="notes">文档 / 笔记</option>
-                      <option value="custom">自定义</option>
+                      <option value="web">Web app</option>
+                      <option value="backend">Backend service</option>
+                      <option value="desktop">Desktop app</option>
+                      <option value="library">Library / tool</option>
+                      <option value="notes">Documents / Notes</option>
+                      <option value="custom">Custom</option>
                     </Select>
                   </label>
                   {Object.entries(areas).map(([area, name]) => (
@@ -342,9 +343,9 @@ export default function ProjectReviewPanel({
                         value={area}
                         checked={report.profile.areas.includes(area)}
                       >
-                        此项目包含{name}
+                        This project includes {name}
                       </CheckBox>
-                      <p className="text-xs text-muted">需要核对的检查项</p>
+                      <p className="text-xs text-muted">Checks to verify</p>
                       {report.coverageOptions
                         .filter((r) => r.area === area)
                         .map((r) => (
@@ -360,7 +361,9 @@ export default function ProjectReviewPanel({
                     </fieldset>
                   ))}
                   <fieldset className="space-y-2 border-t border-line pt-3">
-                    <legend className="text-sm font-medium">交付阶段</legend>
+                    <legend className="text-sm font-medium">
+                      Delivery stages
+                    </legend>
                     {report.delivery
                       .filter((s) => !["working", "commit"].includes(s.stage))
                       .map((s) => (
@@ -374,28 +377,30 @@ export default function ProjectReviewPanel({
                         </CheckBox>
                       ))}
                   </fieldset>
-                  <Submit pending={pending}>保存适用项</Submit>
+                  <Submit pending={pending}>Save applicability</Submit>
                 </ReviewForm>
               )}
               {state.section === "changes" && (
                 <>
                   <dl className="grouped-list">
-                    <Info label="上游引用">
-                      {report.snapshot.upstream || "未配置或无法读取"}
+                    <Info label="Upstream ref">
+                      {report.snapshot.upstream ||
+                        "Not configured or unreadable"}
                     </Info>
-                    <Info label="提交差异">
+                    <Info label="Commit differences">
                       {report.snapshot.upstreamKnown
-                        ? `领先 ${report.snapshot.ahead} / 落后 ${report.snapshot.behind}`
-                        : "未核验"}
+                        ? `Ahead ${report.snapshot.ahead} / Behind ${report.snapshot.behind}`
+                        : "Unverified"}
                     </Info>
-                    <Info label="最近获取">
+                    <Info label="Last fetch">
                       {report.snapshot.fetchedAt
                         ? date(report.snapshot.fetchedAt)
-                        : "未知"}
+                        : "Unknown"}
                     </Info>
                   </dl>
                   <p className="text-xs leading-5 text-muted">
-                    以上按本地 Git 引用计算，未联网确认远程现状。
+                    Calculated from local Git refs; remote state has not been
+                    checked online.
                   </p>
                   <Button
                     onClick={() => {
@@ -403,7 +408,7 @@ export default function ProjectReviewPanel({
                       onGit();
                     }}
                   >
-                    查看工作树、分支和 stash
+                    View worktrees, branches, and stash
                   </Button>
                   {report.snapshot.files.length ? (
                     <ul className="grouped-list max-h-64 overflow-auto">
@@ -414,10 +419,10 @@ export default function ProjectReviewPanel({
                         >
                           <span className="shrink-0 text-xs text-muted">
                             {file.conflict
-                              ? "冲突"
+                              ? "Conflicts"
                               : file.untracked
-                                ? "未跟踪"
-                                : `${file.index !== " " ? "已暂存" : ""}${file.index !== " " && file.worktree !== " " ? " / " : ""}${file.worktree !== " " ? "未暂存" : ""}`}
+                                ? "Untracked"
+                                : `${file.index !== " " ? "Staged" : ""}${file.index !== " " && file.worktree !== " " ? " / " : ""}${file.worktree !== " " ? "Unstaged" : ""}`}
                           </span>
                           <span className="min-w-0 break-all">{file.path}</span>
                         </li>
@@ -425,12 +430,13 @@ export default function ProjectReviewPanel({
                     </ul>
                   ) : (
                     <p className="text-sm text-muted">
-                      {report.snapshot.error || "没有已读取的文件改动。"}
+                      {report.snapshot.error || "No file changes loaded."}
                     </p>
                   )}
                   {report.snapshot.files.length > 100 && (
                     <p className="text-xs text-muted">
-                      这里只列前 100 项，CLI 回执包含完整的已读取列表。
+                      Showing the first 100 items, CLI The receipt includes the
+                      full loaded list.
                     </p>
                   )}
                 </>
@@ -439,8 +445,10 @@ export default function ProjectReviewPanel({
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs leading-5 text-muted">
-                      比较文件内容和命令配置；未覆盖被忽略的依赖或外部环境。提交变化后需确认检查是否依赖
-                      Git 状态。
+                      Compares file contents and command configuration; ignored
+                      dependencies and external environments are excluded. After
+                      a commit changes, check whether verification depends on
+                      Git status.
                     </p>
                     <Button
                       onClick={() => {
@@ -448,7 +456,7 @@ export default function ProjectReviewPanel({
                         onCI();
                       }}
                     >
-                      前往 CI/CD
+                      Open CI/CD
                     </Button>
                   </div>
                   <div className="grouped-list">
@@ -466,15 +474,16 @@ export default function ProjectReviewPanel({
                         </p>
                         {(item.environment || item.target) && (
                           <p className="break-all text-xs text-muted">
-                            环境：{item.environment || "未填"} · 目标：
-                            {item.target || "未填"}
+                            Environment: {item.environment || "Not provided"} ·
+                            Target:
+                            {item.target || "Not provided"}
                           </p>
                         )}
                         {item.evidence && (
                           <p className="break-words text-xs text-muted">
                             {item.source === "pipeline"
-                              ? "应用执行"
-                              : "外部填报"}{" "}
+                              ? "App execution"
+                              : "Externally reported"}{" "}
                             · {item.evidence}
                           </p>
                         )}
@@ -483,7 +492,7 @@ export default function ProjectReviewPanel({
                   </div>
                   {!report.coverage.length && (
                     <p className="text-sm text-muted">
-                      尚未选择必需检查项，请在「适用项」中配置。
+                      Select required checks under Applicability.
                     </p>
                   )}
                   {report.checks.length ? (
@@ -499,30 +508,30 @@ export default function ProjectReviewPanel({
                           </p>
                           <p className="text-xs text-muted">
                             {check.source === "pipeline"
-                              ? "应用执行"
-                              : "外部填报，未由应用执行"}{" "}
+                              ? "App execution"
+                              : "Externally reported; not executed by the app"}{" "}
                             · {date(check.createdAt)} · {status[check.current]}
                           </p>
                           <p className="break-words text-xs leading-5 text-muted">
-                            范围：{check.scope}；{check.reason}
+                            Scope: {check.scope}; {check.reason}
                             {check.coverage?.length
-                              ? `；${check.coverage.map((c) => coverageName(report.coverageOptions, c)).join("、")}`
-                              : "；未声明核验类别"}
+                              ? `; ${check.coverage.map((c) => coverageName(report.coverageOptions, c)).join(", ")}`
+                              : "; No verification categories declared"}
                           </p>
                           <p className="break-words text-xs text-muted">
                             {check.evidence}
                             {(check.environment || check.target) &&
-                              ` · 环境：${check.environment || "未填"} / 目标：${check.target || "未填"}`}
+                              ` · Environment: ${check.environment || "Not provided"} / Target: ${check.target || "Not provided"}`}
                           </p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted">尚无检查记录。</p>
+                    <p className="text-sm text-muted">No check records yet.</p>
                   )}
                   <section>
                     <h3 className="break-words text-sm font-medium">
-                      记录外部检查
+                      Record external check
                     </h3>
                     <ReviewForm
                       pending={pending}
@@ -542,15 +551,19 @@ export default function ProjectReviewPanel({
                               environment: value(data, "environment"),
                               target: value(data, "target"),
                             }),
-                          "已记录外部检查说明",
+                          "External check recorded",
                         )
                       }
                     >
-                      <Field name="command" label="检查命令" required />
-                      <Field name="scope" label="实际覆盖范围与限制" required />
+                      <Field name="command" label="Check command" required />
+                      <Field
+                        name="scope"
+                        label="Actual coverage and limitations"
+                        required
+                      />
                       <fieldset className="space-y-2">
                         <legend className="mb-2 text-xs text-muted">
-                          本次实际核验的类别（可多选）
+                          Categories actually verified (select all that apply)
                         </legend>
                         {report.coverageOptions.map((r) => (
                           <CheckBox key={r.id} name="coverage" value={r.id}>
@@ -558,18 +571,19 @@ export default function ProjectReviewPanel({
                           </CheckBox>
                         ))}
                         <CheckBox name="coverage" value="database-static">
-                          数据库脚本静态检查（不抵扣真实数据库核验）
+                          Database script static checks (do not replace real
+                          database verification)
                         </CheckBox>
                       </fieldset>
                       <EnvironmentFields />
                       <ResultSelect />
                       <Field
                         name="evidence"
-                        label="结果说明或日志位置"
+                        label="Result notes or log location"
                         multiline
                         required
                       />
-                      <Submit pending={pending}>记录检查</Submit>
+                      <Submit pending={pending}>Record check</Submit>
                     </ReviewForm>
                   </section>
                 </>
@@ -590,7 +604,7 @@ export default function ProjectReviewPanel({
                         </p>
                         {stage.recordedAt && (
                           <p className="text-xs text-muted">
-                            记录于 {date(stage.recordedAt)}
+                            Recorded at {date(stage.recordedAt)}
                           </p>
                         )}
                       </div>
@@ -598,7 +612,7 @@ export default function ProjectReviewPanel({
                   </div>
                   <section>
                     <h3 className="break-words text-sm font-medium">
-                      记录阶段核验
+                      Record stage verification
                     </h3>
                     <ReviewForm
                       pending={pending}
@@ -612,12 +626,12 @@ export default function ProjectReviewPanel({
                               status: value(data, "status"),
                               note: value(data, "note"),
                             }),
-                          "已保存手工核验记录",
+                          "Manual verification saved",
                         )
                       }
                     >
                       <label className="block space-y-1">
-                        <span className="text-xs text-muted">阶段</span>
+                        <span className="text-xs text-muted">Stage</span>
                         <Select name="stage">
                           {report.delivery
                             .filter(
@@ -633,14 +647,15 @@ export default function ProjectReviewPanel({
                       <ResultSelect allowNA />
                       <Field
                         name="note"
-                        label="核验方式、提交或结果链接"
+                        label="Verification method, commit, or result URL"
                         multiline
                         required
                       />
                       <p className="text-xs text-muted">
-                        保存为手工核验记录，不会执行推送、部署或验收命令。
+                        Save a manual verification record. This does not run
+                        push, deployment, or acceptance commands.
                       </p>
-                      <Submit pending={pending}>保存核验</Submit>
+                      <Submit pending={pending}>Save verification</Submit>
                     </ReviewForm>
                   </section>
                 </>
@@ -670,7 +685,7 @@ export default function ProjectReviewPanel({
                             <p className="text-sm font-medium">
                               {resource.state.definition.name} ·{" "}
                               {resource.status === "success"
-                                ? "已记录核验"
+                                ? "Verification recorded"
                                 : status[resource.status]}
                             </p>
                             <button
@@ -681,12 +696,13 @@ export default function ProjectReviewPanel({
                                 })
                               }
                             >
-                              记录核验
+                              Record verification
                             </button>
                           </div>
                           <p className="break-all text-xs text-muted">
-                            {resource.state.definition.target || "手工确认"} ·{" "}
-                            {status[resource.state.observed]}
+                            {resource.state.definition.target ||
+                              "Manual confirmation"}{" "}
+                            · {status[resource.state.observed]}
                             {resource.state.tracking !== "not_applicable"
                               ? ` · ${status[resource.state.tracking] || resource.state.tracking}`
                               : ""}
@@ -698,16 +714,16 @@ export default function ProjectReviewPanel({
                           )}
                           <p className="break-words text-xs leading-5 text-muted">
                             {resource.state.definition.guide ||
-                              "存在不代表已备份或可恢复，请记录核验方法。"}
+                              "Existence does not prove a valid backup or recovery. Record how you verified it."}
                           </p>
                           {resource.note && (
                             <p className="break-words text-xs text-muted">
-                              填报：{resource.note}
+                              Reported: {resource.note}
                             </p>
                           )}
                           {resource.recordedAt && (
                             <p className="text-xs text-muted">
-                              填报于 {date(resource.recordedAt)}
+                              Reported at {date(resource.recordedAt)}
                             </p>
                           )}
                           {state.resourceTarget ===
@@ -728,18 +744,20 @@ export default function ProjectReviewPanel({
                                         note: value(data, "note"),
                                       },
                                     ),
-                                  "已保存数据与环境核验说明",
+                                  "Data and environment verification saved",
                                 )
                               }
                             >
                               <ResultSelect allowNA />
                               <Field
                                 name="note"
-                                label="备份、恢复演练或状态核验说明"
+                                label="Backup, recovery drill, or status verification notes"
                                 multiline
                                 required
                               />
-                              <Submit pending={pending}>保存核验</Submit>
+                              <Submit pending={pending}>
+                                Save verification
+                              </Submit>
                             </ReviewForm>
                           )}
                           <button
@@ -759,23 +777,24 @@ export default function ProjectReviewPanel({
                                       )
                                       .map((r) => r.state.definition),
                                   ),
-                                "已移除检查声明，未删除数据",
+                                "Verification declaration removed. Data preserved.",
                               )
                             }
                           >
-                            移除检查声明
+                            Remove declaration
                           </button>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="text-sm text-muted">
-                      尚未声明需要核验的数据或环境对象。
+                      No data or environment resources declared for
+                      verification.
                     </p>
                   )}
                   <section>
                     <h3 className="break-words text-sm font-medium">
-                      添加检查对象
+                      Add verification resource
                     </h3>
                     <ReviewForm
                       pending={pending}
@@ -801,34 +820,34 @@ export default function ProjectReviewPanel({
                               ],
                             );
                           },
-                          "检查对象已保存，不执行项目命令",
+                          "Verification resource saved. No project commands run.",
                         )
                       }
                     >
-                      <Field name="name" label="名称" required />
+                      <Field name="name" label="Name" required />
                       <label className="block space-y-1">
-                        <span className="text-xs text-muted">类型</span>
+                        <span className="text-xs text-muted">Type</span>
                         <Select name="kind">
-                          <option value="file">项目内文件</option>
-                          <option value="directory">项目内目录</option>
+                          <option value="file">Project file</option>
+                          <option value="directory">Project folder</option>
                           <option value="environment">
-                            环境变量（仅检查是否定义）
+                            Environment variable (checks definition only)
                           </option>
                           <option value="manual">
-                            手工核验数据库、迁移或备份
+                            Manually verify databases, migrations, or backups
                           </option>
                         </Select>
                       </label>
                       <Field
                         name="target"
-                        label="项目内相对路径或环境变量名（手工核验可留空）"
+                        label="Project-relative path or environment variable name (optional for manual verification)"
                       />
                       <Field
                         name="guide"
-                        label="核验方法或项目指南"
+                        label="Verification method or project guide"
                         multiline
                       />
-                      <Submit pending={pending}>保存检查对象</Submit>
+                      <Submit pending={pending}>Save resource</Submit>
                     </ReviewForm>
                   </section>
                 </>
@@ -856,20 +875,20 @@ export default function ProjectReviewPanel({
                               target: value(data, "target"),
                             },
                           ),
-                        "已记录任务开始状态",
+                        "Task start state recorded",
                       )
                     }
                   >
-                    <Field name="title" label="任务名称" required />
+                    <Field name="title" label="Task name" required />
                     <section>
                       <h3 className="break-words text-sm font-medium">
-                        声明负责人和修改范围
+                        Declare owner and change scope
                       </h3>
                       <div className="mt-3 space-y-3">
-                        <Field name="owner" label="负责人 / AI 会话别名" />
+                        <Field name="owner" label="Owner / AI Session alias" />
                         <fieldset className="space-y-2">
                           <legend className="mb-2 text-xs text-muted">
-                            涉及范围
+                            Affected scope
                           </legend>
                           {Object.entries(areas).map(([area, name]) => (
                             <CheckBox key={area} name="areas" value={area}>
@@ -879,16 +898,17 @@ export default function ProjectReviewPanel({
                         </fieldset>
                         <Field
                           name="paths"
-                          label="项目内文件或目录（每行一个相对路径）"
+                          label="Project files or folders (one relative path per line)"
                           multiline
                         />
                         <EnvironmentFields />
                       </div>
                     </section>
-                    <Submit pending={pending}>记录任务开始</Submit>
+                    <Submit pending={pending}>Record task start</Submit>
                   </ReviewForm>
                   <p className="text-xs leading-5 text-muted">
-                    开始和结束均手动记录；期间新增内容不推定由某个 AI 创建。
+                    Start and end are recorded manually. New content is not
+                    attributed to any AI .
                   </p>
                   {report.taskWarnings.map((warning) => (
                     <p
@@ -905,7 +925,8 @@ export default function ProjectReviewPanel({
                       className="border-t border-line pt-3"
                     >
                       <h3 className="break-words text-sm font-medium">
-                        {task.title} · {task.endedAt ? "已交接" : "尚未交接"}
+                        {task.title} ·{" "}
+                        {task.endedAt ? "Handed off" : "Not handed off"}
                       </h3>
                       <p className="mt-2 break-all text-xs text-muted">
                         {date(task.startedAt)} · {task.start.branch} ·{" "}
@@ -917,11 +938,11 @@ export default function ProjectReviewPanel({
                         task.environment ||
                         task.target) && (
                         <p className="mt-2 break-words text-xs leading-5 text-muted">
-                          {task.owner || "负责人未填"} ·{" "}
-                          {task.areas?.map((a) => areas[a] || a).join("、") ||
-                            "范围未填"}
+                          {task.owner || "No owner declared"} ·{" "}
+                          {task.areas?.map((a) => areas[a] || a).join(", ") ||
+                            "No scope declared"}
                           {task.paths?.length
-                            ? ` · ${task.paths.join("、")}`
+                            ? ` · ${task.paths.join(", ")}`
                             : ""}
                           {(task.environment || task.target) &&
                             ` · ${task.environment} / ${task.target}`}
@@ -930,8 +951,8 @@ export default function ProjectReviewPanel({
                       {task.endedAt ? (
                         <div className="mt-3 space-y-2">
                           <p className="text-xs text-muted">
-                            期间新增 {task.newStashes.length} 条 stash /{" "}
-                            {task.newUntracked.length} 个未跟踪文件
+                            Added during task {task.newStashes.length} records
+                            stash / {task.newUntracked.length} untracked files
                           </p>
                           <CopyHandover text={task.handover} />
                         </div>
@@ -952,27 +973,27 @@ export default function ProjectReviewPanel({
                                     blockers: value(data, "blockers"),
                                   },
                                 ),
-                              "任务交接已保存",
+                              "Task handoff saved",
                             )
                           }
                         >
                           <Field
                             name="summary"
-                            label="完成内容"
+                            label="Completed work"
                             multiline
                             required
                           />
                           <Field
                             name="checks"
-                            label="检查说明与结果位置"
+                            label="Check notes and result location"
                             multiline
                           />
                           <Field
                             name="blockers"
-                            label="遗留问题与下一步"
+                            label="Open issues and next steps"
                             multiline
                           />
-                          <Submit pending={pending}>保存交接</Submit>
+                          <Submit pending={pending}>Save handoff</Submit>
                         </ReviewForm>
                       )}
                     </section>
@@ -1052,11 +1073,11 @@ function Field({
 function ResultSelect({ allowNA = false }: { allowNA?: boolean }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-xs text-muted">结果</span>
+      <span className="block text-xs text-muted">Result</span>
       <Select name="status">
-        <option value="success">核验通过</option>
-        <option value="failure">未通过</option>
-        {allowNA && <option value="not_applicable">不适用</option>}
+        <option value="success">Verified</option>
+        <option value="failure">Failed</option>
+        {allowNA && <option value="not_applicable">Not applicable</option>}
       </Select>
     </label>
   );
@@ -1070,7 +1091,7 @@ function Submit({
 }) {
   return (
     <Button type="submit" disabled={!native || pending}>
-      {pending ? "保存中…" : children}
+      {pending ? "Saving…" : children}
     </Button>
   );
 }
@@ -1082,13 +1103,15 @@ function CopyHandover({ text }: { text: string }) {
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(text);
-            setNotice("已复制交接");
+            setNotice("Handoff copied");
           } catch {
-            setNotice("无法写入剪贴板，请从下方选取文本复制。");
+            setNotice(
+              "Could not access the clipboard. Select and copy the text below.",
+            );
           }
         }}
       >
-        复制交接
+        Copy handoff
       </Button>
       {notice && (
         <p role="status" className="text-xs text-muted">
@@ -1103,14 +1126,14 @@ function CopyHandover({ text }: { text: string }) {
 }
 
 const areas: Record<string, string> = {
-  frontend: "前端",
-  backend: "后端",
-  database: "数据库",
+  frontend: "Frontend",
+  backend: "Backend",
+  database: "Database",
 };
 function coverageName(options: ReviewRequirement[], c: ReviewCoverage) {
   return (
     options.find((r) => r.area === c.area && r.method === c.method)?.name ||
-    `${areas[c.area] || c.area} · ${c.method === "static" ? "静态检查" : c.method}`
+    `${areas[c.area] || c.area} · ${c.method === "static" ? "Static checks" : c.method}`
   );
 }
 function selectedCoverage(
@@ -1153,11 +1176,16 @@ function EnvironmentFields() {
     <>
       <Field
         name="environment"
-        label="环境别名（如 local / staging / production）"
+        label="Environment alias (e.g. local / staging / production)"
       />
-      <Field name="target" label="目标别名（服务、数据库或备份集名称）" />
+      <Field
+        name="target"
+        label="Target alias (service, database, or backup set)"
+      />
       <p className="text-xs leading-5 text-muted">
-        涉及数据库时必填。只填别名，勿填连接串、密码或令牌；内容一致不代表外部环境仍然一致。
+        Required for database checks. Use aliases only, never connection
+        strings, passwords, or tokens. Matching content does not verify external
+        state.
       </p>
     </>
   );
@@ -1184,8 +1212,8 @@ function IssueList({
             <div className="mt-2 space-y-2">
               <p className="break-words text-xs text-muted">
                 {issue.acknowledgement.state === "retained"
-                  ? "已核对保留"
-                  : "稍后处理"}{" "}
+                  ? "Reviewed; kept"
+                  : "Defer"}{" "}
                 · {issue.acknowledgement.reason} ·{" "}
                 {date(issue.acknowledgement.createdAt)}
               </p>
@@ -1193,7 +1221,7 @@ function IssueList({
                 disabled={!native || pending}
                 onClick={() => save(issue, "reopened", "")}
               >
-                重新提醒
+                Reopen reminder
               </Button>
             </div>
           ) : (
@@ -1213,14 +1241,19 @@ function IssueList({
               }}
             >
               <label className="block space-y-1">
-                <span className="text-xs text-muted">处理状态</span>
+                <span className="text-xs text-muted">Resolution status</span>
                 <Select name="state">
-                  <option value="retained">已核对，保留</option>
-                  <option value="later">稍后处理</option>
+                  <option value="retained">Reviewed; keep</option>
+                  <option value="later">Defer</option>
                 </Select>
               </label>
-              <Field name="reason" label="理由与后续安排" required multiline />
-              <Submit pending={pending}>保存处理状态</Submit>
+              <Field
+                name="reason"
+                label="Reason and follow-up"
+                required
+                multiline
+              />
+              <Submit pending={pending}>Save status</Submit>
             </ReviewForm>
           )}
         </section>

@@ -49,8 +49,8 @@ func reviewSnapshot(path string) ReviewSnapshot {
 	}
 	snapshot.Head, snapshot.Branch, snapshot.Stashes = stashes.Head, stashes.Branch, stashes.Entries
 	raw, err := git(path, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-	if err != nil || strings.Contains(raw, "[输出超过 1 MiB") {
-		snapshot.Error = "无法完整读取工作区文件状态"
+	if err != nil || strings.Contains(raw, "[output exceeds 1 MiB") {
+		snapshot.Error = "Could not read the full workspace file state"
 		return snapshot
 	}
 	fields := strings.Split(raw, "\x00")
@@ -60,7 +60,7 @@ func reviewSnapshot(path string) ReviewSnapshot {
 			continue
 		}
 		if len(entry) < 4 {
-			snapshot.Error = "无法解析工作区文件状态"
+			snapshot.Error = "Could not parse workspace file state"
 			return snapshot
 		}
 		file := ReviewFile{Path: entry[3:], Index: entry[:1], Worktree: entry[1:2], Untracked: entry[:2] == "??"}
@@ -113,18 +113,18 @@ func reviewSnapshot(path string) ReviewSnapshot {
 func reviewFingerprint(path string) (string, error) {
 	top, err := git(path, "rev-parse", "--show-toplevel")
 	if err != nil {
-		return "", errors.New("不是可读取的 Git 工作树")
+		return "", errors.New("not a readable Git worktree")
 	}
 	top = strings.TrimSpace(top)
 	raw, err := git(top, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-	if err != nil || strings.Contains(raw, "[输出超过 1 MiB") {
-		return "", errors.New("无法完整列出需要核对的文件")
+	if err != nil || strings.Contains(raw, "[output exceeds 1 MiB") {
+		return "", errors.New("could not list all files for review")
 	}
 	files := strings.Split(strings.TrimSuffix(raw, "\x00"), "\x00")
 	slices.Sort(files)
 	files = slices.Compact(files)
 	if len(files) > 5000 {
-		return "", errors.New("超过 5000 个文件，内容一致性未核验")
+		return "", errors.New("more than 5000 files; content consistency not verified")
 	}
 	root, err := os.OpenRoot(top)
 	if err != nil {
@@ -139,14 +139,14 @@ func reviewFingerprint(path string) (string, error) {
 			continue
 		}
 		if !filepath.IsLocal(name) || time.Now().After(deadline) {
-			return "", errors.New("文件路径或读取时限无法确认")
+			return "", errors.New("could not confirm file path or read deadline")
 		}
 		info, e := root.Lstat(name)
 		if errors.Is(e, os.ErrNotExist) {
 			continue
 		}
 		if e != nil {
-			return "", fmt.Errorf("读取文件信息 %s: %w", name, e)
+			return "", fmt.Errorf("read file metadata %s: %w", name, e)
 		}
 		fmt.Fprintf(hash, "%q:%d:", name, info.Mode()&(os.ModeType|0111))
 		if info.Mode()&os.ModeSymlink != 0 {
@@ -158,10 +158,10 @@ func reviewFingerprint(path string) (string, error) {
 			continue
 		}
 		if !info.Mode().IsRegular() {
-			return "", fmt.Errorf("%s 不是普通文件，子模块需单独核验", name)
+			return "", fmt.Errorf("%s is not a regular file; verify submodules separately", name)
 		}
 		if total+info.Size() > 40*1024*1024 {
-			return "", errors.New("文件总量超过 40 MiB，内容一致性未核验")
+			return "", errors.New("total file size exceeds 40 MiB; content consistency not verified")
 		}
 		file, e := root.Open(name)
 		if e != nil {
@@ -175,11 +175,11 @@ func reviewFingerprint(path string) (string, error) {
 		}
 		total += n
 		if total > 40*1024*1024 {
-			return "", errors.New("读取过程中超出文件大小限制")
+			return "", errors.New("file size limit exceeded while reading")
 		}
 		current, e := root.Lstat(name)
 		if e != nil || !os.SameFile(info, current) || info.Size() != current.Size() || !info.ModTime().Equal(current.ModTime()) {
-			return "", errors.New("文件在读取期间发生变化，请重新检查")
+			return "", errors.New("file changed while reading; check again")
 		}
 		fmt.Fprintf(hash, "%x\n", content.Sum(nil))
 	}

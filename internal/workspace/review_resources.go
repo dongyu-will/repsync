@@ -43,7 +43,7 @@ func (s *Service) reviewResources(path string) ([]ReviewResourceState, string, e
 	definitions := []ReviewResource{}
 	if data := file.fields["reviewResources"]; len(data) > 0 {
 		if err := json.Unmarshal(data, &definitions); err != nil {
-			return states, file.version, errors.New("reviewResources 配置无效")
+			return states, file.version, errors.New("invalid reviewResources configuration")
 		}
 	}
 	if err := validateReviewResources(definitions); err != nil {
@@ -68,7 +68,7 @@ func (s *Service) reviewResources(path string) ([]ReviewResourceState, string, e
 				state.Error = e.Error()
 			} else {
 				if d.Kind == "directory" && !info.IsDir() || d.Kind == "file" && !info.Mode().IsRegular() {
-					state.Error = "对象类型与配置不符"
+					state.Error = "Resource type does not match configuration"
 				} else {
 					state.Observed = "exists"
 				}
@@ -91,22 +91,22 @@ func (s *Service) reviewResources(path string) ([]ReviewResourceState, string, e
 
 func validateReviewResources(definitions []ReviewResource) error {
 	if len(definitions) > 32 {
-		return errors.New("最多声明 32 个数据与环境检查对象")
+		return errors.New("up to 32 data and environment resources can be declared")
 	}
 	ids := map[string]bool{}
 	for _, d := range definitions {
 		if d.ID == "" || len(d.ID) > 80 || ids[d.ID] || strings.TrimSpace(d.Name) == "" || len(d.Name) > 200 || len(d.Guide) > 4096 {
-			return errors.New("检查对象需要唯一标识、名称和有效说明")
+			return errors.New("verification resources require unique IDs, names, and valid guidance")
 		}
 		ids[d.ID] = true
 		if !slices.Contains([]string{"file", "directory", "environment", "manual"}, d.Kind) {
-			return errors.New("检查对象类型无效")
+			return errors.New("invalid verification resource type")
 		}
 		if d.Kind == "environment" && !environmentName.MatchString(d.Target) {
-			return errors.New("环境变量名无效")
+			return errors.New("invalid environment variable name")
 		}
 		if (d.Kind == "file" || d.Kind == "directory") && (!filepath.IsLocal(d.Target) || d.Target == ".") {
-			return fmt.Errorf("%s 需要项目内相对路径", d.Name)
+			return fmt.Errorf("%s requires a project-relative path", d.Name)
 		}
 	}
 	return nil

@@ -248,7 +248,7 @@ func TestCloneRegistrationFailureKeepsCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := waitForClone(t, service, initial.ID)
-	if state.Status != "failure" || !state.Cloned || !strings.Contains(state.Error, "登记失败") {
+	if state.Status != "failure" || !state.Cloned || !strings.Contains(state.Error, "registration failed") {
 		t.Fatalf("registration failure: %+v", state)
 	}
 	if content, err := os.ReadFile(filepath.Join(state.Destination, "README.md")); err != nil || string(content) != "# Remote fixture\n" {

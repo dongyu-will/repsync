@@ -52,7 +52,7 @@ func (l *processLog) Write(data []byte) (int, error) {
 		l.buffer.Write(data)
 	}
 	if n > remaining && !l.truncated {
-		const note = "\n[日志超过 256 KiB，后续输出已省略；任务继续运行]\n"
+		const note = "\n[log exceeds 256 KiB; further output omitted; task continues]\n"
 		if _, err := l.file.WriteString(note); err != nil {
 			return 0, err
 		}

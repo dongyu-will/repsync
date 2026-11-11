@@ -96,7 +96,7 @@ export default function ActionDialog({
           <button
             type="button"
             className="icon-button shrink-0"
-            aria-label="关闭"
+            aria-label="Close"
             disabled={busy}
             onClick={() => changeOpen(false)}
           >

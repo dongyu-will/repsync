@@ -16,11 +16,11 @@ const native = isMyGo();
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 const statuses: Record<string, string> = {
-  current: "已是最新",
-  outdated: "可更新",
-  missing: "待写入",
-  modified: "项目有改动",
-  error: "需处理",
+  current: "Up to date",
+  outdated: "Update available",
+  missing: "Pending write",
+  modified: "Project modified",
+  error: "Needs attention",
 };
 const filename = (path: string) => path.split("/").at(-1) || path;
 const inputClass =
@@ -88,7 +88,7 @@ export default function SharedFiles({
   const registered = (id: string) =>
     update({
       selected: id,
-      notice: "已保存公共来源，项目文件尚未更新",
+      notice: "Shared source saved. Project files have not changed.",
       revision: state.revision + 1,
       preview: null,
     });
@@ -127,10 +127,10 @@ export default function SharedFiles({
   const selectResource = (selected: string) =>
     update({ selected, preview: null, error: "", notice: "" });
   return (
-    <section aria-label="共享文件资源" className="space-y-4">
+    <section aria-label="Shared file resources" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="min-w-0 text-sm text-muted">
-          测试脚本与检查配置共用公共来源，项目按需采用。
+          Share test scripts and check configurations across projects.
         </p>
         <div className="flex flex-wrap gap-2">
           {!project && report && (
@@ -142,7 +142,7 @@ export default function SharedFiles({
           )}
           <button
             className="icon-button text-muted"
-            aria-label="重新读取共享文件"
+            aria-label="Reload shared files"
             disabled={!!state.busy}
             onClick={refresh}
           >
@@ -162,7 +162,7 @@ export default function SharedFiles({
       )}
       {state.busy && (
         <p role="status" className="text-sm text-muted">
-          {state.busy === "preview" ? "正在生成差异…" : "正在保存…"}
+          {state.busy === "preview" ? "Generating diff…" : "Saving…"}
         </p>
       )}
       {!selected &&
@@ -174,24 +174,25 @@ export default function SharedFiles({
               role="alert"
               className="break-words text-sm text-removed"
             >
-              {item.project.name}：{item.error}
+              {item.project.name}: {item.error}
             </p>
           ))}
       {!report ? (
         <p role="status" className="text-sm text-muted">
           {state.loadError
-            ? "共享资源读取失败，请重新读取。"
-            : "正在读取共享资源…"}
+            ? "Could not load shared resources. Try reloading."
+            : "Loading shared resources…"}
         </p>
       ) : !selected ? (
-        <Empty title="尚未登记共享文件" icon="layers">
-          将可复用的测试脚本或检查配置登记为公共来源。
-          {project && "可在全局公共规范中登记。"}
+        <Empty title="No shared files registered" icon="layers">
+          Register reusable test scripts or check configurations as shared
+          sources.
+          {project && "Register a source in global shared rules."}
         </Empty>
       ) : (
         <div className="grid min-w-0 gap-5 min-[900px]:grid-cols-[176px_minmax(0,1fr)]">
           <label className="grid gap-1 text-xs text-muted min-[900px]:hidden">
-            共享文件
+            Shared files
             <Select
               className="w-full"
               value={selected.id}
@@ -207,7 +208,7 @@ export default function SharedFiles({
           <div
             className="grouped-list hidden self-start min-[900px]:block"
             role="group"
-            aria-label="共享文件列表"
+            aria-label="Shared files"
           >
             {report.resources.map((resource) => {
               const count = report.projects.filter((p) =>
@@ -226,14 +227,14 @@ export default function SharedFiles({
                   </span>
                   <span className="mt-1 block text-xs text-muted">
                     {resource.error
-                      ? "来源需处理"
+                      ? "Source needs attention"
                       : report.projects.some((item) => item.error)
-                        ? `${count} 个已知采用 · 部分状态未知`
+                        ? `${count}  known adoptions · Some statuses unknown`
                         : project
                           ? count
-                            ? "本项目已采用"
-                            : "本项目未采用"
-                          : `${count} 个项目采用`}
+                            ? "Adopted by this project"
+                            : "Not adopted by this project"
+                          : `${count}  projects using this`}
                   </span>
                 </button>
               );
@@ -246,8 +247,8 @@ export default function SharedFiles({
                   {selected.id}
                 </h2>
                 <p className="mt-1 text-xs text-muted" title={selected.version}>
-                  来源版本{" "}
-                  {selected.version ? selected.version.slice(0, 12) : "未知"}
+                  Source version{" "}
+                  {selected.version ? selected.version.slice(0, 12) : "Unknown"}
                 </p>
               </div>
               {!project && (
@@ -259,15 +260,16 @@ export default function SharedFiles({
                     onSaved={registered}
                   />
                   <ActionDialog
-                    title="移除共享资源登记"
-                    trigger="移除登记"
+                    title="Remove shared resource registration"
+                    trigger="Remove registration"
                     busy={!!state.busy}
                     error={state.error}
                     notice={state.notice}
                   >
                     <p className="text-sm leading-6">
-                      移除 {selected.id}{" "}
-                      的公共登记。已采用的项目文件和更新记录会保留，项目需重新登记来源后才能继续更新。
+                      Remove {selected.id} from shared resources? Adopted
+                      project files and history are preserved. Register the
+                      source again to resume updates.
                     </p>
                     <Button
                       disabled={!native || !!state.busy || !selected.path}
@@ -275,11 +277,11 @@ export default function SharedFiles({
                         void perform(
                           () =>
                             Service.forgetResource(report.version, selected.id),
-                          "已移除公共登记；项目文件和历史保留",
+                          "Shared registration removed. Project files and history preserved.",
                         )
                       }
                     >
-                      移除登记
+                      Remove registration
                     </Button>
                   </ActionDialog>
                 </div>
@@ -287,12 +289,14 @@ export default function SharedFiles({
             </div>
             <dl className="space-y-2 text-xs leading-5">
               <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                <dt className="text-muted">公共来源</dt>
-                <dd className="break-all">{selected.path || "未登记"}</dd>
+                <dt className="text-muted">Shared source</dt>
+                <dd className="break-all">
+                  {selected.path || "Not registered"}
+                </dd>
               </div>
               <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                <dt className="text-muted">项目位置</dt>
-                <dd className="break-all">{selected.target || "未知"}</dd>
+                <dt className="text-muted">Project location</dt>
+                <dd className="break-all">{selected.target || "Unknown"}</dd>
               </div>
             </dl>
             {selected.error && (
@@ -301,16 +305,16 @@ export default function SharedFiles({
               </p>
             )}
             {report.projects.length ? (
-              <div className="grouped-list" aria-label="项目采用情况">
+              <div className="grouped-list" aria-label="Project adoption">
                 {report.projects.map((entry) => {
                   const adopted = entry.adoptions.find(
                     (item) => item.id === selected.id,
                   );
                   const status = entry.error
-                    ? "读取失败"
+                    ? "Read failed"
                     : adopted
                       ? statuses[adopted.status] || adopted.status
-                      : "未采用";
+                      : "Not adopted";
                   return (
                     <section
                       key={entry.project.path}
@@ -334,7 +338,7 @@ export default function SharedFiles({
                           className="text-xs text-muted"
                           title={adopted.adoptedVersion}
                         >
-                          采用版本 {adopted.adoptedVersion.slice(0, 12)}
+                          Adopted version {adopted.adoptedVersion.slice(0, 12)}
                         </p>
                       )}
                       {(entry.error || adopted?.error) && (
@@ -361,12 +365,12 @@ export default function SharedFiles({
                                   !adopted,
                                 ),
                               adopted
-                                ? "已取消采用；项目文件和历史保留"
-                                : "已登记采用，预览差异后再写入项目文件",
+                                ? "Adoption removed. Project files and history preserved."
+                                : "Adoption registered. Preview the diff before updating project files.",
                             )
                           }
                         >
-                          {adopted ? "取消采用" : "采用此资源"}
+                          {adopted ? "Remove adoption" : "Adopt this resource"}
                         </Button>
                         {adopted && (
                           <Button
@@ -377,12 +381,12 @@ export default function SharedFiles({
                               void preview(entry.project, selected.id)
                             }
                           >
-                            预览差异
+                            Preview diff
                           </Button>
                         )}
                         <ActionDialog
-                          title={`${entry.project.name} · 共享文件记录`}
-                          trigger="更新记录"
+                          title={`${entry.project.name} · Shared file history`}
+                          trigger="Update history"
                           onOpen={() =>
                             update({ historyPath: entry.project.path })
                           }
@@ -398,7 +402,7 @@ export default function SharedFiles({
                               onRestore={(record) =>
                                 void perform(
                                   () => Service.restoreUpdate(record.id),
-                                  `已恢复 ${record.project.name} 的 ${record.target}`,
+                                  `Restored ${record.project.name}   ${record.target}`,
                                 )
                               }
                             />
@@ -410,7 +414,7 @@ export default function SharedFiles({
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted">尚无已登记项目。</p>
+              <p className="text-sm text-muted">No registered projects.</p>
             )}
             {state.preview && (
               <ActionDialog
@@ -423,13 +427,16 @@ export default function SharedFiles({
                 busy={!!state.busy}
                 error={state.error}
               >
-                <section aria-label="共享文件更新预览" className="space-y-3">
+                <section
+                  aria-label="Shared file update preview"
+                  className="space-y-3"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p
                       className="text-xs text-muted"
                       title={state.preview.version}
                     >
-                      来源版本 {state.preview.version.slice(0, 12)}
+                      Source version {state.preview.version.slice(0, 12)}
                     </p>
                     <Button
                       primary
@@ -444,28 +451,29 @@ export default function SharedFiles({
                         if (plan)
                           void perform(
                             () => Service.applyUpdate(plan.token),
-                            `已更新 ${plan.project.name} 的 ${plan.target}，备份已保存`,
+                            `Updated ${plan.project.name}   ${plan.target}, Backup saved`,
                           );
                       }}
                     >
-                      应用更新
+                      Apply update
                     </Button>
                   </div>
                   {state.preview.conflict && (
                     <p role="alert" className="text-sm text-removed">
-                      项目文件有本地改动，无法覆盖。请保留项目差异，或由 AI
-                      接入独立的公共文件。
+                      The project file has local edits and cannot be
+                      overwritten. Preserve project differences, or ask AI
+                      Connect an independent shared file.
                     </p>
                   )}
                   {!state.preview.changed ? (
                     <p role="status" className="text-sm text-muted">
-                      文件已与公共来源一致。
+                      File matches the shared source.
                     </p>
                   ) : (
                     <pre
                       className="source-panel"
                       tabIndex={0}
-                      aria-label="共享文件更新差异"
+                      aria-label="Shared file diff"
                     >
                       {state.preview.diff.split("\n").map((line, i) => (
                         <span
@@ -525,8 +533,8 @@ function ResourceEditor({
   }
   return (
     <ActionDialog
-      title={resource ? "编辑共享来源" : "登记共享文件"}
-      trigger={resource ? "编辑来源" : "登记共享文件"}
+      title={resource ? "Edit shared source" : "Register shared file"}
+      trigger={resource ? "Edit source" : "Register shared file"}
       open={state.open}
       onOpenChange={(open) => update({ open })}
       onOpen={() => update({ error: "" })}
@@ -536,7 +544,7 @@ function ResourceEditor({
       <form className="space-y-3" onSubmit={save}>
         <fieldset disabled={state.busy} className="space-y-3">
           <label className="block space-y-1 text-sm">
-            资源标识
+            Resource ID
             <input
               className={inputClass}
               name="id"
@@ -547,7 +555,7 @@ function ResourceEditor({
             />
           </label>
           <label className="block space-y-1 text-sm">
-            公共来源文件
+            Shared source file
             <input
               className={inputClass}
               name="path"
@@ -560,7 +568,7 @@ function ResourceEditor({
             />
           </label>
           <label className="block space-y-1 text-sm">
-            项目内目标位置
+            Destination in project
             <input
               className={inputClass}
               name="target"
@@ -573,11 +581,12 @@ function ResourceEditor({
             />
           </label>
           <p className="text-xs leading-5 text-muted">
-            来源为独立的 UTF-8 文本文件。登记不写入项目；目标父目录由 AI
-            接入时准备。
+            The source is an independent UTF-8 text file. Registration does not
+            write to projects. The destination parent folder is prepared by AI
+            during setup.
           </p>
           <Button type="submit" primary disabled={!native || state.busy}>
-            {state.busy ? "正在保存…" : "保存登记"}
+            {state.busy ? "Saving…" : "Save registration"}
           </Button>
         </fieldset>
       </form>
@@ -625,9 +634,9 @@ function ResourceHistory({
         {state.error}
       </p>
     );
-  if (!state.records) return <p role="status">正在读取更新记录…</p>;
+  if (!state.records) return <p role="status">Loading update history…</p>;
   if (!state.records.length)
-    return <p className="text-sm text-muted">尚无共享文件更新记录。</p>;
+    return <p className="text-sm text-muted">No shared file updates yet.</p>;
   return (
     <div className="grouped-list">
       {state.records.map((record) => (
@@ -637,17 +646,17 @@ function ResourceHistory({
         >
           <p className="break-all text-sm font-medium">{record.target}</p>
           <p className="break-all text-xs text-muted">
-            {new Date(record.createdAt).toLocaleString()} · 来源{" "}
-            {record.sourcePath} · 版本 {record.version.slice(0, 12)}
+            {new Date(record.createdAt).toLocaleString()} · Source{" "}
+            {record.sourcePath} · Version {record.version.slice(0, 12)}
           </p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted">
               {(
                 {
-                  applied: "可恢复",
-                  restored: "已恢复",
-                  changed: "文件已有后续改动",
-                  "not-applied": "未应用",
+                  applied: "Restorable",
+                  restored: "Restored",
+                  changed: "File changed since this update",
+                  "not-applied": "Not applied",
                 } as Record<string, string>
               )[record.state] || record.state}
             </span>
@@ -655,7 +664,7 @@ function ResourceHistory({
               disabled={!native || busy || record.state !== "applied"}
               onClick={() => onRestore(record)}
             >
-              恢复更新前内容
+              Restore previous content
             </Button>
           </div>
         </div>

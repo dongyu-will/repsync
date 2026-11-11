@@ -71,7 +71,7 @@ func (s *Service) localServiceConfig(path string) (localServiceConfig, error) {
 	}
 	if err == nil {
 		if err := json.Unmarshal(data, &file); err != nil {
-			return config, fmt.Errorf("读取 .repsync.json: %w", err)
+			return config, fmt.Errorf("read .repsync.json: %w", err)
 		}
 		config.services = file.Services
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -91,7 +91,7 @@ func (s *Service) localServiceConfig(path string) (localServiceConfig, error) {
 			PackageManager string            `json:"packageManager"`
 		}
 		if err := json.Unmarshal(data, &pkg); err != nil {
-			return config, fmt.Errorf("读取 package.json: %w", err)
+			return config, fmt.Errorf("read package.json: %w", err)
 		}
 		for _, name := range []string{"dev", "start"} {
 			script, ok := pkg.Scripts[name]
@@ -137,16 +137,16 @@ func (s *Service) localServiceConfig(path string) (localServiceConfig, error) {
 
 func validateLocalServices(definitions []LocalServiceDefinition) error {
 	if len(definitions) > 8 {
-		return errors.New("每项目最多配置 8 个本地服务")
+		return errors.New("each project supports up to 8 local services")
 	}
 	ids := map[string]bool{}
 	for i := range definitions {
 		d := &definitions[i]
 		if d.FixedPort && d.AutoPort {
-			return errors.New("fixedPort 与 autoPort 不能同时启用")
+			return errors.New("fixedPort and autoPort cannot both be enabled")
 		}
 		if d.ID == "" || len(d.ID) > 80 || ids[d.ID] || strings.TrimSpace(d.Name) == "" || len(d.Command) == 0 || strings.TrimSpace(d.Command[0]) == "" {
-			return errors.New("本地服务需要唯一 id、名称和 command 命令参数")
+			return errors.New("local services require a unique id, name, and command arguments")
 		}
 		ids[d.ID] = true
 		if err := validateCommandOptions(d.Cwd, d.Env); err != nil {
@@ -154,25 +154,25 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 		}
 		for name, endpoint := range d.EnvFrom {
 			if name == "PATH" || name == "PORT" {
-				return fmt.Errorf("环境变量 %s 由当前服务的路径或端口配置提供，不能引用其他服务", name)
+				return fmt.Errorf("environment variable %s is provided by this service's path or port configuration and cannot reference another service", name)
 			}
 			if err := validateCommandOptions("", map[string]string{name: ""}); err != nil {
 				return err
 			}
 			if _, exists := d.Env[name]; exists {
-				return fmt.Errorf("环境变量 %s 不能同时配置 env 和 envFrom", name)
+				return fmt.Errorf("environment variable %s cannot be set in both env and envFrom", name)
 			}
 			if endpoint.Service == "" || (endpoint.Field != "" && endpoint.Field != "url" && endpoint.Field != "port") {
-				return errors.New("envFrom 需要 service，field 只支持 url 或 port")
+				return errors.New("envFrom requires service; field must be url or port")
 			}
 		}
 		for _, arg := range d.Command {
 			if strings.ContainsRune(arg, 0) {
-				return errors.New("服务命令不能包含空字符")
+				return errors.New("service commands cannot contain null characters")
 			}
 		}
 		if d.Port < 0 || d.Port > 65535 {
-			return errors.New("服务端口应为 1–65535，或留空")
+			return errors.New("service port must be 1–65535 or omitted")
 		}
 		if d.AutoPort {
 			portInput := strings.Contains(strings.Join(d.Command, "\n"), "{port}")
@@ -180,17 +180,17 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 				portInput = portInput || strings.Contains(value, "{port}")
 			}
 			if !portInput {
-				return errors.New("autoPort 服务的 command 或 env 必须包含 {port}，确保命令使用分配的端口")
+				return errors.New("autoPort services require {port} in command or env to use the assigned port")
 			}
 			if d.URL != "" && !strings.Contains(d.URL, "{port}") {
-				return errors.New("autoPort 服务的 URL 需要包含 {port}")
+				return errors.New("autoPort service URLs must contain {port}")
 			}
 		}
 		if d.URL != "" {
 			urlText := d.URL
 			if strings.Contains(urlText, "{port}") {
 				if !d.AutoPort && d.Port == 0 {
-					return errors.New("URL 使用 {port} 时需设置 port 或 autoPort")
+					return errors.New("URLs using {port} require port or autoPort")
 				}
 				port := d.Port
 				if port == 0 {
@@ -200,7 +200,7 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 			}
 			u, err := url.Parse(urlText)
 			if err != nil || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") || !slices.Contains([]string{"127.0.0.1", "localhost", "::1"}, u.Hostname()) {
-				return errors.New("服务 URL 需要使用本机 http/https 地址（localhost、127.0.0.1 或 ::1）")
+				return errors.New("service URLs must use a local HTTP(S) address (localhost, 127.0.0.1, or ::1)")
 			}
 			port := 80
 			if u.Scheme == "https" {
@@ -210,7 +210,7 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 				port, err = strconv.Atoi(u.Port())
 			}
 			if err != nil || port < 1 || port > 65535 || (d.Port != 0 && d.Port != port) {
-				return errors.New("服务 URL 与 port 的端口必须一致且有效")
+				return errors.New("service URL and port must specify the same valid port")
 			}
 			if !strings.Contains(d.URL, "{port}") {
 				d.Port = port
@@ -295,11 +295,11 @@ func (s *Service) LocalServices(path string) (LocalServicesOverview, error) {
 				state = previous
 				state.Definition = definition
 				if localServiceRunning(state.Status) {
-					state.Status, state.Error = "interrupted", "上次服务运行未正常结束，请检查端口后手动启动"
+					state.Status, state.Error = "interrupted", "previous service run did not stop cleanly; check the port before starting manually"
 				}
 				state.PID = 0
 			} else if !errors.Is(err, os.ErrNotExist) {
-				state.Error = "读取上次服务记录: " + err.Error()
+				state.Error = "read previous service record: " + err.Error()
 			}
 		}
 		if !localServiceRunning(state.Status) {
