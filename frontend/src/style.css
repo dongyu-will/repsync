@@ -253,3 +253,13 @@ code {
 .markdown-document hr {
   @apply my-5 border-line;
 }
+
+::highlight(document-find-matches) {
+  background-color: #fef08a;
+  color: #422006;
+}
+
+::highlight(document-find-active) {
+  background-color: #fbbf24;
+  color: #422006;
+}

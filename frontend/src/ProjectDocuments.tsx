@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Service } from "./mygo";
 import { Button, Empty, Icon } from "./components";
 import { previewDocuments } from "./preview";
+import DocumentFind from "./DocumentFind";
 
 const MarkdownPreview = lazy(() => import("./MarkdownPreview"));
 const native = isMyGo();
@@ -72,6 +73,7 @@ function DocumentContent({
   names: string[];
   onDocument: (name: string) => void;
 }) {
+  const reader = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<DocumentDraft | null>(null);
   const [mode, setMode] = useState<"preview" | "edit">("preview");
   const [loadError, setLoadError] = useState("");
@@ -231,6 +233,7 @@ function DocumentContent({
           <span role="status" className="text-xs text-muted">
             {dirty ? "未保存" : notice}
           </span>
+          {mode === "preview" && <DocumentFind reader={reader} />}
           <button
             className="icon-button"
             aria-label="重新载入文档"
@@ -240,14 +243,16 @@ function DocumentContent({
           >
             <Icon name="refresh" size={16} />
           </button>
-          <Button
-            primary
-            disabled={!native || !dirty || busy}
-            onClick={() => void save()}
-            title={native ? "保存（⌘S / Ctrl+S）" : "当前环境无法写入文件"}
-          >
-            {busy ? "保存中…" : "保存"}
-          </Button>
+          {(mode === "edit" || dirty) && (
+            <Button
+              primary
+              disabled={!native || !dirty || busy}
+              onClick={() => void save()}
+              title={native ? "保存（⌘S / Ctrl+S）" : "当前环境无法写入文件"}
+            >
+              {busy ? "保存中…" : "保存"}
+            </Button>
+          )}
         </div>
       </div>
       {(saveError || storageError) && (
@@ -268,6 +273,7 @@ function DocumentContent({
         />
       ) : (
         <div
+          ref={reader}
           role="region"
           aria-label={`${name} 预览`}
           tabIndex={0}
