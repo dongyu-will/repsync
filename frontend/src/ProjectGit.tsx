@@ -2,7 +2,12 @@ import { formatMessage, getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, useRef, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
-import { Service, type GitCleanupPolicy, type GitOverview } from "./mygo";
+import {
+  Service,
+  type GitOverview,
+  type GitCleanupTarget,
+  type GitCleanupPolicy,
+} from "./mygo";
 import { Button, Empty, Icon, Select } from "./components";
 import { gitPreview } from "./git-preview";
 import ProjectStashes from "./ProjectStashes";
@@ -71,6 +76,7 @@ export default function ProjectGit({
   }, [path, state.revision]);
 
   async function perform(operation: () => Promise<unknown>, success: string) {
+    if (!native || pending) return;
     update({ pending: true, error: "", notice: "" });
     try {
       await operation();
@@ -84,13 +90,13 @@ export default function ProjectGit({
     }
   }
 
-  const candidates = (data: GitOverview) => [
+  const candidates = (data: GitOverview): GitCleanupTarget[] => [
     ...data.worktrees
       .filter((w) => w.eligible)
-      .map((w) => ({ kind: "Worktrees", name: w.path })),
+      .map((w) => ({ kind: "worktree", target: w.path })),
     ...data.branches
       .filter((b) => b.eligible)
-      .map((b) => ({ kind: "Local branches", name: b.name })),
+      .map((b) => ({ kind: "branch", target: b.name })),
   ];
 
   return (
@@ -123,12 +129,12 @@ export default function ProjectGit({
         </div>
         <div className="flex items-center gap-2">
           <Button
-            disabled={!native || !view?.git || pending}
+            disabled={!view?.git || pending}
             onClick={() =>
               view && update({ preview: view, error: "", notice: "" })
             }
           >
-            {t("Preview cleanup")}
+            {t("Manual cleanup")}
           </Button>
           <button
             className="icon-button text-muted disabled:opacity-45"
@@ -388,13 +394,16 @@ export default function ProjectGit({
       {preview && (
         <CleanupPreview
           pending={pending}
-          count={candidates(preview).length}
+          items={candidates(preview)}
+          branches={preview.branches}
+          error={error}
           onClose={() => update({ preview: null })}
-          onApply={() =>
+          onApply={(targets) =>
             perform(async () => {
-              const result = await Service.cleanupGitWorkspace(
+              const result = await Service.cleanupGitSelection(
                 path,
                 preview.version,
+                targets,
               );
               const removed = result.items.filter(
                 (i) => i.status === "removed",
@@ -414,25 +423,44 @@ export default function ProjectGit({
         >
           <p className="text-sm leading-6 text-muted">
             {t(
-              "Remove only the worktrees and local branches below. Recovery refs preserve commits. Modified, ignored, unmerged, or active worktrees are kept.",
+              "Choose the worktrees and local branches to remove. Only selected eligible items will be cleaned up; retention and workspace protections still apply. Recovery refs preserve commits.",
             )}
           </p>
-          {candidates(preview).length ? (
-            <ul className="grouped-list mt-4 max-h-[40dvh] overflow-auto">
-              {candidates(preview).map((c) => (
-                <li
-                  key={`${c.kind}:${c.name}`}
-                  className="break-all border-b border-line-subtle p-3 text-sm last:border-0"
-                >
-                  <span className="mr-2 text-muted">{t(c.kind)}</span>
-                  {c.name}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="py-5 text-sm">
+          {preview.warnings.map((warning) => (
+            <p key={warning} className="text-sm text-removed">
+              {t(warning)}
+            </p>
+          ))}
+          {!candidates(preview).length && (
+            <p className="py-3 text-sm">
               {t("Nothing to clean up. See the list for retention reasons.")}
             </p>
+          )}
+          {!candidates(preview).length && (
+            <ul className="max-h-[40dvh] space-y-3 overflow-auto text-xs text-muted">
+              {preview.worktrees
+                .filter((item) => !item.eligible)
+                .map((item) => (
+                  <li key={item.path}>
+                    <p className="break-all font-medium">{item.path}</p>
+                    <p className="mt-1 break-words">
+                      {item.reasons.map((reason) => t(reason)).join("; ")}
+                    </p>
+                  </li>
+                ))}
+              {preview.branches
+                .filter((item) => !item.eligible)
+                .map((item) => (
+                  <li key={`branch:${item.name}`}>
+                    <p className="break-all font-medium">
+                      {t("Branch")} · {item.name}
+                    </p>
+                    <p className="mt-1 break-words">
+                      {item.reasons.map((reason) => t(reason)).join("; ")}
+                    </p>
+                  </li>
+                ))}
+            </ul>
           )}
         </CleanupPreview>
       )}
@@ -530,51 +558,171 @@ function CleanupSettings({
 
 function CleanupPreview({
   children,
-  count,
+  items,
+  branches,
   pending,
+  error,
   onClose,
   onApply,
 }: {
   children: React.ReactNode;
-  count: number;
+  items: GitCleanupTarget[];
+  branches: GitOverview["branches"];
   pending: boolean;
+  error: string;
   onClose: () => void;
-  onApply: () => void;
+  onApply: (targets: GitCleanupTarget[]) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [selected, select] = useReducer(
+    (_current: string[], next: string[]) => next,
+    [],
+  );
+  const key = (item: GitCleanupTarget) =>
+    JSON.stringify([item.kind, item.target]);
+  const targets = items.filter((item) => selected.includes(key(item)));
+  const missingWorktrees = branches
+    .filter((branch) =>
+      targets.some(
+        (item) => item.kind === "branch" && item.target === branch.name,
+      ),
+    )
+    .flatMap((branch) => branch.worktrees)
+    .filter(
+      (path) =>
+        !targets.some(
+          (item) => item.kind === "worktree" && item.target === path,
+        ),
+    );
   useEffect(() => {
-    ref.current?.showModal();
+    const dialog = ref.current;
+    dialog
+      ?.querySelector<HTMLButtonElement>("[data-cleanup-cancel]")
+      ?.setAttribute("autofocus", "");
+    dialog?.showModal();
   }, []);
+  const close = () => {
+    if (pending) return;
+    ref.current?.close();
+    onClose();
+  };
   return (
     <dialog
       ref={ref}
       aria-labelledby="git-cleanup-title"
-      onCancel={(e) => {
-        if (pending) e.preventDefault();
-        else onClose();
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
       }}
-      className="m-auto max-h-[calc(100dvh-32px)] w-[520px] max-w-[calc(100vw-32px)] overflow-auto rounded-xl bg-white p-4 text-ink shadow-xl backdrop:bg-black/20"
+      className="m-auto max-h-[calc(100dvh-32px)] w-[520px] max-w-[calc(100vw-32px)] overflow-auto overscroll-contain rounded-xl bg-white p-4 text-ink shadow-xl backdrop:overflow-hidden backdrop:overscroll-contain backdrop:bg-black/20"
     >
       <div className="mb-3 flex items-center gap-3">
         <h2 id="git-cleanup-title" className="flex-1 text-lg font-semibold">
-          {t("Cleanup preview")}
+          {t("Manual cleanup")}
         </h2>
         <button
           className="icon-button"
           aria-label={t("Close cleanup preview")}
           disabled={pending}
-          onClick={onClose}
+          onClick={close}
         >
           <Icon name="close" />
         </button>
       </div>
       {children}
+      {items.length > 0 && (
+        <>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span>
+              {t(
+                "Selected {0} of {1} eligible items",
+                targets.length,
+                items.length,
+              )}
+            </span>
+            <Button
+              disabled={pending}
+              onClick={() =>
+                select(targets.length === items.length ? [] : items.map(key))
+              }
+            >
+              {t(
+                targets.length === items.length
+                  ? "Clear selection"
+                  : "Select all eligible items",
+              )}
+            </Button>
+          </div>
+          <ul className="grouped-list mt-3 max-h-[40dvh] overflow-auto">
+            {items.map((item) => (
+              <li key={key(item)}>
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 px-3 py-3 text-sm">
+                  <input
+                    type="checkbox"
+                    aria-label={t(
+                      item.kind === "worktree"
+                        ? "Select worktree {0}"
+                        : "Select branch {0}",
+                      item.target,
+                    )}
+                    className="mt-0.5 size-4 shrink-0 accent-accent"
+                    disabled={pending}
+                    checked={selected.includes(key(item))}
+                    onChange={(event) =>
+                      select(
+                        event.target.checked
+                          ? [...selected, key(item)]
+                          : selected.filter((value) => value !== key(item)),
+                      )
+                    }
+                  />
+                  <span className="min-w-0 break-all">
+                    <span className="mr-2 text-muted">
+                      {t(item.kind === "worktree" ? "Worktrees" : "Branch")}
+                    </span>
+                    {item.target}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {missingWorktrees.length > 0 && (
+        <p className="mt-3 break-all text-sm text-removed">
+          {t(
+            "Also select the linked worktrees: {0}",
+            missingWorktrees.join(", "),
+          )}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="mt-3 break-words text-sm text-removed">
+          {t(error)}
+        </p>
+      )}
+      {!native && targets.length > 0 && (
+        <p className="mt-3 text-xs text-muted">
+          {t("Open the desktop app to execute this cleanup.")}
+        </p>
+      )}
       <div className="mt-4 flex justify-end gap-2">
-        <Button disabled={pending} onClick={onClose}>
+        <Button data-cleanup-cancel="" disabled={pending} onClick={close}>
           {t("Cancel")}
         </Button>
-        <Button primary disabled={pending || count === 0} onClick={onApply}>
-          {pending ? t("Cleaning up…") : t("Clean up {0}  items", count)}
+        <Button
+          primary
+          disabled={
+            !native ||
+            pending ||
+            targets.length === 0 ||
+            missingWorktrees.length > 0
+          }
+          onClick={() => onApply(targets)}
+        >
+          {pending
+            ? t("Cleaning up…")
+            : t("Clean up {0}  items", targets.length)}
         </Button>
       </div>
     </dialog>

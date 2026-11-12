@@ -2,7 +2,11 @@ import { t } from "./i18n";
 import type { ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Icon, Select } from "./components";
-import { projectTabs, type ProjectTab } from "./project-tabs";
+import {
+  primaryProjectTabs,
+  projectTabLabel,
+  type ProjectTab,
+} from "./project-tabs";
 import type { Preferences } from "./preferences";
 import appInfo from "../../mygo.json";
 
@@ -63,7 +67,7 @@ export default function Settings({
             id="remember-tabs"
             title={t("Remember project tabs")}
             description={t(
-              "Return to the last page you viewed in each project.",
+              "Return to the last main page you viewed in each project. Utilities open only when selected.",
             )}
           >
             <input
@@ -94,9 +98,9 @@ export default function Settings({
                 onChange({ defaultTab: event.target.value as ProjectTab })
               }
             >
-              {projectTabs.map((tab) => (
+              {primaryProjectTabs.map((tab) => (
                 <option key={tab} value={tab}>
-                  {t(tab)}
+                  {t(projectTabLabel(tab))}
                 </option>
               ))}
             </Select>

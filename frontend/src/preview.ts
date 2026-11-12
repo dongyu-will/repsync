@@ -2,6 +2,25 @@ import type { Inspection } from "./mygo";
 
 // Browser-only document content; never read from local repositories.
 export const previewDocuments: Record<string, Record<string, string>> = {
+  "/Projects/notebook": {
+    "AGENTS.md": `# Notebook 项目规范
+
+## 实现
+- 优先复用已有组件和项目命令，保持改动范围清晰。
+- 前端、后端和数据库分别验证，不以页面加载成功代替接口与数据检查。
+
+## 工作区与交付
+- 提交前核对修改范围，保留其他任务的改动。
+- 不提交凭据、数据库文件和本地运行日志。
+- 修改入口或行为时同步相关指南。
+`,
+    "CONTRIBUTING.md": `# Notebook 开发约定
+
+- 启动前查阅 README 中的前端、后端和数据库入口。
+- 日常改动运行受影响范围的检查。
+- 数据库迁移、备份和恢复按项目已有流程处理。
+`,
+  },
   "/Projects/atlas": {
     "AGENTS.md": `# Atlas Project rules
 
@@ -77,7 +96,7 @@ export const previewInspections: Inspection[] = [
     stashKnown: true,
     stashCount: 0,
     status: "",
-    documents: [],
+    documents: Object.keys(previewDocuments["/Projects/notebook"]),
     scripts: { dev: "vite", build: "vite build" },
     warnings: [],
   },

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useReducer } from "react";
-import { projectTabs, type ProjectTab } from "./project-tabs";
+import { restorePrimaryProjectTab, type ProjectTab } from "./project-tabs";
 import {
   preferenceStorageKey,
   readLanguage,
@@ -49,9 +49,10 @@ function load(): State {
           typeof saved.rememberTabs === "boolean"
             ? saved.rememberTabs
             : defaultPreferences.rememberTabs,
-        defaultTab: projectTabs.includes(saved.defaultTab)
-          ? saved.defaultTab
-          : defaultPreferences.defaultTab,
+        defaultTab: restorePrimaryProjectTab(
+          saved.defaultTab,
+          defaultPreferences.defaultTab,
+        ),
         refreshSeconds: [0, 30, 60, 300].includes(saved.refreshSeconds)
           ? saved.refreshSeconds
           : defaultPreferences.refreshSeconds,

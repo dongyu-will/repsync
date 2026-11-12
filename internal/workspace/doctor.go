@@ -22,6 +22,7 @@ type ServiceCheck struct {
 	Cwd                 string   `json:"cwd"`
 	Port                int      `json:"port"`
 	AutoPort            bool     `json:"autoPort"`
+	ObserveOnly         bool     `json:"observeOnly"`
 	Environment         []string `json:"environment"`
 	EndpointEnvironment []string `json:"endpointEnvironment"`
 	ExecutableAvailable bool     `json:"executableAvailable"`
@@ -71,10 +72,17 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 			}
 			slices.Sort(check.Environment)
 			slices.Sort(check.EndpointEnvironment)
-			_, err := projectCommand(context.Background(), path, d.Cwd, d.Env, d.Command, false)
-			check.ExecutableAvailable = err == nil
-			if err != nil {
-				issue("error", "executable", d.ID, err.Error())
+			check.ObserveOnly = d.ObserveOnly
+			if d.ObserveOnly {
+				if !servicePortConnects(d) {
+					issue("error", "dependency_unreachable", d.ID, "External dependency is unreachable; start it using its existing owner")
+				}
+			} else {
+				_, err := projectCommand(context.Background(), path, d.Cwd, d.Env, d.Command, false)
+				check.ExecutableAvailable = err == nil
+				if err != nil {
+					issue("error", "executable", d.ID, err.Error())
+				}
 			}
 			if d.Port == 0 && !d.AutoPort {
 				issue("warning", "port_unchecked", d.ID, "No listening port declared; ask AI to configure it for network services")
@@ -97,10 +105,15 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 				}
 				s.taskMu.Unlock()
 				for i, plan := range plans {
+					if plan.configured.ObserveOnly {
+						live[i] = ServiceStartResult{State: observedServiceState(plan.configured)}
+					}
+				}
+				for i, plan := range plans {
 					if len(plan.dependencies) > 0 && localServiceRunning(live[i].State.Status) {
 						unavailable := false
 						for _, index := range plan.dependencies {
-							if !localServiceRunning(live[index].State.Status) {
+							if !localServiceRunning(live[index].State.Status) && live[index].State.Status != "reachable" {
 								unavailable = true
 							}
 						}

@@ -47,6 +47,9 @@ func (s *Service) StartLocalService(path, id, version string) (LocalServiceState
 		return LocalServiceState{}, errors.New("service configuration removed; refresh")
 	}
 	definition := config.services[index]
+	if definition.ObserveOnly {
+		return LocalServiceState{}, errors.New("this dependency is observed only; start it using its existing owner")
+	}
 	if len(definition.EnvFrom) > 0 {
 		batch, err := s.startServices([]string{path}, false, map[string]string{path: id}, map[string]string{path: version})
 		for _, item := range batch.Services {

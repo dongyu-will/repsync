@@ -86,7 +86,9 @@ function DocumentContent({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
-  const dirty = !!draft && draft.base !== draft.content;
+  const [editing, setEditing] = useState(false);
+  const readOnly = !editing;
+  const dirty = !readOnly && !!draft && draft.base !== draft.content;
   const key = storageKey(path, name);
 
   useEffect(() => {
@@ -98,6 +100,11 @@ function DocumentContent({
           : previewDocuments[path]?.[name];
         if (content === undefined) throw new Error("Document not found");
         if (!active) return;
+        if (readOnly) {
+          setDraft({ base: content, content });
+          setLoadError("");
+          return;
+        }
         let stored: DocumentDraft | null = null;
         try {
           const value = JSON.parse(sessionStorage.getItem(key) || "null");
@@ -126,7 +133,7 @@ function DocumentContent({
     return () => {
       active = false;
     };
-  }, [path, name, key, revision]);
+  }, [path, name, key, revision, readOnly]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -154,7 +161,7 @@ function DocumentContent({
   }
 
   async function save() {
-    if (!native || !draft || !dirty || busy) return;
+    if (readOnly || !native || !draft || !dirty || busy) return;
     setBusy(true);
     setSaveError("");
     setNotice("");
@@ -179,6 +186,12 @@ function DocumentContent({
   }
 
   function reload() {
+    if (readOnly) {
+      setDraft(null);
+      setLoadError("");
+      setRevision((value) => value + 1);
+      return;
+    }
     if (
       dirty &&
       !window.confirm(t("Discard unsaved changes and reload the file?"))
@@ -229,32 +242,49 @@ function DocumentContent({
       }}
     >
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <div
-          role="group"
-          aria-label={t("Document view")}
-          className="flex gap-1 rounded-md bg-surface p-1"
-        >
-          {(
-            [
-              ["preview", "Preview"],
-              ["edit", "Edit"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              aria-pressed={mode === value}
-              onClick={() => setMode(value)}
-              className={`min-h-7 rounded px-3 text-sm ${mode === value ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
-            >
-              {t(label)}
-            </button>
-          ))}
-        </div>
+        {readOnly ? (
+          <span className="break-all text-sm font-medium">{name}</span>
+        ) : (
+          <div
+            role="group"
+            aria-label={t("Document view")}
+            className="flex gap-1 rounded-md bg-surface p-1"
+          >
+            {(
+              [
+                ["preview", "Preview"],
+                ["edit", "Edit"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                aria-pressed={mode === value}
+                onClick={() => setMode(value)}
+                className={`min-h-7 rounded px-3 text-sm ${mode === value ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
+              >
+                {t(label)}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            disabled={busy || (dirty && !!storageError)}
+            onClick={() => {
+              setDraft(null);
+              setLoadError("");
+              setSaveError("");
+              setNotice("");
+              setMode(editing ? "preview" : "edit");
+              setEditing(!editing);
+            }}
+          >
+            {t(editing ? "Back to saved file" : "Edit document")}
+          </Button>
           <span role="status" className="text-xs text-muted">
             {dirty ? t("Unsaved") : notice}
           </span>
-          {mode === "preview" && <DocumentFind reader={reader} />}
+          {(readOnly || mode === "preview") && <DocumentFind reader={reader} />}
           <button
             className="icon-button"
             aria-label={t("Reload document")}
@@ -264,7 +294,7 @@ function DocumentContent({
           >
             <Icon name="refresh" size={16} />
           </button>
-          {(mode === "edit" || dirty) && (
+          {!readOnly && (mode === "edit" || dirty) && (
             <Button
               primary
               disabled={!native || !dirty || busy}
@@ -285,7 +315,7 @@ function DocumentContent({
           {t(saveError || storageError)}
         </p>
       )}
-      {mode === "edit" ? (
+      {!readOnly && mode === "edit" ? (
         <textarea
           aria-label={t("{0} Editor", name)}
           spellCheck={false}

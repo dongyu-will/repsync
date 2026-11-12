@@ -322,6 +322,11 @@ export interface GitCleanupRecord {
   items: GitCleanupItem[];
 }
 
+export interface GitCleanupTarget {
+  kind: string;
+  target: string;
+}
+
 export interface GitOverview {
   git: boolean;
   worktrees: GitWorktree[];
@@ -400,6 +405,7 @@ export interface LocalServiceDefinition {
   port: number;
   autoPort: boolean;
   fixedPort?: boolean;
+  observeOnly?: boolean;
   url: string;
   cwd: string;
   env: Record<string, string>;
@@ -422,6 +428,17 @@ export interface LocalServiceState {
   exitCode: number;
   error: string;
   configChanged: boolean;
+  usage?: LocalServiceUsage;
+  usageError?: string;
+}
+
+/** LocalServiceUsage is an on-demand host process snapshot, never a container metric. */
+export interface LocalServiceUsage {
+  cpuPercent: number;
+  memoryBytes: number;
+  processCount: number;
+  scope: string;
+  sampledAt: string;
 }
 
 export interface LocalServicesOverview {
@@ -891,6 +908,7 @@ export interface ServiceCheck {
   cwd: string;
   port: number;
   autoPort: boolean;
+  observeOnly: boolean;
   environment: string[];
   endpointEnvironment: string[];
   executableAvailable: boolean;
@@ -1014,6 +1032,10 @@ export const Service = {
   },
   checkPolicies(path: string): Promise<PolicyReport> {
     return call("Service.CheckPolicies", path);
+  },
+  /** CleanupGitSelection removes only explicitly selected, currently eligible targets. */
+  cleanupGitSelection(path: string, version: string, targets: GitCleanupTarget[]): Promise<GitCleanupRecord> {
+    return call("Service.CleanupGitSelection", path, version, targets);
   },
   /** CleanupGitWorkspace applies exactly the reviewed inventory, rechecking it first. */
   cleanupGitWorkspace(path: string, version: string): Promise<GitCleanupRecord> {
@@ -1244,7 +1266,7 @@ export const Service = {
   scanDocumentReview(path: string, scope: string, keywords: string): Promise<DocumentReview> {
     return call("Service.ScanDocumentReview", path, scope, keywords);
   },
-  /** ServiceReadiness reports TCP readiness for exact run receipts; it never follows replacements. */
+  /** ServiceReadiness checks exact managed runs and current observed dependencies without run IDs. */
   serviceReadiness(runs: ServiceRunRef[]): Promise<ServiceBatch> {
     return call("Service.ServiceReadiness", runs);
   },
@@ -1291,6 +1313,10 @@ export const Service = {
   /** StartPipeline requires the exact configuration the user has just reviewed. */
   startPipeline(path: string, pipelineID: string, version: string): Promise<PipelineRun> {
     return call("Service.StartPipeline", path, pipelineID, version);
+  },
+  /** StartProject uses the configuration version displayed in the project workspace. */
+  startProject(path: string, version: string): Promise<ServiceBatch> {
+    return call("Service.StartProject", path, version);
   },
   /**
    * StartProjects validates all selected projects before starting any new service.

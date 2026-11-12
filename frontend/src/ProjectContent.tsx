@@ -1,16 +1,16 @@
 import { t } from "./i18n";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import type { Inspection } from "./mygo";
-import ProjectDocuments from "./ProjectDocuments";
-import ProjectMap from "./ProjectMap";
-import SharedRules from "./SharedRules";
-import SharedFiles from "./SharedFiles";
-import ProjectPipelines from "./ProjectPipelines";
 import ProjectCommands from "./ProjectCommands";
 import ProjectRules from "./ProjectRules";
-import ProjectGit, { type GitSection } from "./ProjectGit";
-import ProjectReviewPanel from "./ProjectReview";
-import AIResources from "./AIResources";
+import type { GitSection } from "./ProjectGit";
+
+const ProjectDocuments = lazy(() => import("./ProjectDocuments"));
+const ProjectMap = lazy(() => import("./ProjectMap"));
+const ProjectPipelines = lazy(() => import("./ProjectPipelines"));
+const ProjectGit = lazy(() => import("./ProjectGit"));
+const ProjectReviewPanel = lazy(() => import("./ProjectReview"));
+const AIResources = lazy(() => import("./AIResources"));
 
 import type { ProjectTab } from "./project-tabs";
 export type { ProjectTab } from "./project-tabs";
@@ -18,72 +18,58 @@ export type { ProjectTab } from "./project-tabs";
 export default function ProjectContent({
   details,
   tab,
-  onOpenShared,
   onUpdated,
   onOpenStashes,
   gitSection,
   onOpenCI,
+  onOpenReview,
 }: {
   details: Inspection;
   tab: ProjectTab;
-  onOpenShared: () => void;
   onUpdated: () => void;
   onOpenStashes: () => void;
   gitSection: GitSection;
   onOpenCI: () => void;
+  onOpenReview: () => void;
 }) {
   return (
-    <div
-      className={
-        tab === "Documents" ? "flex h-full min-h-0 flex-col" : "contents"
-      }
-    >
-      {details.warnings.map((warning, i) => (
-        <p
-          key={i}
-          className="mb-4 shrink-0 break-words rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-900"
-        >
-          {t(warning)}
-        </p>
-      ))}
-      {tab === "Project map" ? (
-        <ProjectMap key={details.project.path} path={details.project.path} />
-      ) : tab === "Worktrees" ? (
-        <ProjectGit
-          key={details.project.path}
-          path={details.project.path}
-          initialSection={gitSection}
-          onUpdated={onUpdated}
-        />
-      ) : tab === "CI/CD" ? (
-        <ProjectPipelines
-          key={details.project.path}
-          path={details.project.path}
-        />
-      ) : tab === "Rules" ? (
-        <ProjectStandards
-          key={details.project.path}
-          details={details}
-          onOpenShared={onOpenShared}
-          onUpdated={onUpdated}
-        />
-      ) : tab === "AI resources" ? (
-        <AIResources key={details.project.path} path={details.project.path} />
-      ) : tab === "Documents" ? (
-        <ProjectDocuments
-          key={details.project.path}
-          path={details.project.path}
-          names={details.documents}
-        />
-      ) : (
-        <>
-          <section aria-label={t("Local services")}>
-            <ProjectCommands
-              key={details.project.path}
-              path={details.project.path}
-              scripts={details.scripts}
-            />
-          </section>
+    <Suspense fallback={<p role="status">{t("Loading…")}</p>}>
+      <div
+        className={
+          tab === "Rules" ? "flex h-full min-h-0 flex-col" : "contents"
+        }
+      >
+        {details.warnings.map((warning, i) => (
+          <p
+            key={i}
+            className="mb-4 shrink-0 break-words rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-900"
+          >
+            {t(warning)}
+          </p>
+        ))}
+        {tab === "Project map" ? (
+          <ProjectMap key={details.project.path} path={details.project.path} />
+        ) : tab === "Worktrees" ? (
+          <ProjectGit
+            key={details.project.path}
+            path={details.project.path}
+            initialSection={gitSection}
+            onUpdated={onUpdated}
+          />
+        ) : tab === "CI/CD" ? (
+          <ProjectPipelines
+            key={details.project.path}
+            path={details.project.path}
+          />
+        ) : tab === "Rules" ? (
+          <ProjectStandards
+            key={details.project.path}
+            details={details}
+            onUpdated={onUpdated}
+          />
+        ) : tab === "AI resources" ? (
+          <AIResources key={details.project.path} path={details.project.path} />
+        ) : tab === "Review" ? (
           <ProjectReviewPanel
             key={details.project.path}
             path={details.project.path}
@@ -100,65 +86,127 @@ export default function ProjectContent({
                     : t("Clean workspace")
             }
           />
-        </>
-      )}
-    </div>
+        ) : (
+          <div className="space-y-4">
+            <ProjectCommands
+              key={details.project.path}
+              path={details.project.path}
+              scripts={details.scripts}
+            />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-xs text-muted">
+              <span>
+                {t(
+                  !details.git
+                    ? "Git status unavailable"
+                    : !details.statusKnown
+                      ? "Could not read workspace status"
+                      : details.status
+                        ? "Uncommitted changes"
+                        : "Clean workspace",
+                )}
+              </span>
+              {details.stashKnown && details.stashCount > 0 && (
+                <button className="min-h-7 text-accent" onClick={onOpenStashes}>
+                  {t("View stash")} · {details.stashCount}
+                </button>
+              )}
+              <button
+                className="ml-auto min-h-7 text-accent"
+                onClick={onOpenReview}
+              >
+                {t("Todos and handoff")}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Suspense>
   );
 }
 
 function ProjectStandards({
   details,
-  onOpenShared,
   onUpdated,
 }: {
   details: Inspection;
-  onOpenShared: () => void;
   onUpdated: () => void;
 }) {
-  const [section, setSection] = useState("project");
+  const [section, setSection] = useState("current");
+  const [visited, setVisited] = useState(["current"]);
+  const guidelineOrder = [
+    "agents",
+    "claude",
+    "gemini",
+    "contributing",
+    "rules",
+    "styleguide",
+    "development",
+    "design",
+    "code_of_conduct",
+  ];
+  const documentNames = [...details.documents].sort((a, b) => {
+    const aRank = guidelineOrder.indexOf(
+      a.replace(/\.(md|markdown)$/i, "").toLowerCase(),
+    );
+    const bRank = guidelineOrder.indexOf(
+      b.replace(/\.(md|markdown)$/i, "").toLowerCase(),
+    );
+    return (
+      (aRank < 0 ? guidelineOrder.length : aRank) -
+        (bRank < 0 ? guidelineOrder.length : bRank) || a.localeCompare(b)
+    );
+  });
   return (
-    <div className="space-y-5">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div
         role="group"
         aria-label={t("Rules sections")}
-        className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
+        className="flex w-fit max-w-full shrink-0 flex-wrap gap-1 rounded-lg bg-sidebar p-1"
       >
         {[
-          ["project", "Project rules"],
-          ["shared", "Shared rules"],
-          ["files", "Shared files"],
+          ["current", "Guidelines and documents"],
+          ["project", "Rule checks"],
         ].map(([id, title]) => (
           <button
             key={id}
             type="button"
             aria-pressed={section === id}
             aria-controls={`standards-${id}`}
-            onClick={() => setSection(id)}
+            onClick={() => {
+              setSection(id);
+              setVisited((current) =>
+                current.includes(id) ? current : [...current, id],
+              );
+            }}
             className={`min-h-8 rounded-md px-3 text-sm ${section === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
           >
             {t(title)}
           </button>
         ))}
       </div>
+      <div
+        id="standards-current"
+        hidden={section !== "current"}
+        className={
+          section === "current" ? "flex min-h-0 flex-1 flex-col gap-3" : ""
+        }
+      >
+        {visited.includes("current") && (
+          <>
+            <p className="shrink-0 text-xs text-muted">
+              {t("Project-root files only.")}
+            </p>
+            <ProjectDocuments
+              path={details.project.path}
+              names={documentNames}
+            />
+          </>
+        )}
+      </div>
       <div id="standards-project" hidden={section !== "project"}>
-        <ProjectRules path={details.project.path} onUpdated={onUpdated} />
-      </div>
-      <div id="standards-shared" hidden={section !== "shared"}>
-        <SharedRules
-          projects={[details.project]}
-          project={details.project}
-          showProjectRules={false}
-          onOpenShared={onOpenShared}
-          onUpdated={onUpdated}
-        />
-      </div>
-      <div id="standards-files" hidden={section !== "files"}>
-        <SharedFiles
-          projects={[details.project]}
-          project={details.project}
-          onUpdated={onUpdated}
-          active={section === "files"}
-        />
+        {visited.includes("project") && (
+          <ProjectRules path={details.project.path} onUpdated={onUpdated} />
+        )}
       </div>
     </div>
   );

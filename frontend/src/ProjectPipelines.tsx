@@ -25,7 +25,7 @@ const labels: Record<string, string> = {
   waiting: "Waiting",
   pending: "Waiting",
   requested: "Waiting",
-  success: "Passed",
+  success: "Succeeded",
   failure: "Failed",
   cancelled: "Stopped",
   timed_out: "Timed out",
@@ -343,9 +343,7 @@ function LocalPipelines({
         </>
       ) : (
         <Empty icon="file" title={t("No local pipelines yet")}>
-          {t(
-            "Ask AI to connect existing check or release commands, or add them in Configure pipelines.",
-          )}
+          {t("Ask AI to connect this project's existing CI/CD pipelines.")}
         </Empty>
       )}
       <section aria-label={t("Local run history")}>

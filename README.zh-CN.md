@@ -29,7 +29,7 @@ go mod download
 go tool mygo dev
 ```
 
-启动后从侧栏添加项目。`go tool mygo build` 生成的桌面应用位于 `build/darwin-arm64/`。
+启动后从侧栏添加项目。项目页签保留「启动项目 / 项目规范 / CI/CD / 工作树 / 待办与交接」；「项目地图」和项目「AI 资源」归入默认收起的「实用功能」，手动选择后打开。文档查看与编辑并入项目规范，命令详情与脚本并入启动项目；公共更新与共享文件统一从左侧公共规范进入。`go tool mygo build` 生成的桌面应用位于 `build/darwin-arm64/`。
 
 浏览器预览：运行 `npm --prefix frontend run dev`，打开 [localhost:5178](http://127.0.0.1:5178)。浏览器使用独立示例项目，本机文件和进程操作在桌面应用中使用。
 

@@ -29,7 +29,7 @@ type ServiceBatch struct {
 }
 
 func sameServiceDefinition(a, b LocalServiceDefinition) bool {
-	return slices.Equal(a.Command, b.Command) && maps.Equal(a.Env, b.Env) && maps.Equal(a.EnvFrom, b.EnvFrom) && a.Cwd == b.Cwd && a.Port == b.Port && a.URL == b.URL && a.AutoPort == b.AutoPort && a.FixedPort == b.FixedPort && a.scriptVersion == b.scriptVersion
+	return slices.Equal(a.Command, b.Command) && maps.Equal(a.Env, b.Env) && maps.Equal(a.EnvFrom, b.EnvFrom) && a.Cwd == b.Cwd && a.Port == b.Port && a.URL == b.URL && a.AutoPort == b.AutoPort && a.FixedPort == b.FixedPort && a.ObserveOnly == b.ObserveOnly && a.scriptVersion == b.scriptVersion
 }
 
 func (s *Service) activeServicePortsLocked() (int, map[int]string) {
@@ -154,6 +154,26 @@ func (s *Service) StartProjects(paths []string, dryRun bool) (ServiceBatch, erro
 	return s.startServices(paths, dryRun, nil, nil)
 }
 
+// StartProject uses the configuration version displayed in the project workspace.
+func (s *Service) StartProject(path, version string) (ServiceBatch, error) {
+	if version == "" {
+		return ServiceBatch{}, errors.New("refresh the project configuration before starting")
+	}
+	batch, err := s.startServices([]string{path}, false, nil, map[string]string{path: version})
+	if err != nil {
+		details := []string{}
+		for _, item := range batch.Services {
+			if item.Error != "" {
+				details = append(details, item.ServiceID+": "+item.Error)
+			}
+		}
+		if len(details) > 0 {
+			err = fmt.Errorf("%w: %s", err, strings.Join(details, "; "))
+		}
+	}
+	return batch, err
+}
+
 func (s *Service) startServices(paths []string, dryRun bool, selection map[string]string, versions map[string]string) (ServiceBatch, error) {
 	s.serviceStartMu.Lock()
 	defer s.serviceStartMu.Unlock()
@@ -222,6 +242,16 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 				result.Services[i] = entry
 				continue
 			}
+		}
+		if plan.configured.ObserveOnly {
+			entry.State = observedServiceState(plan.configured)
+			entry.Status = "observed"
+			if entry.State.Status != "reachable" {
+				entry.Status, entry.Error = "blocked", "External dependency is unreachable; start it using its existing owner"
+				blocked = true
+			}
+			result.Services[i] = entry
+			continue
 		}
 		resolved, listener, err := reserveServicePort(plan.configured, ports)
 		if err == nil {
@@ -294,7 +324,7 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 	slices.SortStableFunc(launchOrder, func(a, b int) int { return depths[a] - depths[b] })
 	for _, i := range launchOrder {
 		plan := plans[i]
-		if result.Services[i].Status == "already_running" {
+		if result.Services[i].Status == "already_running" || result.Services[i].Status == "observed" {
 			continue
 		}
 		var state LocalServiceState
@@ -396,7 +426,7 @@ type ServiceRunRef struct {
 	RunID     string `json:"runId"`
 }
 
-// ServiceReadiness reports TCP readiness for exact run receipts; it never follows replacements.
+// ServiceReadiness checks exact managed runs and current observed dependencies without run IDs.
 func (s *Service) ServiceReadiness(runs []ServiceRunRef) (ServiceBatch, error) {
 	result := ServiceBatch{Services: []ServiceStartResult{}}
 	if len(runs) == 0 || len(runs) > 256 {
@@ -405,6 +435,29 @@ func (s *Service) ServiceReadiness(runs []ServiceRunRef) (ServiceBatch, error) {
 	failed := false
 	for _, run := range runs {
 		item := ServiceStartResult{Path: run.Path, ServiceID: run.ServiceID, Status: "pending"}
+		if run.RunID == "" {
+			if _, err := s.registeredProject(run.Path); err != nil {
+				return result, err
+			}
+			config, err := s.localServiceConfig(run.Path)
+			if err != nil {
+				return result, err
+			}
+			index := slices.IndexFunc(config.services, func(d LocalServiceDefinition) bool {
+				return d.ID == run.ServiceID && d.ObserveOnly
+			})
+			if index < 0 {
+				return result, errors.New("observed dependency configuration changed; refresh project status")
+			}
+			item.State = observedServiceState(config.services[index])
+			item.PortChecked = true
+			item.Status = "ready"
+			if item.State.Status != "reachable" {
+				item.Status, item.Error, failed = "failed", "External dependency is unreachable", true
+			}
+			result.Services = append(result.Services, item)
+			continue
+		}
 		output, err := s.LocalServiceLog(run.Path, run.ServiceID, run.RunID)
 		item.State = output.State
 		item.PortChecked = output.State.Definition.Port != 0

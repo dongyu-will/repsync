@@ -33,7 +33,7 @@ go mod download
 go tool mygo dev
 ```
 
-Add a project from the sidebar to get started. To package the app, run `go tool mygo build`; output goes to `build/darwin-arm64/`.
+Add a project from the sidebar to get started. Project tabs cover **Project startup**, **Project standards**, **CI/CD**, **Worktrees**, and **Todos and handoff**. **Project map** and project **AI resources** are grouped under **Utilities**, collapsed by default and opened only when selected. Documents and editing live in Project standards; command details and scripts live in Project startup. Shared updates and shared files are managed once from the sidebar's Shared rules. To package the app, run `go tool mygo build`; output goes to `build/darwin-arm64/`.
 
 ### Browser preview
 

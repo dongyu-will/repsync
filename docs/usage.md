@@ -2,6 +2,20 @@
 
 See the [README](../README.md) for installation, development, and validation commands.
 
+## Navigation
+
+The app opens a specific project directly. **Projects** in the sidebar expands or collapses the project list; select a project or use search to switch. There is no separate projects overview.
+
+Projects have five main tabs: **Project startup**, **Project standards**, **CI/CD**, **Worktrees**, and **Todos and handoff**. They remain directly visible and wrap in narrow windows. Expand **Utilities** to open **Project map** or project **AI resources**; expanding the group does not load either page. Selecting a main tab or switching projects collapses Utilities. Collapsing Utilities while viewing a utility page returns to Project startup. Documents are part of Project standards; startup command details and package.json scripts are part of Project startup. Shared updates and shared files are managed once from the sidebar's **Shared rules**. Saved Documents preferences open Project standards, and saved Startup configuration preferences open Project startup.
+
+By default, startup restores the last project and its remembered main tab. Utilities start collapsed, are excluded from the default-page options, and never replace the remembered main tab. Older saved utility pages fall back to the configured main default page. Disable **Reopen last project** in Settings to open the first project in the sidebar instead.
+
+## Project standards
+
+**Project standards → Guidelines and documents** lists all root `.md` and `.markdown` files. Guideline names AGENTS, CLAUDE, GEMINI, CONTRIBUTING, RULES, STYLEGUIDE, DEVELOPMENT, DESIGN, and CODE_OF_CONDUCT are prioritized, with AGENTS first. Select a file to read saved content, search it, or refresh after external edits. **Edit document** restores any session draft in the same reader; save with the existing protected operation, or choose **Back to saved file** to read saved content while retaining the draft. Empty files, missing files, and read errors have separate states.
+
+The reader covers the project root; it does not expand inherited parent instructions, nested directory rules, or non-Markdown tool configuration, and does not claim to resolve all effective rules. **Rule checks** retains policy declarations and checks. The sidebar's **Shared rules** manages common sources, project adoption, diff preview, apply, recovery, and shared files; those views are not duplicated inside each project.
+
 ## Project configuration
 
 Ask your AI assistant to read the project's guides and connect its existing commands through `.repsync.json`. Manual configuration forms are also available.
@@ -31,6 +45,24 @@ Ask your AI assistant to read the project's guides and connect its existing comm
 ```
 
 Commands are argument arrays and run from the project root unless `cwd` is set. The example assumes the `dev` script accepts `--port`; adapt it to your tool. `autoPort` uses `{port}` to pass the allocated port to the command. Use `fixedPort` for services that require a specific port. `envFrom` can reference declared service endpoints.
+
+## Project runtime
+
+**Project startup** starts the configured project components together and shows each component's process state, port connectivity, address, and recent logs. Startup reuses running app-owned instances and checks all prerequisites before launching new processes. **Stop project** stops only instances owned by repsync for this project; cross-project dependencies retain their own lifecycle. Each managed component has **Command details**, and package.json scripts are available on the same page. Configuration stays with the existing AI workflow. **Monitoring details** expands the connectivity and resource measurement limitations; component start buttons remain secondary to project startup.
+
+CPU and memory refresh with the component status, roughly every two seconds while this view is open. Managed components sum their owned process group, including ordinary children such as npm, Node, and build tools. Observed dependencies sum only the host processes listening on the declared port, labeled **Host listener**. These are host measurements: a container port proxy does not expose the database process inside the container. No container API, database credentials, or monitoring agent is added. Unavailable measurements are shown as unavailable; stopped components retain no live metrics.
+
+CPU uses the operating system's `ps %CPU` snapshot (100% represents one core and values can exceed 100%); it is not a precise two-second utilization sample. Memory is summed resident set size (RSS), displayed in MiB; shared resident pages can be counted by more than one process. Metrics are read on demand and are not persisted as history.
+
+Declare shared databases, caches, or other existing local dependencies as `observeOnly`, with an explicit port and no command:
+
+```json
+{"id": "db", "name": "PostgreSQL", "observeOnly": true, "port": 5432}
+```
+
+These entries are checked for TCP connectivity and never started, stopped, or assigned a run ID. They cannot declare `command`, `cwd`, `env`, `envFrom`, or `autoPort`. An unreachable observed dependency blocks project startup before any new process launches. Database credentials and database URLs are not needed for this check. Observed dependencies have no repsync process log; inspect them through their existing database or container tools. For project-owned databases, reuse the project's existing foreground service command; detached container commands do not establish process ownership.
+
+Use `envFrom` on a managed component to declare a real endpoint dependency, for example `"envFrom": {"DATABASE_PORT": {"service": "db", "field": "port"}}`. The consumer waits for the prerequisite port before launch. This injects only the referenced endpoint; keep credentials and complete database connection strings in the project's existing environment setup. TCP connectivity does not verify authentication, migrations, application responses, or database business health.
 
 ## CLI
 
@@ -68,7 +100,7 @@ repsync runs /absolute/path/to/project
 
 Settings saves preferences automatically for the current desktop app or browser. Desktop and browser preferences are separate.
 
-- **Startup:** reopen the last project, remember each project's tab, and choose a default page. The default applies when there is no remembered tab, or whenever tab restoration is disabled.
+- **Startup:** reopen the last project (default), remember each project's tab, and choose a default page. The default applies when there is no remembered tab, or whenever tab restoration is disabled.
 - **Appearance:** choose the interface language (Follow system, 简体中文, or English), standard or larger text, and system or reduced motion. Language changes apply immediately and are remembered after reopening. Follow system uses the system/WebView language (Chinese maps to Simplified Chinese; other languages use English) and responds to language-change events. Project names, paths, commands, logs, diffs, and document or memory content keep their original text.
 - **Project status:** choose how often to refresh the project overview. Focus and manual refresh remain available. Other views retain their own update schedules.
 - **About:** view the current app version and open documentation, issues, releases, or source code.
@@ -77,7 +109,7 @@ Reset preferences restores these defaults without changing project registrations
 
 ## Project map
 
-The project's **Project map** tab groups implementations by user-facing feature. Open a module to see its implementations and entry references. **Ask AI to organize** copies an instruction for your existing AI chat; refresh after it writes `.repsync-map.json` in the project root. The app does not call a model or change project code.
+Open **Project map** in a project to group implementations by user-facing feature. Open a module to see its implementations and entry references. **Ask AI to organize** copies an instruction for your existing AI chat; refresh after it writes `.repsync-map.json` in the project root. The app does not call a model or change project code.
 
 ```json
 {

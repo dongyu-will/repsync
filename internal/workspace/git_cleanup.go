@@ -20,10 +20,32 @@ import (
 func (s *Service) CleanupGitWorkspace(path, version string) (GitCleanupRecord, error) {
 	s.gitMu.Lock()
 	defer s.gitMu.Unlock()
-	return s.cleanupGitWorkspace(path, version, false)
+	return s.cleanupGitWorkspace(path, version, false, nil)
 }
 
-func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (GitCleanupRecord, error) {
+type GitCleanupTarget struct {
+	Kind   string `json:"kind"`
+	Target string `json:"target"`
+}
+
+// CleanupGitSelection removes only explicitly selected, currently eligible targets.
+func (s *Service) CleanupGitSelection(path, version string, targets []GitCleanupTarget) (GitCleanupRecord, error) {
+	if len(targets) == 0 || len(targets) > 320 {
+		return GitCleanupRecord{}, errors.New("select 1–320 cleanup items")
+	}
+	selected := map[GitCleanupTarget]bool{}
+	for _, target := range targets {
+		if (target.Kind != "worktree" && target.Kind != "branch") || target.Target == "" || selected[target] {
+			return GitCleanupRecord{}, errors.New("cleanup selection contains an invalid or duplicate target")
+		}
+		selected[target] = true
+	}
+	s.gitMu.Lock()
+	defer s.gitMu.Unlock()
+	return s.cleanupGitWorkspace(path, version, false, selected)
+}
+
+func (s *Service) cleanupGitWorkspace(path, version string, automatic bool, selected map[GitCleanupTarget]bool) (GitCleanupRecord, error) {
 	record := GitCleanupRecord{Items: []GitCleanupItem{}}
 	view, err := s.gitOverview(path)
 	if err != nil {
@@ -42,14 +64,24 @@ func (s *Service) cleanupGitWorkspace(path, version string, automatic bool) (Git
 	record.ID = fmt.Sprintf("%019d-%s", time.Now().UnixMilli(), rand.Text())
 	record.CreatedAt, record.Automatic = time.Now().UTC().Format(time.RFC3339), automatic
 	for _, w := range view.Worktrees {
-		if w.Eligible {
+		if w.Eligible && (selected == nil || selected[GitCleanupTarget{Kind: "worktree", Target: w.Path}]) {
 			record.Items = append(record.Items, GitCleanupItem{Kind: "worktree", Target: w.Path, Branch: w.Branch, Commit: w.Commit, Status: "pending"})
 		}
 	}
 	for _, b := range view.Branches {
-		if b.Eligible {
+		if b.Eligible && (selected == nil || selected[GitCleanupTarget{Kind: "branch", Target: b.Name}]) {
+			if selected != nil {
+				for _, worktree := range b.Worktrees {
+					if !selected[GitCleanupTarget{Kind: "worktree", Target: worktree}] {
+						return record, errors.New("select the linked worktree before cleaning up its checked-out branch")
+					}
+				}
+			}
 			record.Items = append(record.Items, GitCleanupItem{Kind: "branch", Target: b.Name, Branch: b.Name, Commit: b.Commit, Upstream: b.Upstream, Status: "pending"})
 		}
+	}
+	if selected != nil && len(record.Items) != len(selected) {
+		return record, errors.New("selected cleanup items are missing or protected; refresh and review the selection")
 	}
 	if len(record.Items) == 0 {
 		return record, nil
@@ -270,7 +302,7 @@ func (s *Service) RunAutomaticGitCleanup() ([]GitCleanupRecord, error) {
 			view, scanErr := s.gitOverview(p.Path)
 			if scanErr == nil {
 				var result GitCleanupRecord
-				result, e = s.cleanupGitWorkspace(p.Path, view.Version, true)
+				result, e = s.cleanupGitWorkspace(p.Path, view.Version, true, nil)
 				if len(result.Items) > 0 {
 					results = append(results, result)
 				}

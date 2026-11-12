@@ -27,6 +27,8 @@ const statusLabels: Record<string, string> = {
   failure: "Failed to start or run",
   exited: "Exited",
   interrupted: "Interrupted",
+  reachable: "Reachable",
+  unreachable: "Unreachable",
 };
 const portLabels: Record<string, string> = {
   listening: "Port reachable",
@@ -35,6 +37,7 @@ const portLabels: Record<string, string> = {
   available: "Port available",
   unknown: "Port status unknown",
   none: "No port configured",
+  unreachable: "Port unreachable",
 };
 
 export default function ProjectCommands({
@@ -50,6 +53,7 @@ export default function ProjectCommands({
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [pending, setPending] = useState("");
+  const [projectPending, setProjectPending] = useState("");
   const [revision, setRevision] = useState(0);
   const [selected, setSelected] = useState("");
   const [output, setOutput] = useState<LocalServiceOutput | null>(null);
@@ -170,6 +174,21 @@ export default function ProjectCommands({
     }
   }
 
+  async function projectAction(kind: "start" | "stop") {
+    if (!overview || !native) return;
+    setProjectPending(kind);
+    setActionError("");
+    try {
+      if (kind === "start") await Service.startProject(path, overview.version);
+      else await Service.stopProjects([path]);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setProjectPending("");
+      setRevision((value) => value + 1);
+    }
+  }
+
   async function inspectPort(state: LocalServiceState) {
     const request = ++ownerRequest.current;
     setOwnerID(state.definition.id);
@@ -188,11 +207,63 @@ export default function ProjectCommands({
   const selectedState = overview?.services.find(
     (service) => service.definition.id === selected,
   );
+  const states = overview?.services || [];
+  const busy = !!pending || !!projectPending;
+  const managed = states.filter((state) => !state.definition.observeOnly);
+  const ready = states.filter(
+    (state) => state.portState === "listening",
+  ).length;
+  const running = managed.filter(isRunning).length;
+  const canStartProject =
+    managed.some((state) => !isRunning(state)) &&
+    !states.some((state) => state.configChanged || state.status === "stopping");
   return (
-    <div className="min-w-0 space-y-4">
-      <div className="section-heading flex items-center justify-between gap-3">
-        <h2>{t("Local services")}</h2>
-        <div className="flex items-center gap-2">
+    <div className="min-w-0 space-y-3">
+      <h2 className="sr-only">{t("Project runtime")}</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        {states.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              primary
+              disabled={
+                !native ||
+                busy ||
+                !canStartProject ||
+                !!loadError ||
+                !!overview?.error
+              }
+              onClick={() => void projectAction("start")}
+            >
+              {t(
+                projectPending === "start"
+                  ? "Starting project…"
+                  : "Start project",
+              )}
+            </Button>
+            <Button
+              disabled={!native || busy || !running}
+              onClick={() => void projectAction("stop")}
+            >
+              {t(
+                projectPending === "stop"
+                  ? "Stopping project…"
+                  : "Stop project",
+              )}
+            </Button>
+          </div>
+        )}
+        {states.length > 0 && (
+          <p role="status" className="text-xs text-muted">
+            {loadError || overview?.error
+              ? t("Runtime status needs review")
+              : t(
+                  "{0} of {1} components have reachable ports",
+                  ready,
+                  states.length,
+                )}
+          </p>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           <ProjectConfigEditor
             path={path}
             section="services"
@@ -222,16 +293,17 @@ export default function ProjectCommands({
         )
       ) : overview.services.length ? (
         <>
-          <div className="grouped-list">
+          <ul role="list" className="grouped-list">
             {overview.services.map((state) => {
               const d = state.definition;
               const active = isRunning(state);
+              const usage = loadError ? undefined : state.usage;
               const canStart =
                 !active &&
                 !overview.error &&
                 (d.autoPort || ["available", "none"].includes(state.portState));
               return (
-                <div key={d.id} className="px-3 py-3">
+                <li key={d.id} className="px-3 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-2">
@@ -239,120 +311,188 @@ export default function ProjectCommands({
                           {d.name}
                         </h3>
                         <span
-                          role="status"
-                          className={`text-xs ${state.status === "failure" ? "text-removed" : state.status === "running" ? "text-green-700" : "text-muted"}`}
+                          className={`text-xs ${state.status === "failure" ? "text-removed" : state.portState === "listening" ? "text-green-700" : "text-muted"}`}
                         >
                           {t(statusLabels[state.status] || state.status)}
                         </span>
+                        {d.observeOnly && (
+                          <span
+                            className="text-xs text-muted"
+                            title={t("Managed externally")}
+                          >
+                            {t("Observe only")}
+                          </span>
+                        )}
                       </div>
                       <p className="mt-1 break-all text-xs text-muted">
                         {d.port ? t("Port {0} · ", d.port) : ""}
                         {t(portLabels[state.portState] || state.portState)}
+                        {state.pid ? t(" · PID {0}", state.pid) : ""}
                         {!active && state.exitCode >= 0
                           ? t(" · Last exit code {0}", state.exitCode)
                           : ""}
                       </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {active ? (
-                        <>
-                          <Button
-                            aria-label={t("Stop {0}", d.name)}
-                            disabled={
-                              !native ||
-                              !!pending ||
-                              state.status === "stopping"
-                            }
-                            onClick={() => void action(state, "stop")}
-                          >
-                            {t("Stop")}
-                          </Button>
-                          <Button
-                            aria-label={t("Restart {0}", d.name)}
-                            disabled={
-                              !native ||
-                              !!pending ||
-                              state.status === "stopping" ||
-                              state.configChanged ||
-                              !!overview.error
-                            }
-                            onClick={() => void action(state, "restart")}
-                          >
-                            {t("Restart")}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          aria-label={t("Start {0}", d.name)}
-                          disabled={!native || !!pending || !canStart}
-                          onClick={() => void action(state, "start")}
+                      {usage ? (
+                        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums text-muted">
+                          <span>
+                            {t("CPU {0}%", usage.cpuPercent.toFixed(1))}
+                          </span>
+                          <span>
+                            {t(
+                              "Memory {0} MiB",
+                              (usage.memoryBytes / 1048576).toFixed(1),
+                            )}
+                          </span>
+                          <span>
+                            {t(
+                              usage.scope === "listener"
+                                ? "Host listener · {0} processes"
+                                : "Process group · {0} processes",
+                              usage.processCount,
+                            )}
+                          </span>
+                        </p>
+                      ) : state.usageError ||
+                        (loadError && (active || d.observeOnly)) ? (
+                        <p
+                          className="mt-1 text-xs text-muted"
+                          title={state.usageError}
                         >
-                          {pending === d.id ? t("Working…") : t("Start")}
+                          {t("CPU and memory unavailable")}
+                        </p>
+                      ) : null}
+                      {d.url && !d.url.includes("{port}") && (
+                        <p className="mt-1 break-all text-xs text-muted">
+                          {d.url}
+                        </p>
+                      )}
+                    </div>
+                    <div className="service-actions">
+                      {!d.observeOnly &&
+                        (active ? (
+                          <>
+                            <Button
+                              aria-label={t("Stop {0}", d.name)}
+                              disabled={
+                                !native || busy || state.status === "stopping"
+                              }
+                              onClick={() => void action(state, "stop")}
+                            >
+                              {t("Stop")}
+                            </Button>
+                            <Button
+                              aria-label={t("Restart {0}", d.name)}
+                              disabled={
+                                !native ||
+                                busy ||
+                                state.status === "stopping" ||
+                                state.configChanged ||
+                                !!overview.error
+                              }
+                              onClick={() => void action(state, "restart")}
+                            >
+                              {t("Restart")}
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            aria-label={t("Start {0}", d.name)}
+                            disabled={
+                              !native || busy || !!loadError || !canStart
+                            }
+                            onClick={() => void action(state, "start")}
+                          >
+                            {pending === d.id ? t("Working…") : t("Start")}
+                          </Button>
+                        ))}
+                      {!d.observeOnly && (
+                        <ActionDialog
+                          title={d.name}
+                          trigger={
+                            <>
+                              {t("Command details")}
+                              <span className="sr-only">{d.name}</span>
+                            </>
+                          }
+                        >
+                          <pre tabIndex={0} className="source-panel mt-2">
+                            {(d.command || [])
+                              .map((arg) =>
+                                /\s/.test(arg) ? JSON.stringify(arg) : arg,
+                              )
+                              .join(" ")}
+                            {t(
+                              "\nWorking directory: {0}",
+                              d.cwd || t("Project root"),
+                            )}
+                            {Object.keys(d.env || {}).length
+                              ? t(
+                                  "\nEnvironment variables: {0}",
+                                  Object.keys(d.env).join(", "),
+                                )
+                              : ""}
+                            {d.url ? `\n${d.url}` : ""}
+                            {state.pid
+                              ? t("\nProcess PID: {0}", state.pid)
+                              : ""}
+                          </pre>
+                        </ActionDialog>
+                      )}
+                      {!d.observeOnly && (
+                        <Button
+                          aria-label={t("View {0} logs", d.name)}
+                          disabled={!state.runId}
+                          aria-pressed={selected === d.id}
+                          onClick={() => {
+                            setSelected((current) =>
+                              current === d.id ? "" : d.id,
+                            );
+                            setOutput(null);
+                            setLogError("");
+                          }}
+                        >
+                          {t("Logs")}
                         </Button>
                       )}
-                      <Button
-                        aria-label={t("View {0} logs", d.name)}
-                        disabled={!state.runId}
-                        onClick={() => {
-                          setSelected((current) =>
-                            current === d.id ? "" : d.id,
-                          );
-                          setOutput(null);
-                          setLogError("");
-                        }}
-                      >
-                        {t("Logs")}
-                      </Button>
                     </div>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    {d.url &&
-                      native &&
-                      active &&
-                      state.portState === "listening" && (
-                        <a
-                          className="inline-flex min-h-7 items-center gap-1 text-accent"
-                          href={d.url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {t("Open page")}
-                          <Icon name="arrow" size={13} />
-                        </a>
-                      )}
-                    {state.portState === "occupied" && (
-                      <button
-                        className="min-h-7 text-accent"
-                        onClick={() => void inspectPort(state)}
-                      >
-                        {t("View port usage")}
-                      </button>
-                    )}
-                    <ActionDialog
-                      title={t("Start command")}
-                      className="min-w-0"
-                    >
-                      <pre tabIndex={0} className="source-panel mt-2">
-                        {(d.command || [])
-                          .map((arg) =>
-                            /\s/.test(arg) ? JSON.stringify(arg) : arg,
-                          )
-                          .join(" ")}
-                        {t(
-                          "\nWorking directory: {0}",
-                          d.cwd || t("Project root"),
+                  {((d.url &&
+                    native &&
+                    (active || d.observeOnly) &&
+                    state.portState === "listening") ||
+                    state.portState === "occupied") && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      {d.url &&
+                        native &&
+                        (active || d.observeOnly) &&
+                        state.portState === "listening" && (
+                          <a
+                            className="inline-flex min-h-7 items-center gap-1 text-accent"
+                            href={d.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t("Open {0}", d.name)}
+                            <Icon name="arrow" size={13} />
+                          </a>
                         )}
-                        {Object.keys(d.env || {}).length
-                          ? t(
-                              "\nEnvironment variables: {0}",
-                              Object.keys(d.env).join(", "),
-                            )
-                          : ""}
-                        {d.url ? `\n${d.url}` : ""}
-                        {state.pid ? t("\nProcess PID: {0}", state.pid) : ""}
-                      </pre>
-                    </ActionDialog>
-                  </div>
+                      {state.portState === "occupied" && (
+                        <button
+                          className="min-h-7 text-accent"
+                          onClick={() => void inspectPort(state)}
+                        >
+                          {t("View port usage")}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {d.observeOnly && state.status === "unreachable" && (
+                    <p className="mt-2 text-xs text-removed">
+                      {t(
+                        "Start this dependency using its existing owner, then refresh.",
+                      )}
+                    </p>
+                  )}
                   {state.configChanged && (
                     <p className="mt-2 text-xs text-muted">
                       {t(
@@ -384,20 +524,52 @@ export default function ProjectCommands({
                       )}
                     </div>
                   )}
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
+          <details className="text-xs leading-5 text-muted">
+            <summary className="w-fit cursor-pointer rounded-sm hover:text-ink">
+              {t("Monitoring details")}
+            </summary>
+            <p className="mt-2 max-w-2xl">
+              {t(
+                "Ports indicate connectivity; application and database health are not verified.",
+              )}{" "}
+              {t(
+                "CPU uses the system process snapshot; 100% is one core. Memory is RSS. Host listeners do not measure container contents.",
+              )}
+            </p>
+          </details>
         </>
       ) : (
         !overview.error && (
           <Empty icon="file" title={t("No local services yet")}>
-            {t(
-              "Ask AI to connect existing start commands, or add them in Configure services.",
-            )}
+            {t("Ask AI to connect this project's existing start commands.")}
           </Empty>
         )
       )}
+      <div className="space-y-4">
+        {!!Object.keys(scripts).length && (
+          <ActionDialog
+            title={
+              <>
+                {t("package.json Script ·")} {Object.keys(scripts).length}
+              </>
+            }
+            className="min-w-0"
+          >
+            <div className="grouped-list mt-3">
+              {Object.entries(scripts).map(([name, command]) => (
+                <div key={name} className="info-row">
+                  <strong className="font-medium">{name}</strong>
+                  <code className="text-muted">{command}</code>
+                </div>
+              ))}
+            </div>
+          </ActionDialog>
+        )}
+      </div>
       {selectedState?.runId && (
         <section aria-label={t("Service logs")}>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
@@ -424,25 +596,6 @@ export default function ProjectCommands({
             </p>
           )}
         </section>
-      )}
-      {!!Object.keys(scripts).length && (
-        <ActionDialog
-          title={
-            <>
-              {t("package.json Script ·")} {Object.keys(scripts).length}
-            </>
-          }
-          className="min-w-0"
-        >
-          <div className="grouped-list mt-3">
-            {Object.entries(scripts).map(([name, command]) => (
-              <div key={name} className="info-row">
-                <strong className="font-medium">{name}</strong>
-                <code className="text-muted">{command}</code>
-              </div>
-            ))}
-          </div>
-        </ActionDialog>
       )}
     </div>
   );

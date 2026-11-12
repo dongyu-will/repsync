@@ -29,6 +29,94 @@ func batchProject(t *testing.T, s *workspace.Service, d workspace.LocalServiceDe
 	return project.Path
 }
 
+func TestServiceBatchObservedDependencyLifecycle(t *testing.T) {
+	t.Parallel()
+	external, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer external.Close()
+	s := workspace.NewService(filepath.Join(t.TempDir(), "projects.json"))
+	t.Cleanup(s.Shutdown)
+	db := workspace.LocalServiceDefinition{
+		ID: "db", Name: "Shared database", ObserveOnly: true,
+		Port: external.Addr().(*net.TCPAddr).Port,
+	}
+	path := batchProject(t, s, db)
+	web := workspace.LocalServiceDefinition{
+		ID: "web", Name: "Frontend", Command: serviceCommand(t, "0"),
+		EnvFrom: map[string]workspace.ServiceEndpoint{"DATABASE_PORT": {Service: "db", Field: "port"}},
+	}
+	writeLocalServices(t, path, []workspace.LocalServiceDefinition{web, db})
+	config, err := s.LocalServices(path)
+	if err != nil || config.Services[1].Status != "reachable" || config.Services[1].RunID != "" {
+		t.Fatalf("observed state: %+v %v", config, err)
+	}
+	if _, err := s.StartLocalService(path, "db", config.Version); err == nil {
+		t.Fatal("observed dependency must not start a process")
+	}
+	if report, err := s.DiagnoseProject(path); err != nil || !report.Ready {
+		t.Fatalf("doctor rejected reachable dependency: %+v %v", report, err)
+	}
+	batch, err := s.StartProject(path, config.Version)
+	if err != nil || len(batch.Services) != 2 {
+		t.Fatalf("start with dependency: %+v %v", batch, err)
+	}
+	refs := []workspace.ServiceRunRef{}
+	var observed, managed bool
+	for _, item := range batch.Services {
+		refs = append(refs, workspace.ServiceRunRef{Path: path, ServiceID: item.ServiceID, RunID: item.State.RunID})
+		if item.ServiceID == "db" {
+			observed = item.Status == "observed" && item.State.PID == 0 && item.State.RunID == ""
+		} else {
+			managed = item.Status == "started" && item.State.Definition.Env["DATABASE_PORT"] == strconv.Itoa(db.Port)
+		}
+	}
+	if !observed || !managed {
+		t.Fatalf("incorrect startup receipts: %+v", batch)
+	}
+	if _, err := s.ServiceReadiness(refs); err != nil {
+		t.Fatal(err)
+	}
+	stopped, err := s.StopProjects([]string{path})
+	if err != nil || len(stopped.Services) != 1 || stopped.Services[0].ServiceID != "web" {
+		t.Fatalf("stop must only capture managed process: %+v %v", stopped, err)
+	}
+	s.Shutdown()
+	connection, err := net.Dial("tcp", external.Addr().String())
+	if err != nil {
+		t.Fatalf("external dependency stopped: %v", err)
+	}
+	connection.Close()
+}
+
+func TestServiceBatchObservedDependencyBlocksBeforeSpawn(t *testing.T) {
+	t.Parallel()
+	s := workspace.NewService(filepath.Join(t.TempDir(), "projects.json"))
+	t.Cleanup(s.Shutdown)
+	db := workspace.LocalServiceDefinition{ID: "db", Name: "Database", ObserveOnly: true, Port: availableServicePort(t)}
+	path := batchProject(t, s, db)
+	web := workspace.LocalServiceDefinition{ID: "web", Name: "Frontend", Command: serviceCommand(t, "0")}
+	writeLocalServices(t, path, []workspace.LocalServiceDefinition{web, db})
+	config, err := s.LocalServices(path)
+	if err != nil || config.Services[1].Status != "unreachable" {
+		t.Fatalf("unreachable dependency: %+v %v", config, err)
+	}
+	batch, err := s.StartProject(path, config.Version)
+	if err == nil || !strings.Contains(err.Error(), "db:") || len(batch.Services) != 2 {
+		t.Fatalf("unreachable dependency did not block: %+v %v", batch, err)
+	}
+	for _, item := range batch.Services {
+		if item.State.RunID != "" || item.State.PID != 0 {
+			t.Fatalf("preflight spawned a process: %+v", item)
+		}
+	}
+	writeLocalServices(t, path, []workspace.LocalServiceDefinition{web})
+	if _, err := s.StartProject(path, config.Version); err == nil {
+		t.Fatal("project start accepted stale configuration")
+	}
+}
+
 func TestServiceBatchAutomaticPortsAndReuse(t *testing.T) {
 	t.Parallel()
 	external, err := net.Listen("tcp", "127.0.0.1:0")

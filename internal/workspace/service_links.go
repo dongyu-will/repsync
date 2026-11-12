@@ -149,6 +149,12 @@ func resolveServiceLinks(d LocalServiceDefinition, plan servicePlan, results []S
 }
 
 func (s *Service) waitServiceEndpoint(ctx context.Context, item ServiceStartResult) error {
+	if item.State.Definition.ObserveOnly {
+		if servicePortConnects(item.State.Definition) {
+			return nil
+		}
+		return fmt.Errorf("external dependency %s is unreachable", item.ServiceID)
+	}
 	s.taskMu.Lock()
 	active := s.activeLocalServices[item.Path][item.ServiceID]
 	s.taskMu.Unlock()

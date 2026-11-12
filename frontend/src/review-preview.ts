@@ -44,7 +44,7 @@ export function reviewPreview(path: string): ProjectReview {
       },
       {
         id: "backend-api",
-        name: "Real HTTP / API Integration",
+        name: "Real HTTP / API integration",
         area: "backend",
         method: "integration",
       },
@@ -330,12 +330,16 @@ export function reviewPreview(path: string): ProjectReview {
       recordedAt: "",
     }));
   if (git.git) {
-    report.issues = report.issues.filter((i) => i.section !== "checks");
+    report.issues = report.issues.filter(
+      (i) =>
+        i.section !== "checks" &&
+        (i.kind !== "stash" || git.stashes.entries.length > 0),
+    );
     report.issues.push(
       ...report.coverage.map((item) => ({
         kind: `coverage_${item.requirement.id}`,
         section: "checks",
-        message: `${item.requirement.name}Verification needed: ${item.reason}`,
+        message: `${item.requirement.name} needs verification: ${item.reason}`,
       })),
     );
   }

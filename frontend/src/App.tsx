@@ -1,5 +1,12 @@
 import { t, useLanguage } from "./i18n";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { isMyGo } from "mygo-runtime";
 import { Service, type Project, type Inspection } from "./mygo";
 import { Brand, Button, Empty, Icon } from "./components";
@@ -9,14 +16,21 @@ import SharedWorkspace from "./SharedWorkspace";
 import AddProjectDialog from "./AddProjectDialog";
 import ManageProjectDialog from "./ManageProjectDialog";
 import type { GitSection } from "./ProjectGit";
-import AIResources from "./AIResources";
 import Settings from "./Settings";
 import { usePreferences, type Preferences } from "./preferences";
-import { projectTabs } from "./project-tabs";
+import {
+  primaryProjectTabs,
+  utilityProjectTabs,
+  isUtilityProjectTab,
+  projectTabLabel,
+  restoreProjectTab,
+  restorePrimaryProjectTab,
+} from "./project-tabs";
+
+const AIResources = lazy(() => import("./AIResources"));
 
 const native = isMyGo();
 type Page = "project" | "shared" | "ai-resources" | "settings";
-const tabs: readonly ProjectTab[] = projectTabs;
 const lastProjectKey = native
   ? "repsync:last-project"
   : "repsync:preview:last-project";
@@ -52,16 +66,7 @@ function savedTab(path: string, preferences: Preferences): ProjectTab {
           )) ||
         JSON.stringify(preferences.defaultTab),
     );
-    const legacyTabs: Record<string, ProjectTab> = {
-      "\u6982\u89c8": "Overview",
-      "\u5de5\u4f5c\u6811": "Worktrees",
-      "\u89c4\u8303": "Rules",
-      "AI \u8d44\u6e90": "AI resources",
-      "\u6587\u6863": "Documents",
-    };
-    return tabs.includes(value)
-      ? value
-      : legacyTabs[value] || preferences.defaultTab;
+    return restorePrimaryProjectTab(value, preferences.defaultTab);
   } catch {
     return preferences.defaultTab;
   }
@@ -84,7 +89,10 @@ export default function App() {
   const [selectedTab, setTab] = useState<ProjectTab>(() =>
     project ? savedTab(project.path, preferences) : "Overview",
   );
-  const tab = tabs.includes(selectedTab) ? selectedTab : "Overview";
+  const tab = restoreProjectTab(selectedTab, "Overview");
+  const tabs = primaryProjectTabs;
+  const utilityPage = isUtilityProjectTab(tab);
+  const [utilitiesExpanded, setUtilitiesExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
@@ -144,6 +152,7 @@ export default function App() {
                 items[0] ||
                 null;
               if (next?.path !== current?.path) {
+                setUtilitiesExpanded(false);
                 currentProjectRef.current = next;
                 setProject(next);
                 setDetails(null);
@@ -182,7 +191,7 @@ export default function App() {
     };
   }, [listRefresh, preferences]);
   useEffect(() => {
-    if (!native || !project) return;
+    if (!native || !project || page !== "project") return;
     let active = true;
     let request = 0;
     const load = () => {
@@ -212,7 +221,7 @@ export default function App() {
       window.clearInterval(timer);
       window.removeEventListener("focus", load);
     };
-  }, [project, refresh, preferences.refreshSeconds]);
+  }, [project, page, refresh, preferences.refreshSeconds]);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
@@ -237,6 +246,7 @@ export default function App() {
 
   function choose(next: Project) {
     closeSearch();
+    setUtilitiesExpanded(false);
     setProjectsExpanded(true);
     setProject(next);
     setPage("project");
@@ -260,7 +270,8 @@ export default function App() {
   }
   function chooseTab(next: ProjectTab) {
     setTab(next);
-    if (project && preferences.rememberTabs) {
+    setUtilitiesExpanded(isUtilityProjectTab(next));
+    if (project && preferences.rememberTabs && !isUtilityProjectTab(next)) {
       try {
         localStorage.setItem(
           `repsync:tab:${project.path}`,
@@ -358,7 +369,7 @@ export default function App() {
           <div className="mb-2 flex shrink-0 items-center gap-1">
             <button
               type="button"
-              id="project-group-toggle"
+              id="project-group"
               className={`nav-item min-w-0 flex-1 ${!projectsExpanded && page === "project" ? "selected" : ""}`}
               aria-expanded={projectsExpanded}
               aria-controls="project-list"
@@ -397,7 +408,7 @@ export default function App() {
             hidden={!projectsExpanded}
             className={projectsExpanded ? "project-subnav" : "hidden"}
             role="group"
-            aria-labelledby="project-group-toggle"
+            aria-labelledby="project-group"
           >
             <div className="min-h-0 flex-1 overflow-y-auto">
               {projects.map((p) => (
@@ -527,52 +538,101 @@ export default function App() {
                   </button>
                 )}
               </div>
-              <div
-                role="tablist"
-                aria-label={t("Project pages")}
-                className="flex gap-1 overflow-x-auto whitespace-nowrap border-b border-line"
-              >
-                {tabs.map((name, index) => (
-                  <button
-                    key={name}
-                    role="tab"
-                    id={`tab-${name}`}
-                    aria-selected={tab === name}
-                    aria-controls="project-panel"
-                    tabIndex={tab === name ? 0 : -1}
-                    onKeyDown={(e) => {
-                      if (
-                        ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
-                          e.key,
-                        )
-                      ) {
-                        e.preventDefault();
-                        const next =
-                          e.key === "Home"
-                            ? 0
-                            : e.key === "End"
-                              ? tabs.length - 1
-                              : (index +
-                                  (e.key === "ArrowRight"
-                                    ? 1
-                                    : tabs.length - 1)) %
-                                tabs.length;
-                        chooseTab(tabs[next]);
-                        document.getElementById(`tab-${tabs[next]}`)?.focus();
+              <div className="flex flex-wrap items-center justify-between gap-x-3 border-b border-line">
+                <div
+                  role="tablist"
+                  aria-label={t("Project pages")}
+                  className="flex flex-wrap gap-1"
+                >
+                  {tabs.map((name, index) => (
+                    <button
+                      key={name}
+                      role="tab"
+                      id={`tab-${name}`}
+                      aria-selected={tab === name}
+                      aria-controls="project-panel"
+                      tabIndex={
+                        tab === name || (utilityPage && index === 0) ? 0 : -1
                       }
-                    }}
-                    onClick={() => chooseTab(name)}
-                    className={`flex min-h-9 shrink-0 items-center border-b-2 px-3 text-sm ${tab === name ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"}`}
+                      onKeyDown={(e) => {
+                        if (
+                          ["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                            e.key,
+                          )
+                        ) {
+                          e.preventDefault();
+                          const next =
+                            e.key === "Home"
+                              ? 0
+                              : e.key === "End"
+                                ? tabs.length - 1
+                                : (index +
+                                    (e.key === "ArrowRight"
+                                      ? 1
+                                      : tabs.length - 1)) %
+                                  tabs.length;
+                          chooseTab(tabs[next]);
+                          document.getElementById(`tab-${tabs[next]}`)?.focus();
+                        }
+                      }}
+                      onClick={() => chooseTab(name)}
+                      className={`flex min-h-9 shrink-0 items-center border-b-2 px-3 text-sm ${tab === name ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"}`}
+                    >
+                      {t(projectTabLabel(name))}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  aria-expanded={utilitiesExpanded}
+                  aria-controls="project-utilities"
+                  onClick={() => {
+                    if (utilitiesExpanded && utilityPage) chooseTab("Overview");
+                    else setUtilitiesExpanded(!utilitiesExpanded);
+                  }}
+                  className={`flex min-h-9 items-center gap-1 rounded-md px-2 text-sm hover:bg-nav-hover ${utilityPage ? "text-ink" : "text-muted"}`}
+                >
+                  {t("Utilities")}
+                  <span
+                    aria-hidden="true"
+                    className={utilitiesExpanded ? "rotate-90" : ""}
                   >
-                    {t(name)}
-                  </button>
-                ))}
+                    <Icon name="chevron" size={14} />
+                  </span>
+                </button>
               </div>
+              <nav
+                id="project-utilities"
+                aria-label={t("Utilities")}
+                className={
+                  utilitiesExpanded
+                    ? "flex flex-wrap gap-1 border-b border-line py-1"
+                    : "hidden"
+                }
+              >
+                {utilitiesExpanded &&
+                  utilityProjectTabs.map((name) => (
+                    <button
+                      type="button"
+                      key={name}
+                      id={`utility-${name.replaceAll(" ", "-")}`}
+                      aria-current={tab === name ? "page" : undefined}
+                      onClick={() => chooseTab(name)}
+                      className={`min-h-8 rounded-md border px-3 text-sm ${tab === name ? "border-accent bg-selection text-ink" : "border-transparent text-muted hover:bg-nav-hover hover:text-ink"}`}
+                    >
+                      {t(projectTabLabel(name))}
+                    </button>
+                  ))}
+              </nav>
             </header>
             <section
               id="project-panel"
-              role="tabpanel"
-              aria-labelledby={`tab-${tab}`}
+              role={utilityPage ? "region" : "tabpanel"}
+              aria-labelledby={
+                utilityPage
+                  ? `utility-${tab.replaceAll(" ", "-")}`
+                  : `tab-${tab}`
+              }
               className="workspace-gutter min-h-0 flex-1 overflow-auto py-4"
               tabIndex={0}
             >
@@ -594,10 +654,10 @@ export default function App() {
                 <ProjectContent
                   details={details}
                   tab={tab}
-                  onOpenShared={() => setPage("shared")}
                   onUpdated={() => setRefresh((value) => value + 1)}
                   gitSection={gitSection}
                   onOpenCI={() => chooseTab("CI/CD")}
+                  onOpenReview={() => chooseTab("Review")}
                   onOpenStashes={() => {
                     setGitSection("stashes");
                     chooseTab("Worktrees");
@@ -662,7 +722,9 @@ export default function App() {
               ) : page === "shared" ? (
                 <SharedWorkspace projects={projects} />
               ) : page === "ai-resources" ? (
-                <AIResources />
+                <Suspense fallback={<p role="status">{t("Loading…")}</p>}>
+                  <AIResources />
+                </Suspense>
               ) : (
                 <Settings
                   values={preferences}

@@ -122,12 +122,24 @@ export default function ProjectReviewPanel({
   const select = (section: string) => {
     update({ section: section as Section, expanded: true });
   };
+  const issueMessage = (issue: ReviewIssue) => {
+    const coverage = report?.coverage.find(
+      (item) => issue.kind === `coverage_${item.requirement.id}`,
+    );
+    return coverage
+      ? t(
+          "{0} needs verification: {1}",
+          t(coverage.requirement.name),
+          t(coverage.reason),
+        )
+      : t(issue.message);
+  };
   return (
     <section
       aria-label={t("Pending project items")}
-      className="mt-5 space-y-3 border-t border-line pt-5"
+      className="flex flex-wrap items-start gap-3"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex w-full items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className="text-base font-semibold">
             {t("Pending")}
@@ -142,22 +154,25 @@ export default function ProjectReviewPanel({
       {state.error && (
         <p
           role="alert"
-          className="break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
+          className="w-full break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
         >
           {t(state.error)}
         </p>
       )}
       {state.notice && (
-        <p role="status" className="text-sm text-muted">
+        <p role="status" className="w-full text-sm text-muted">
           {t(state.notice)}
         </p>
       )}
       {!report ? (
         <>
+          <p role="status" className="w-full text-sm text-muted">
+            {t("Check current state to load pending items.")}
+          </p>
           {stashCount > 0 && (
             <div
               role="status"
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              className="flex w-full flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
             >
               <p>
                 {t("More")} {stashCount} {t("records stash Pending")}
@@ -177,14 +192,14 @@ export default function ProjectReviewPanel({
       ) : (
         <>
           {report.issues.length ? (
-            <ul className="grouped-list">
-              {report.issues.slice(0, 3).map((issue) => (
+            <ul className="grouped-list w-full">
+              {report.issues.map((issue) => (
                 <li
                   key={issue.key || issue.kind + issue.message}
                   className="flex items-center justify-between gap-3 border-b border-line-subtle px-3 py-2 text-sm last:border-0"
                 >
                   <span className="min-w-0 break-words">
-                    {t(issue.message)}
+                    {issueMessage(issue)}
                   </span>
                   <button
                     className="shrink-0 rounded px-2 py-1 text-accent hover:bg-selection"
@@ -200,19 +215,12 @@ export default function ProjectReviewPanel({
               ))}
             </ul>
           ) : (
-            <p role="status" className="text-sm">
+            <p role="status" className="w-full text-sm">
               {t("No pending items in the declared scope.")}
             </p>
           )}
           <ActionDialog
-            title={t("Project checks and records")}
-            trigger={
-              <>
-                {report.issues.length > 3
-                  ? t("View all {0}  items and records", report.issues.length)
-                  : t("View details and history")}
-              </>
-            }
+            title={t("Details and handoff")}
             open={state.expanded}
             onOpenChange={(expanded) => update({ expanded })}
             busy={pending}
@@ -251,6 +259,7 @@ export default function ProjectReviewPanel({
                   </h3>
                   <div className="mt-3">
                     <IssueList
+                      messageFor={issueMessage}
                       issues={report.issues.filter(
                         (i) => i.section === state.section,
                       )}
@@ -278,6 +287,7 @@ export default function ProjectReviewPanel({
                     {t("Reviewed; kept / Defer")}
                   </h3>
                   <IssueList
+                    messageFor={issueMessage}
                     issues={report.acknowledged.filter(
                       (i) => i.section === state.section,
                     )}
@@ -1250,10 +1260,12 @@ function EnvironmentFields() {
 }
 function IssueList({
   issues,
+  messageFor,
   pending,
   save,
 }: {
   issues: ReviewIssue[];
+  messageFor: (issue: ReviewIssue) => string;
   pending: boolean;
   save: (issue: ReviewIssue, next: string, reason: string) => Promise<unknown>;
 }) {
@@ -1266,7 +1278,7 @@ function IssueList({
           className="border-b border-line-subtle p-3 last:border-0"
         >
           <h3 className="break-words text-sm font-medium">
-            {t(issue.message)}
+            {messageFor(issue)}
           </h3>
           {issue.acknowledgement ? (
             <div className="mt-2 space-y-2">

@@ -23,6 +23,7 @@ type LocalServiceDefinition struct {
 	Port          int                        `json:"port"`
 	AutoPort      bool                       `json:"autoPort"`
 	FixedPort     bool                       `json:"fixedPort,omitempty"`
+	ObserveOnly   bool                       `json:"observeOnly,omitempty"`
 	URL           string                     `json:"url"`
 	Cwd           string                     `json:"cwd"`
 	Env           map[string]string          `json:"env"`
@@ -41,6 +42,8 @@ type LocalServiceState struct {
 	ExitCode      int                    `json:"exitCode"`
 	Error         string                 `json:"error"`
 	ConfigChanged bool                   `json:"configChanged"`
+	Usage         *LocalServiceUsage     `json:"usage,omitempty"`
+	UsageError    string                 `json:"usageError,omitempty"`
 }
 
 type LocalServicesOverview struct {
@@ -145,7 +148,14 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 		if d.FixedPort && d.AutoPort {
 			return errors.New("fixedPort and autoPort cannot both be enabled")
 		}
-		if d.ID == "" || len(d.ID) > 80 || ids[d.ID] || strings.TrimSpace(d.Name) == "" || len(d.Command) == 0 || strings.TrimSpace(d.Command[0]) == "" {
+		if d.ID == "" || len(d.ID) > 80 || ids[d.ID] || strings.TrimSpace(d.Name) == "" {
+			return errors.New("local services require a unique id, name, and command arguments")
+		}
+		if d.ObserveOnly {
+			if len(d.Command) > 0 || d.AutoPort || d.Cwd != "" || len(d.Env) > 0 || len(d.EnvFrom) > 0 {
+				return errors.New("observeOnly dependencies cannot declare commands, automatic ports, or command environment")
+			}
+		} else if len(d.Command) == 0 || strings.TrimSpace(d.Command[0]) == "" {
 			return errors.New("local services require a unique id, name, and command arguments")
 		}
 		ids[d.ID] = true
@@ -216,6 +226,9 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 				d.Port = port
 			}
 		}
+		if d.ObserveOnly && d.Port == 0 {
+			return errors.New("observeOnly dependencies require a local listening port")
+		}
 	}
 	return nil
 }
@@ -255,6 +268,14 @@ func servicePortConnects(d LocalServiceDefinition) bool {
 	return true
 }
 
+func observedServiceState(d LocalServiceDefinition) LocalServiceState {
+	state := LocalServiceState{Definition: d, Status: "unreachable", PortState: "unreachable", ExitCode: -1}
+	if servicePortConnects(d) {
+		state.Status, state.PortState = "reachable", "listening"
+	}
+	return state
+}
+
 func (s *Service) localServiceFile(path, id, extension string) string {
 	return filepath.Join(filepath.Dir(s.path), "services", fmt.Sprintf("%x", sha256.Sum256([]byte(path))), fmt.Sprintf("%x", sha256.Sum256([]byte(id)))+extension)
 }
@@ -279,6 +300,19 @@ func (s *Service) LocalServices(path string) (LocalServicesOverview, error) {
 	seen := map[string]bool{}
 	for _, definition := range config.services {
 		seen[definition.ID] = true
+		if definition.ObserveOnly {
+			active := owned[definition.ID]
+			running := false
+			if active != nil {
+				active.mu.Lock()
+				running = localServiceRunning(active.state.Status)
+				active.mu.Unlock()
+			}
+			if !running {
+				result.Services = append(result.Services, observedServiceState(definition))
+				continue
+			}
+		}
 		state := LocalServiceState{Definition: definition, Status: "stopped", ExitCode: -1}
 		if active := owned[definition.ID]; active != nil {
 			active.mu.Lock()
@@ -319,6 +353,7 @@ func (s *Service) LocalServices(path string) (LocalServicesOverview, error) {
 			result.Services = append(result.Services, state)
 		}
 	}
+	populateServiceUsage(result.Services)
 	return result, nil
 }
 
