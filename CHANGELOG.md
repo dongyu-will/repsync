@@ -6,6 +6,7 @@
 - Read existing check commands and tool configurations instead of enforcing built-in code policies; discover local CI/CD entries and GitHub workflows in one view.
 - Simplify AI configuration through contextual instructions for existing AI tools, and start shared rules and files empty until users add them.
 - Rename the worktree tab to Branches and workspaces and defer cleanup inspection until requested, improving initial loading while preserving deletion safeguards.
+- Require Go 1.27.4 to include the standard-library fix for GO-2026-6859.
 - Upgrade MyGo, its CLI, and the frontend runtime together from 0.8.3 to 0.9.0.
 - Add signed in-place desktop updates, daily checks, and update actions in Settings and the app menu; preserve project data and keep development builds separate.
 - Publish the macOS Apple Silicon installer and signed update feed only after signature verification and an in-place update smoke test.

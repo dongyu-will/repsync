@@ -23,7 +23,7 @@
 
 0.1.2 之前的版本需先手动替换一次 `/Applications/repsync.app` 才能启用更新器。只保留一份正式版，历史版本保留安装包，不长期保留解压的应用。发布配置与限制见[桌面更新](docs/usage.md#desktop-updates)。
 
-从源码启动需要 Go 1.27.3+、Node.js 22.13+（建议 Node 24）、npm 和 Git：
+从源码启动需要 Go 1.27.4+、Node.js 22.13+（建议 Node 24）、npm 和 Git：
 
 ```sh
 git clone https://github.com/dongyu-will/repsync.git

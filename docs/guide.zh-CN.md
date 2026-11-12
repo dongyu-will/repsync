@@ -21,7 +21,7 @@
 
 ## 安装与启动
 
-macOS：Go 1.27.3+、Node.js 22.13+（建议 Node 24 LTS）、npm。Go 模块和前端 runtime 固定 MyGo v0.9.0；Go 可自动下载模块要求的工具链。当前仅在 macOS 验证。
+macOS：Go 1.27.4+、Node.js 22.13+（建议 Node 24 LTS）、npm。Go 模块和前端 runtime 固定 MyGo v0.9.0；Go 可自动下载模块要求的工具链。当前仅在 macOS 验证。
 
 ```sh
 npm --prefix frontend ci

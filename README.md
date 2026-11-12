@@ -26,7 +26,7 @@ From 0.1.2, the desktop app checks for signed updates shortly after launch and d
 
 Versions before 0.1.2 need one manual replacement of `/Applications/repsync.app` to enable the updater. Keep one installed copy; archive installers rather than extracted apps. Releases must include the signed update manifest and archive. See [Desktop updates](docs/usage.md#desktop-updates) for release setup and limits.
 
-Or build from source with **Go 1.27.3+**, **Node.js 22.13+** (Node 24 recommended), npm, and Git:
+Or build from source with **Go 1.27.4+**, **Node.js 22.13+** (Node 24 recommended), npm, and Git:
 
 ```sh
 git clone https://github.com/dongyu-will/repsync.git

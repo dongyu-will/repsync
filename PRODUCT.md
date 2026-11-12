@@ -24,7 +24,7 @@
 
 | 项目 | 当前状态 |
 | --- | --- |
-| Go | 1.27.3，随模块锁定工具链要求 |
+| Go | 1.27.4，随模块锁定工具链要求 |
 | MyGo | v0.9.0，采用系统 WebView 路线；替换原 Wails 方案 |
 | React + TypeScript + Vite | 已建立前端入口与构建 |
 | Tailwind CSS | 用户于 2026-11-10 确认；替换 CSS Modules 基线 |
