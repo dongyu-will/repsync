@@ -15,9 +15,6 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "check-rules" {
-		os.Exit(workspace.RunPolicyCheckCLI(os.Args[2:], os.Stdout, os.Stderr))
-	}
 	if len(os.Args) > 1 {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		code := control.Run(ctx)
@@ -44,6 +41,7 @@ func main() {
 		defer local.Close()
 		service.StartGitCleanup()
 	}
+	configureUpdater()
 	mygo.Bind(service)
 	mygo.Bind(&Desktop{})
 	mygo.App.OnQuit(func() {

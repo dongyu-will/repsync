@@ -4,7 +4,7 @@ Thanks for helping improve repsync. It is an early-stage local desktop tool; foc
 
 ## Getting started
 
-Follow the [README](README.md#quick-start) to install dependencies and launch the desktop app. Browser preview is useful for interface work but cannot validate native file writes, processes, dialogs, or CLI control. The Go and frontend MyGo versions must stay aligned.
+Follow the [README](README.md#install) to install dependencies and launch the desktop app. Browser preview is useful for interface work but cannot validate native file writes, processes, dialogs, or CLI control. The Go and frontend MyGo versions must stay aligned.
 
 Read [AGENTS.md](AGENTS.md) before working in this repository. [PRODUCT.md](PRODUCT.md) owns product decisions and [DESIGN.md](DESIGN.md) owns interface conventions. Both currently contain Chinese development notes; ask for clarification if a requirement is unclear.
 

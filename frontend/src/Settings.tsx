@@ -1,5 +1,5 @@
-import { t } from "./i18n";
-import type { ReactNode } from "react";
+import { getLocale, t } from "./i18n";
+import { useState, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Icon, Select } from "./components";
 import {
@@ -9,6 +9,7 @@ import {
 } from "./project-tabs";
 import type { Preferences } from "./preferences";
 import appInfo from "../../mygo.json";
+import { Desktop } from "./mygo";
 
 const repository = "https://github.com/dongyu-will/repsync";
 
@@ -27,6 +28,17 @@ export default function Settings({
   onChange: (patch: Partial<Preferences>) => void;
   onReset: () => void;
 }) {
+  const [updateError, setUpdateError] = useState("");
+
+  async function checkForUpdates() {
+    setUpdateError("");
+    try {
+      await Desktop.checkForUpdates(getLocale());
+    } catch (error) {
+      setUpdateError(String(error));
+    }
+  }
+
   return (
     <div className="max-w-3xl space-y-7 pb-4">
       <div className="flex min-h-5 flex-wrap items-center justify-between gap-2 text-xs text-muted">
@@ -233,6 +245,21 @@ export default function Settings({
             </div>
           ))}
         </dl>
+        <div className="mt-3 space-y-2">
+          <Button disabled={!isMyGo()} onClick={() => void checkForUpdates()}>
+            {t("Check for updates")}
+          </Button>
+          <p className="text-xs text-muted">
+            {t(
+              "The desktop app checks daily. Updates replace this app after it quits and keep your data.",
+            )}
+          </p>
+          {updateError && (
+            <p role="alert" className="break-words text-sm text-removed">
+              {t(updateError)}
+            </p>
+          )}
+        </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
           {[
             ["Documentation", `${repository}#readme`],

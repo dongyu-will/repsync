@@ -15,6 +15,8 @@ import (
 )
 
 type Pipeline struct {
+	Source            string            `json:"source,omitempty"`
+	Definition        string            `json:"definition,omitempty"`
 	ID                string            `json:"id"`
 	Name              string            `json:"name"`
 	Kind              string            `json:"kind"`
@@ -28,6 +30,7 @@ type Pipeline struct {
 }
 
 type PipelineConfig struct {
+	Warnings  []string   `json:"warnings,omitempty"`
 	Pipelines []Pipeline `json:"pipelines"`
 	Source    string     `json:"source"`
 	Version   string     `json:"version"`
@@ -91,38 +94,23 @@ func (s *Service) Pipelines(path string) (PipelineConfig, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return config, err
 	}
+	limit := 32
 	if file.Pipelines == nil {
-		config.Source = "package.json"
-		data, err = read(config.Source)
-		if errors.Is(err, os.ErrNotExist) {
-			data, err = []byte("{}"), nil
-		}
+		config.Source = "Project files"
+		limit = 128
+		config.Pipelines, data, config.Warnings, err = discoverPipelines(path, root)
 		if err != nil {
 			return config, err
 		}
-		var pkg struct {
-			Scripts        map[string]string `json:"scripts"`
-			PackageManager string            `json:"packageManager"`
-		}
-		if err = json.Unmarshal(data, &pkg); err != nil {
-			return config, fmt.Errorf("read package.json: %w", err)
-		}
-		for _, name := range []string{"ci", "check:ci", "check"} {
-			if _, ok := pkg.Scripts[name]; !ok {
-				continue
-			}
-			manager, err := projectPackageManager(root, pkg.PackageManager)
-			if err != nil {
-				return config, err
-			}
-			config.Pipelines = []Pipeline{{ID: name, Name: name, Kind: "ci", Steps: [][]string{{manager, "run", name}}, TimeoutSeconds: 1800}}
-			break
+	} else {
+		for i := range config.Pipelines {
+			config.Pipelines[i].Source = ".repsync.json"
 		}
 	}
 	if config.Pipelines == nil {
 		config.Pipelines = []Pipeline{}
 	}
-	if err := validatePipelines(config.Pipelines); err != nil {
+	if err := validatePipelineDefinitions(config.Pipelines, limit); err != nil {
 		return config, err
 	}
 	for _, pipeline := range config.Pipelines {
@@ -137,8 +125,12 @@ func (s *Service) Pipelines(path string) (PipelineConfig, error) {
 }
 
 func validatePipelines(pipelines []Pipeline) error {
-	if len(pipelines) > 32 {
-		return errors.New("each project supports up to 32 pipelines")
+	return validatePipelineDefinitions(pipelines, 32)
+}
+
+func validatePipelineDefinitions(pipelines []Pipeline, limit int) error {
+	if len(pipelines) > limit {
+		return fmt.Errorf("each project supports up to %d pipelines", limit)
 	}
 	ids := map[string]bool{}
 	for i := range pipelines {

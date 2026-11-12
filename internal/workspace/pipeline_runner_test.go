@@ -239,7 +239,7 @@ func TestLocalPipelineProjectIsolationAndShutdown(t *testing.T) {
 	}
 }
 
-func TestLocalPipelineDiscoversOnlyExistingCI(t *testing.T) {
+func TestLocalPipelineDiscoversExistingCIAndCD(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"packageManager":"pnpm@10.0.0","scripts":{"check:ci":"exit 0","deploy":"exit 1","test":"exit 0"}}`), 0600); err != nil {
@@ -251,7 +251,7 @@ func TestLocalPipelineDiscoversOnlyExistingCI(t *testing.T) {
 		t.Fatal(err)
 	}
 	config, err := s.Pipelines(p.Path)
-	if err != nil || len(config.Pipelines) != 1 || config.Pipelines[0].ID != "check:ci" || config.Pipelines[0].Steps[0][0] != "pnpm" {
+	if err != nil || len(config.Pipelines) != 3 || config.Pipelines[0].Name != "check:ci" || config.Pipelines[0].Steps[0][0] != "pnpm" || config.Pipelines[1].Kind != "cd" || config.Pipelines[1].Name != "deploy" {
 		t.Fatalf("incorrect CI discovery: %+v %v", config, err)
 	}
 	outside := filepath.Join(t.TempDir(), "external.json")

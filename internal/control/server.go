@@ -43,6 +43,7 @@ type Request struct {
 	ReviewTask           *workspace.ReviewTaskContext         `json:"reviewTask,omitempty"`
 	ReviewIssue          *workspace.ReviewAcknowledgement     `json:"reviewIssue,omitempty"`
 	CodexResource        *workspace.CodexResourceChange       `json:"codexResource,omitempty"`
+	GitPolicy            *workspace.GitCleanupPolicy          `json:"gitPolicy,omitempty"`
 }
 
 type Response struct {
@@ -257,8 +258,15 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 			err = errors.New(result.Message)
 		}
 		return result, err
+	case "git-summary":
+		return service.GitWorkspaceSummary(request.Path)
 	case "git-workspace":
 		return service.GitWorkspace(request.Path)
+	case "git-policy":
+		if request.GitPolicy == nil {
+			return nil, errors.New("missing Git cleanup policy")
+		}
+		return nil, service.SaveGitCleanupPolicy(request.Path, request.Version, *request.GitPolicy)
 	case "git-cleanup":
 		return service.CleanupGitWorkspace(request.Path, request.Version)
 	case "git-restore":
@@ -332,6 +340,8 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 		return service.LocalServiceLog(request.Path, request.ServiceID, request.RunID)
 	case "pipelines":
 		return service.Pipelines(request.Path)
+	case "workflows":
+		return service.PipelineWorkflows(request.Path)
 	case "run":
 		return service.StartPipeline(request.Path, request.ServiceID, request.Version)
 	case "runs":
@@ -349,8 +359,10 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 		return service.SharedAdoptions()
 	case "sync-preview":
 		return service.PreviewUpdate(request.Path)
-	case "policy-preview":
-		return service.PreviewPolicyGuidance(request.Path)
+	case "checks":
+		return service.ProjectChecks(request.Path)
+	case "check":
+		return service.StartProjectCheck(request.Path, request.ServiceID, request.Version)
 	case "sync-apply":
 		return service.ApplyUpdate(request.RunID)
 	case "sync-history":

@@ -61,6 +61,10 @@ func (s *Service) StartPipeline(path, pipelineID, version string) (PipelineRun, 
 	if config.Version != version {
 		return PipelineRun{}, errors.New("pipeline configuration changed; refresh and review commands before running")
 	}
+	return s.startPipeline(path, pipelineID, config)
+}
+
+func (s *Service) startPipeline(path, pipelineID string, config PipelineConfig) (PipelineRun, error) {
 	index := slices.IndexFunc(config.Pipelines, func(p Pipeline) bool { return p.ID == pipelineID })
 	if index < 0 {
 		return PipelineRun{}, errors.New("pipeline not found; refresh")
@@ -130,25 +134,6 @@ func (s *Service) StartPipeline(path, pipelineID, version string) (PipelineRun, 
 
 func (s *Service) executePipeline(ctx context.Context, path string, pipeline Pipeline, active *activePipeline) {
 	status, exitCode, detail := "success", 0, ""
-	if pipeline.Kind == "ci" {
-		report, err := checkPolicies(ctx, path, s.path)
-		if err != nil {
-			status, exitCode, detail = "failure", 1, "Project rule checks incomplete: "+err.Error()
-		} else {
-			for _, finding := range report.Findings {
-				fmt.Fprintf(active.log, "[rules/%s/%s] %s:%d:%d %s\n", finding.Level, finding.Kind, finding.Path, finding.Line, finding.Column, finding.Message)
-			}
-			for _, problem := range report.Errors {
-				fmt.Fprintln(active.log, "[rule checks incomplete] "+problem)
-			}
-			if !report.Passed {
-				status, exitCode, detail = "failure", 1, "Project rule checks failed; subsequent commands were not run"
-			}
-		}
-		if status != "success" {
-			fmt.Fprintln(active.log, detail)
-		}
-	}
 	for i, args := range pipeline.Steps {
 		if status != "success" {
 			break
@@ -266,9 +251,6 @@ func (s *Service) Shutdown() {
 	s.closing = true
 	if s.gitCleanupCancel != nil {
 		s.gitCleanupCancel()
-	}
-	for _, cancel := range s.activePolicyChecks {
-		cancel()
 	}
 	if s.activeClone != nil {
 		s.activeClone.cancel()

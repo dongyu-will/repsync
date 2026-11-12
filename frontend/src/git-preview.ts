@@ -5,6 +5,7 @@ export function gitPreview(path: string): GitOverview {
   const commit = "e2a7c43f597fd9fa52eafef9a5b335df571d21ab";
   const current = path === "/Projects/atlas" ? "feat/workspace-layout" : "main";
   const view: GitOverview = {
+    cleanupChecked: true,
     git,
     policy: { enabled: false, baseBranch: "main", retentionDays: 7 },
     policyVersion: "preview",

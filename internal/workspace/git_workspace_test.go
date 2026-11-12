@@ -323,3 +323,55 @@ func TestGitWorkspaceRestoreDoesNotOverwriteAndTimerStops(t *testing.T) {
 	f.service.StartGitCleanup()
 	f.service.Shutdown()
 }
+
+func TestGitWorkspaceSummaryDefersCleanupInspection(t *testing.T) {
+	f := newGitFixture(t)
+	f.tree("completed")
+	// The listing must not perform the process/reflog checks reserved for cleanup.
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(f.root, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(f.root, "git-trace")
+	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + quote(trace) + "\nexec " + quote(realGit) + " \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(f.root, "process-scan-ran")
+	if err := os.WriteFile(filepath.Join(bin, "lsof"), []byte("#!/bin/sh\ntouch "+quote(marker)+"\nexit 1\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	summary, err := f.service.GitWorkspaceSummary(f.repo)
+	if err != nil || !summary.Git || summary.CleanupChecked || len(summary.Worktrees) != 2 {
+		t.Fatalf("summary: %+v %v", summary, err)
+	}
+	if slices.ContainsFunc(summary.Worktrees, func(w workspace.GitWorktree) bool { return w.Eligible }) || slices.ContainsFunc(summary.Branches, func(b workspace.GitBranch) bool { return b.Eligible }) {
+		t.Fatal("summary declared cleanup eligibility")
+	}
+	commands, err := os.ReadFile(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(commands), "reflog") || strings.Contains(string(commands), "merge-base") {
+		t.Fatalf("summary performed per-ref cleanup inspection: %s", commands)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("summary scanned active processes")
+	}
+	observed, err := filepath.Glob(filepath.Join(filepath.Dir(f.config), "git", "*", "state.json"))
+	if err != nil || len(observed) != 0 {
+		t.Fatal("listing changed retention observations")
+	}
+	if _, err := f.service.CleanupGitSelection(f.repo, summary.Version, []workspace.GitCleanupTarget{{Kind: "branch", Target: "completed"}}); err == nil {
+		t.Fatal("summary version authorized cleanup")
+	}
+	if _, err := os.Stat(filepath.Join(f.root, "completed tree")); err != nil {
+		t.Fatal("summary cleanup removed a worktree")
+	}
+}

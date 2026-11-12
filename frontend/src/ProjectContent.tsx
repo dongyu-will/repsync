@@ -2,7 +2,7 @@ import { t } from "./i18n";
 import { lazy, Suspense, useState } from "react";
 import type { Inspection } from "./mygo";
 import ProjectCommands from "./ProjectCommands";
-import ProjectRules from "./ProjectRules";
+import ProjectChecks from "./ProjectChecks";
 import type { GitSection } from "./ProjectGit";
 
 const ProjectDocuments = lazy(() => import("./ProjectDocuments"));
@@ -22,7 +22,6 @@ export default function ProjectContent({
   onOpenStashes,
   gitSection,
   onOpenCI,
-  onOpenReview,
 }: {
   details: Inspection;
   tab: ProjectTab;
@@ -30,7 +29,6 @@ export default function ProjectContent({
   onOpenStashes: () => void;
   gitSection: GitSection;
   onOpenCI: () => void;
-  onOpenReview: () => void;
 }) {
   return (
     <Suspense fallback={<p role="status">{t("Loading…")}</p>}>
@@ -62,11 +60,7 @@ export default function ProjectContent({
             path={details.project.path}
           />
         ) : tab === "Rules" ? (
-          <ProjectStandards
-            key={details.project.path}
-            details={details}
-            onUpdated={onUpdated}
-          />
+          <ProjectStandards key={details.project.path} details={details} />
         ) : tab === "AI resources" ? (
           <AIResources key={details.project.path} path={details.project.path} />
         ) : tab === "Review" ? (
@@ -87,50 +81,17 @@ export default function ProjectContent({
             }
           />
         ) : (
-          <div className="space-y-4">
-            <ProjectCommands
-              key={details.project.path}
-              path={details.project.path}
-              scripts={details.scripts}
-            />
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-xs text-muted">
-              <span>
-                {t(
-                  !details.git
-                    ? "Git status unavailable"
-                    : !details.statusKnown
-                      ? "Could not read workspace status"
-                      : details.status
-                        ? "Uncommitted changes"
-                        : "Clean workspace",
-                )}
-              </span>
-              {details.stashKnown && details.stashCount > 0 && (
-                <button className="min-h-7 text-accent" onClick={onOpenStashes}>
-                  {t("View stash")} · {details.stashCount}
-                </button>
-              )}
-              <button
-                className="ml-auto min-h-7 text-accent"
-                onClick={onOpenReview}
-              >
-                {t("Todos and handoff")}
-              </button>
-            </div>
-          </div>
+          <ProjectCommands
+            key={details.project.path}
+            path={details.project.path}
+          />
         )}
       </div>
     </Suspense>
   );
 }
 
-function ProjectStandards({
-  details,
-  onUpdated,
-}: {
-  details: Inspection;
-  onUpdated: () => void;
-}) {
+function ProjectStandards({ details }: { details: Inspection }) {
   const [section, setSection] = useState("current");
   const [visited, setVisited] = useState(["current"]);
   const guidelineOrder = [
@@ -165,7 +126,7 @@ function ProjectStandards({
       >
         {[
           ["current", "Guidelines and documents"],
-          ["project", "Rule checks"],
+          ["project", "Project checks"],
         ].map(([id, title]) => (
           <button
             key={id}
@@ -205,7 +166,10 @@ function ProjectStandards({
       </div>
       <div id="standards-project" hidden={section !== "project"}>
         {visited.includes("project") && (
-          <ProjectRules path={details.project.path} onUpdated={onUpdated} />
+          <ProjectChecks
+            key={details.project.path}
+            path={details.project.path}
+          />
         )}
       </div>
     </div>

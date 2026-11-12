@@ -76,7 +76,7 @@ func automaticServicePort(path string, definition LocalServiceDefinition) (Local
 	}
 	d.Port, d.AutoPort = preferred, true
 	if len(input) > 0 {
-		d.scriptVersion = digest(string(input))
+		d.scriptVersion = digest(definition.scriptVersion + string(input))
 	}
 	if d.URL != "" && !strings.Contains(d.URL, "{port}") {
 		u, err := url.Parse(d.URL)

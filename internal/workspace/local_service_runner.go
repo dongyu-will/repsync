@@ -50,7 +50,7 @@ func (s *Service) StartLocalService(path, id, version string) (LocalServiceState
 	if definition.ObserveOnly {
 		return LocalServiceState{}, errors.New("this dependency is observed only; start it using its existing owner")
 	}
-	if len(definition.EnvFrom) > 0 {
+	if len(definition.EnvFrom) > 0 || len(definition.DependsOn) > 0 || definition.OneShot {
 		batch, err := s.startServices([]string{path}, false, map[string]string{path: id}, map[string]string{path: version})
 		for _, item := range batch.Services {
 			if item.Path == path && item.ServiceID == id {

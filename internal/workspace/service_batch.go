@@ -29,7 +29,7 @@ type ServiceBatch struct {
 }
 
 func sameServiceDefinition(a, b LocalServiceDefinition) bool {
-	return slices.Equal(a.Command, b.Command) && maps.Equal(a.Env, b.Env) && maps.Equal(a.EnvFrom, b.EnvFrom) && a.Cwd == b.Cwd && a.Port == b.Port && a.URL == b.URL && a.AutoPort == b.AutoPort && a.FixedPort == b.FixedPort && a.ObserveOnly == b.ObserveOnly && a.scriptVersion == b.scriptVersion
+	return slices.Equal(a.Command, b.Command) && slices.Equal(a.DependsOn, b.DependsOn) && a.OneShot == b.OneShot && maps.Equal(a.Env, b.Env) && maps.Equal(a.EnvFrom, b.EnvFrom) && a.Cwd == b.Cwd && a.Port == b.Port && a.URL == b.URL && a.AutoPort == b.AutoPort && a.FixedPort == b.FixedPort && a.ObserveOnly == b.ObserveOnly && a.scriptVersion == b.scriptVersion
 }
 
 func (s *Service) activeServicePortsLocked() (int, map[int]string) {
@@ -246,7 +246,9 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		if plan.configured.ObserveOnly {
 			entry.State = observedServiceState(plan.configured)
 			entry.Status = "observed"
-			if entry.State.Status != "reachable" {
+			if len(plan.waitFor) > 0 {
+				entry.Status = "planned"
+			} else if entry.State.Status != "reachable" {
 				entry.Status, entry.Error = "blocked", "External dependency is unreachable; start it using its existing owner"
 				blocked = true
 			}
@@ -309,13 +311,13 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 	}
 	s.taskMu.Unlock()
 	locked = false
-	waitCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	waitCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	depths := make([]int, len(plans))
 	launchOrder := make([]int, len(plans))
 	for i, plan := range plans {
 		launchOrder[i] = i
-		for _, dependency := range plan.dependencies {
+		for _, dependency := range plan.waitFor {
 			if depths[dependency]+1 > depths[i] {
 				depths[i] = depths[dependency] + 1
 			}
@@ -329,9 +331,18 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		}
 		var state LocalServiceState
 		var startErr error
-		for _, dependency := range plan.dependencies {
+		for _, dependency := range plan.waitFor {
 			if startErr = s.waitServiceEndpoint(waitCtx, result.Services[dependency]); startErr != nil {
 				break
+			}
+		}
+		if startErr == nil && plan.configured.ObserveOnly {
+			state = observedServiceState(plan.configured)
+			if state.Status != "reachable" {
+				startErr = fmt.Errorf("external dependency %s is unreachable after setup", plan.configured.Name)
+			} else {
+				result.Services[i].State, result.Services[i].Status = state, "observed"
+				continue
 			}
 		}
 		s.taskMu.Lock()
@@ -359,6 +370,14 @@ func (s *Service) startServices(paths []string, dryRun bool, selection map[strin
 		s.taskMu.Unlock()
 		if state.RunID != "" {
 			result.Services[i].State = state
+		}
+		if startErr == nil && plan.configured.OneShot {
+			startErr = s.waitServiceSetup(waitCtx, result.Services[i])
+			if startErr == nil {
+				output, readErr := s.LocalServiceLog(plan.path, plan.configured.ID, state.RunID)
+				state, startErr = output.State, readErr
+				result.Services[i].State = state
+			}
 		}
 		if startErr != nil {
 			result.Services[i].Status, result.Services[i].Error = "failed", startErr.Error()
@@ -464,6 +483,8 @@ func (s *Service) ServiceReadiness(runs []ServiceRunRef) (ServiceBatch, error) {
 		switch {
 		case err != nil:
 			item.Status, item.Error, failed = "failed", err.Error(), true
+		case output.State.Definition.OneShot && output.State.Status == "exited" && output.State.ExitCode == 0:
+			item.Status = "ready"
 		case !localServiceRunning(output.State.Status) || output.State.Status == "stopping":
 			item.Status, item.Error, failed = "failed", "Service exited or is stopping", true
 		case !item.PortChecked:

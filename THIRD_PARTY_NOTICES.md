@@ -87,7 +87,7 @@ repsync uses the MIT license. Dependencies retain their own terms. The [bundled 
 | `micromark-util-symbol`                             | 2.0.1   | MIT              |
 | `micromark-util-types`                              | 2.0.3   | MIT              |
 | `ms`                                                | 2.1.3   | MIT              |
-| `mygo-runtime`                                      | 0.8.3   | MIT              |
+| `mygo-runtime`                                      | 0.9.0   | MIT              |
 | `parse-entities`                                    | 4.0.2   | MIT              |
 | `@types/unist`                                      | 2.0.11  | MIT              |
 | `property-information`                              | 7.2.0   | MIT              |
@@ -119,9 +119,23 @@ repsync uses the MIT license. Dependencies retain their own terms. The [bundled 
 | Module                            | Version | License             |
 | --------------------------------- | ------- | ------------------- |
 | `github.com/ebitengine/purego`    | v0.11.1 | See bundled license |
-| `github.com/egoist/mygo`          | v0.8.3  | See bundled license |
+| `github.com/egoist/mygo`          | v0.9.0  | See bundled license |
 | `github.com/go-text/typesetting`  | v0.3.5  | See bundled license |
 | `github.com/pelletier/go-toml/v2` | v2.4.3  | See bundled license |
 | `golang.org/x/image`              | v0.46.0 | See bundled license |
 | `golang.org/x/net`                | v0.59.0 | See bundled license |
 | `golang.org/x/text`               | v0.43.0 | See bundled license |
+
+## MyGo build-tool dependencies
+
+MyGo 0.9.0 adds these indirect dependencies through its pinned CLI and Linux RPM packaging. They are maintained by MyGo upstream; repsync does not introduce a separate packager or use them as new application services.
+
+| Module | Version | License |
+| --- | --- | --- |
+| `github.com/ProtonMail/go-crypto` | v1.4.1 | See bundled license |
+| `github.com/cloudflare/circl` | v1.6.2 | See bundled license |
+| `github.com/klauspost/compress` | v1.18.6 | See bundled license |
+| `github.com/ulikunitz/xz` | v0.5.15 | See bundled license |
+| `go.digitalxero.dev/rpm` | v0.3.4 | See bundled license |
+| `golang.org/x/crypto` | v0.57.0 | See bundled license |
+| `golang.org/x/sys` | v0.48.0 | See bundled license |

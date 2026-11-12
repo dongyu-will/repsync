@@ -12,7 +12,7 @@ import {
 import { Button, Empty, Icon } from "./components";
 import { servicePreview, servicePreviewLog } from "./service-preview";
 
-import ProjectConfigEditor from "./ProjectConfigEditor";
+import AISetup from "./AISetup";
 
 const native = isMyGo();
 const errorMessage = (error: unknown) =>
@@ -40,13 +40,7 @@ const portLabels: Record<string, string> = {
   unreachable: "Port unreachable",
 };
 
-export default function ProjectCommands({
-  path,
-  scripts,
-}: {
-  path: string;
-  scripts: Record<string, string>;
-}) {
+export default function ProjectCommands({ path }: { path: string }) {
   const [overview, setOverview] = useState<LocalServicesOverview | null>(
     native ? null : servicePreview(path),
   );
@@ -264,11 +258,7 @@ export default function ProjectCommands({
           </p>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <ProjectConfigEditor
-            path={path}
-            section="services"
-            onSaved={() => setRevision((value) => value + 1)}
-          />
+          <AISetup path={path} task="services" />
           {native && (
             <button
               className="icon-button"
@@ -285,6 +275,11 @@ export default function ProjectCommands({
           {t(actionError || loadError || overview?.error)}
         </p>
       )}
+      {overview?.warnings?.map((warning) => (
+        <p key={warning} role="status" className="text-sm text-muted">
+          {t(warning)}
+        </p>
+      ))}
       {!overview ? (
         !loadError && (
           <p role="status" className="text-sm text-muted">
@@ -313,7 +308,13 @@ export default function ProjectCommands({
                         <span
                           className={`text-xs ${state.status === "failure" ? "text-removed" : state.portState === "listening" ? "text-green-700" : "text-muted"}`}
                         >
-                          {t(statusLabels[state.status] || state.status)}
+                          {t(
+                            d.oneShot &&
+                              state.status === "exited" &&
+                              state.exitCode === 0
+                              ? "Completed"
+                              : statusLabels[state.status] || state.status,
+                          )}
                         </span>
                         {d.observeOnly && (
                           <span
@@ -326,7 +327,11 @@ export default function ProjectCommands({
                       </div>
                       <p className="mt-1 break-all text-xs text-muted">
                         {d.port ? t("Port {0} · ", d.port) : ""}
-                        {t(portLabels[state.portState] || state.portState)}
+                        {t(
+                          d.oneShot
+                            ? "Preparation step"
+                            : portLabels[state.portState] || state.portState,
+                        )}
                         {state.pid ? t(" · PID {0}", state.pid) : ""}
                         {!active && state.exitCode >= 0
                           ? t(" · Last exit code {0}", state.exitCode)
@@ -487,9 +492,17 @@ export default function ProjectCommands({
                     </div>
                   )}
                   {d.observeOnly && state.status === "unreachable" && (
-                    <p className="mt-2 text-xs text-removed">
+                    <p className="mt-2 text-xs text-muted">
                       {t(
-                        "Start this dependency using its existing owner, then refresh.",
+                        d.dependsOn?.some((id) =>
+                          states.some(
+                            (item) =>
+                              item.definition.id === id &&
+                              item.definition.oneShot,
+                          ),
+                        )
+                          ? "Project startup runs preparation before checking this dependency."
+                          : "Start this dependency using its existing owner, then refresh.",
                       )}
                     </p>
                   )}
@@ -549,27 +562,6 @@ export default function ProjectCommands({
           </Empty>
         )
       )}
-      <div className="space-y-4">
-        {!!Object.keys(scripts).length && (
-          <ActionDialog
-            title={
-              <>
-                {t("package.json Script ·")} {Object.keys(scripts).length}
-              </>
-            }
-            className="min-w-0"
-          >
-            <div className="grouped-list mt-3">
-              {Object.entries(scripts).map(([name, command]) => (
-                <div key={name} className="info-row">
-                  <strong className="font-medium">{name}</strong>
-                  <code className="text-muted">{command}</code>
-                </div>
-              ))}
-            </div>
-          </ActionDialog>
-        )}
-      </div>
       {selectedState?.runId && (
         <section aria-label={t("Service logs")}>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">

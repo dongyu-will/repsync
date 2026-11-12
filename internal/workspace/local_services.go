@@ -28,6 +28,8 @@ type LocalServiceDefinition struct {
 	Cwd           string                     `json:"cwd"`
 	Env           map[string]string          `json:"env"`
 	EnvFrom       map[string]ServiceEndpoint `json:"envFrom,omitempty"`
+	DependsOn     []string                   `json:"dependsOn,omitempty"`
+	OneShot       bool                       `json:"oneShot,omitempty"`
 	scriptVersion string
 }
 
@@ -51,12 +53,14 @@ type LocalServicesOverview struct {
 	Source   string              `json:"source"`
 	Version  string              `json:"version"`
 	Error    string              `json:"error"`
+	Warnings []string            `json:"warnings,omitempty"`
 }
 
 type localServiceConfig struct {
 	services []LocalServiceDefinition
 	source   string
 	version  string
+	warnings []string
 }
 
 var serviceScriptPort = regexp.MustCompile(`(?:--port(?:=|\s+)|\bPORT=)([0-9]{1,5})(?:\b|$)`)
@@ -81,36 +85,18 @@ func (s *Service) localServiceConfig(path string) (localServiceConfig, error) {
 		return config, err
 	}
 	if file.Services == nil {
-		config.source = "package.json"
-		data, err = readProjectConfig(root, config.source)
-		if errors.Is(err, os.ErrNotExist) {
-			data, err = []byte("{}"), nil
-		}
+		moon, input, found, err := discoverMoonServices(path, root)
 		if err != nil {
 			return config, err
 		}
-		var pkg struct {
-			Scripts        map[string]string `json:"scripts"`
-			PackageManager string            `json:"packageManager"`
-		}
-		if err := json.Unmarshal(data, &pkg); err != nil {
-			return config, fmt.Errorf("read package.json: %w", err)
-		}
-		for _, name := range []string{"dev", "start"} {
-			script, ok := pkg.Scripts[name]
-			if !ok {
-				continue
-			}
-			manager, err := projectPackageManager(root, pkg.PackageManager)
+		if found {
+			config.services, config.source, data = moon, "Moon · README.md", input
+		} else {
+			config.source = "package.json"
+			config.services, data, config.warnings, err = discoverPackageServices(path, root)
 			if err != nil {
 				return config, err
 			}
-			definition := LocalServiceDefinition{ID: name, Name: name, Command: []string{manager, "run", name}}
-			if match := serviceScriptPort.FindStringSubmatch(script); len(match) > 1 {
-				definition.Port, _ = strconv.Atoi(match[1])
-			}
-			config.services = []LocalServiceDefinition{definition}
-			break
 		}
 	}
 	if config.services == nil {
@@ -152,13 +138,21 @@ func validateLocalServices(definitions []LocalServiceDefinition) error {
 			return errors.New("local services require a unique id, name, and command arguments")
 		}
 		if d.ObserveOnly {
-			if len(d.Command) > 0 || d.AutoPort || d.Cwd != "" || len(d.Env) > 0 || len(d.EnvFrom) > 0 {
+			if len(d.Command) > 0 || d.AutoPort || d.Cwd != "" || len(d.Env) > 0 || len(d.EnvFrom) > 0 || d.OneShot {
 				return errors.New("observeOnly dependencies cannot declare commands, automatic ports, or command environment")
 			}
 		} else if len(d.Command) == 0 || strings.TrimSpace(d.Command[0]) == "" {
 			return errors.New("local services require a unique id, name, and command arguments")
 		}
 		ids[d.ID] = true
+		if d.OneShot && (d.Port != 0 || d.AutoPort || d.URL != "") {
+			return errors.New("oneShot setup commands cannot declare listening ports or URLs")
+		}
+		for _, dependency := range d.DependsOn {
+			if dependency == "" || dependency == d.ID {
+				return errors.New("dependsOn requires another service id")
+			}
+		}
 		if err := validateCommandOptions(d.Cwd, d.Env); err != nil {
 			return err
 		}
@@ -286,7 +280,7 @@ func (s *Service) LocalServices(path string) (LocalServicesOverview, error) {
 		return LocalServicesOverview{}, err
 	}
 	config, configErr := s.localServiceConfig(path)
-	result := LocalServicesOverview{Services: []LocalServiceState{}, Source: config.source, Version: config.version}
+	result := LocalServicesOverview{Services: []LocalServiceState{}, Source: config.source, Version: config.version, Warnings: config.warnings}
 	if configErr != nil {
 		result.Error = configErr.Error()
 		config.services = nil

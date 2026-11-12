@@ -23,6 +23,8 @@ type ServiceCheck struct {
 	Port                int      `json:"port"`
 	AutoPort            bool     `json:"autoPort"`
 	ObserveOnly         bool     `json:"observeOnly"`
+	OneShot             bool     `json:"oneShot,omitempty"`
+	DependsOn           []string `json:"dependsOn,omitempty"`
 	Environment         []string `json:"environment"`
 	EndpointEnvironment []string `json:"endpointEnvironment"`
 	ExecutableAvailable bool     `json:"executableAvailable"`
@@ -63,7 +65,7 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 		issue("error", "services", "", err.Error())
 	} else {
 		for _, d := range services.services {
-			check := ServiceCheck{ID: d.ID, Name: d.Name, Command: d.Command, Cwd: d.Cwd, Port: d.Port, AutoPort: d.AutoPort, Environment: []string{}, EndpointEnvironment: []string{}}
+			check := ServiceCheck{ID: d.ID, Name: d.Name, Command: d.Command, Cwd: d.Cwd, Port: d.Port, AutoPort: d.AutoPort, OneShot: d.OneShot, DependsOn: slices.Clone(d.DependsOn), Environment: []string{}, EndpointEnvironment: []string{}}
 			for name := range d.Env {
 				check.Environment = append(check.Environment, name)
 			}
@@ -75,7 +77,14 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 			check.ObserveOnly = d.ObserveOnly
 			if d.ObserveOnly {
 				if !servicePortConnects(d) {
-					issue("error", "dependency_unreachable", d.ID, "External dependency is unreachable; start it using its existing owner")
+					prepared := slices.ContainsFunc(services.services, func(setup LocalServiceDefinition) bool {
+						return setup.OneShot && slices.Contains(d.DependsOn, setup.ID)
+					})
+					if prepared {
+						issue("warning", "dependency_pending_setup", d.ID, "Dependency is unreachable; project startup will run its declared preparation before checking connectivity")
+					} else {
+						issue("error", "dependency_unreachable", d.ID, "External dependency is unreachable; start it using its existing owner")
+					}
 				}
 			} else {
 				_, err := projectCommand(context.Background(), path, d.Cwd, d.Env, d.Command, false)
@@ -84,7 +93,7 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 					issue("error", "executable", d.ID, err.Error())
 				}
 			}
-			if d.Port == 0 && !d.AutoPort {
+			if d.Port == 0 && !d.AutoPort && !d.OneShot {
 				issue("warning", "port_unchecked", d.ID, "No listening port declared; ask AI to configure it for network services")
 			}
 			report.Services = append(report.Services, check)
@@ -159,6 +168,9 @@ func (s *Service) DiagnoseProject(path string) (ProjectDiagnosis, error) {
 	}
 	overview, err := s.LocalServices(path)
 	if err == nil {
+		for _, warning := range overview.Warnings {
+			issue("warning", "runtime_discovery", "", warning)
+		}
 		for _, state := range overview.Services {
 			if !localServiceRunning(state.Status) && state.PortState == "occupied" && !state.Definition.AutoPort {
 				issue("error", "port_occupied", state.Definition.ID, fmt.Sprintf("Fixed port %d is occupied", state.Definition.Port))

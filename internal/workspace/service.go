@@ -47,7 +47,6 @@ type Service struct {
 	activePipelines     map[string]*activePipeline
 	activeLocalServices map[string]map[string]*activeLocalService
 	activeClone         *activeClone
-	activePolicyChecks  map[string]context.CancelFunc
 	taskWG              sync.WaitGroup
 	closing             bool
 	gitMu               sync.Mutex
@@ -172,9 +171,6 @@ func (s *Service) changeProject(path, destination string) (Project, error) {
 		if running {
 			return Project{}, errors.New("stop this project's pipelines first")
 		}
-	}
-	if s.activePolicyChecks[path] != nil {
-		return Project{}, errors.New("wait for this project's rule checks to finish")
 	}
 	updated := projects[index]
 	if destination == "" {

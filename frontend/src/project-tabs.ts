@@ -20,6 +20,7 @@ export function isUtilityProjectTab(tab: ProjectTab): boolean {
 export function projectTabLabel(tab: ProjectTab): string {
   if (tab === "Overview") return "Project startup";
   if (tab === "Rules") return "Project standards";
+  if (tab === "Worktrees") return "Branches and workspaces";
   if (tab === "Review") return "Todos and handoff";
   return tab;
 }

@@ -500,8 +500,8 @@ export default function App() {
                 </div>
                 <button
                   className="flex min-h-7 max-w-[30%] items-center gap-2 rounded-md bg-surface px-2 text-sm hover:bg-nav-hover"
-                  title={t("View worktrees and branches")}
-                  aria-label={t("View worktrees and branches")}
+                  title={t("View branches and workspaces")}
+                  aria-label={t("View branches and workspaces")}
                   onClick={() => {
                     setGitSection("worktrees");
                     chooseTab("Worktrees");
@@ -657,7 +657,6 @@ export default function App() {
                   onUpdated={() => setRefresh((value) => value + 1)}
                   gitSection={gitSection}
                   onOpenCI={() => chooseTab("CI/CD")}
-                  onOpenReview={() => chooseTab("Review")}
                   onOpenStashes={() => {
                     setGitSection("stashes");
                     chooseTab("Worktrees");

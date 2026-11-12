@@ -23,6 +23,7 @@ type servicePlan struct {
 	configured   LocalServiceDefinition
 	config       localServiceConfig
 	dependencies map[string]int
+	waitFor      []int
 }
 
 func endpointProject(path string, endpoint ServiceEndpoint) (string, error) {
@@ -92,6 +93,19 @@ func (s *Service) servicePlans(paths []string, selection map[string]string) ([]s
 				return 0, err
 			}
 			plan.dependencies[name] = dependency
+			plan.waitFor = append(plan.waitFor, dependency)
+		}
+		for _, id := range plan.configured.DependsOn {
+			dependency, err := visit(path, id)
+			if err != nil {
+				return 0, err
+			}
+			if source := plans[dependency].configured; !source.OneShot && source.Port == 0 && !source.AutoPort {
+				return 0, fmt.Errorf("dependency %s needs a listening port or oneShot completion", id)
+			}
+			if !slices.Contains(plan.waitFor, dependency) {
+				plan.waitFor = append(plan.waitFor, dependency)
+			}
 		}
 		delete(visiting, key)
 		indexes[key] = len(plans)
@@ -149,6 +163,9 @@ func resolveServiceLinks(d LocalServiceDefinition, plan servicePlan, results []S
 }
 
 func (s *Service) waitServiceEndpoint(ctx context.Context, item ServiceStartResult) error {
+	if item.State.Definition.OneShot {
+		return s.waitServiceSetup(ctx, item)
+	}
 	if item.State.Definition.ObserveOnly {
 		if servicePortConnects(item.State.Definition) {
 			return nil
@@ -192,6 +209,28 @@ func (s *Service) waitServiceEndpoint(ctx context.Context, item ServiceStartResu
 			return fmt.Errorf("waiting for dependency service %s port failed: %w", item.ServiceID, ctx.Err())
 		case <-active.done:
 			return fmt.Errorf("dependency service %s exited", item.ServiceID)
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Service) waitServiceSetup(ctx context.Context, item ServiceStartResult) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		output, err := s.LocalServiceLog(item.Path, item.ServiceID, item.State.RunID)
+		if err != nil {
+			return err
+		}
+		if output.State.Status == "exited" && output.State.ExitCode == 0 {
+			return nil
+		}
+		if !localServiceRunning(output.State.Status) {
+			return fmt.Errorf("setup %s failed; inspect its log", item.ServiceID)
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("waiting for setup %s: %w", item.ServiceID, ctx.Err())
 		case <-ticker.C:
 		}
 	}

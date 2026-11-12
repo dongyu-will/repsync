@@ -182,6 +182,11 @@ export interface ActionsOverview {
   runs: ActionRun[];
 }
 
+export interface CheckConfiguration {
+  path: string;
+  tool: string;
+}
+
 export interface CloneState {
   id: string;
   remote: string;
@@ -274,12 +279,6 @@ export interface DocumentReviewPreview {
   token: string;
 }
 
-export interface EffectivePolicy {
-  rule: PolicyRule;
-  origin: string;
-  applies: boolean;
-}
-
 export interface GitBranch {
   name: string;
   commit: string;
@@ -328,6 +327,7 @@ export interface GitCleanupTarget {
 }
 
 export interface GitOverview {
+  cleanupChecked: boolean;
   git: boolean;
   worktrees: GitWorktree[];
   branches: GitBranch[];
@@ -410,6 +410,8 @@ export interface LocalServiceDefinition {
   cwd: string;
   env: Record<string, string>;
   envFrom?: Record<string, ServiceEndpoint>;
+  dependsOn?: string[];
+  oneShot?: boolean;
 }
 
 export interface LocalServiceOutput {
@@ -446,6 +448,7 @@ export interface LocalServicesOverview {
   source: string;
   version: string;
   error: string;
+  warnings?: string[];
 }
 
 export interface MemoryCitation {
@@ -481,6 +484,8 @@ export interface MemorySessions {
 }
 
 export interface Pipeline {
+  source?: string;
+  definition?: string;
   id: string;
   name: string;
   kind: string;
@@ -494,6 +499,7 @@ export interface Pipeline {
 }
 
 export interface PipelineConfig {
+  warnings?: string[];
   pipelines: Pipeline[];
   source: string;
   version: string;
@@ -526,47 +532,23 @@ export interface PipelineRun {
   reviewTarget?: string;
 }
 
-export interface PolicyDefaults {
-  version: string;
-  rules: PolicyRule[];
-}
-
-export interface PolicyFinding {
-  ruleId: string;
-  path: string;
-  line: number;
-  column: number;
-  message: string;
-  level: string;
-  kind: string;
-}
-
-export interface PolicyReport {
-  rulesChecked: string[];
-  skipped: string[];
-  findings: PolicyFinding[];
-  errors: string[];
-  baseline: string;
-  passed: boolean;
-  complete: boolean;
-  checkedAt: string;
-}
-
-/** PolicyRule is a declarative restriction; off keeps adoption explicit. */
-export interface PolicyRule {
-  cwd: string;
-  id: string;
-  level: string;
-  scope: string;
-  include: string[];
-  exclude: string[];
-  excludeMarkers: string[];
-}
-
 export interface Project {
   name: string;
   path: string;
   id?: string;
+}
+
+export interface ProjectCheck {
+  pipeline: Pipeline;
+  source: string;
+}
+
+export interface ProjectCheckOverview {
+  configurations: CheckConfiguration[];
+  guidance: string[];
+  checks: ProjectCheck[];
+  warnings: string[];
+  version: string;
 }
 
 /** ProjectConfig contains editable definitions, with omitted sections discovered independently. */
@@ -642,14 +624,6 @@ export interface ProjectMemoryInput {
   source: string;
   environment: string;
   keywords: string[];
-}
-
-export interface ProjectPolicies {
-  version: string;
-  projectVersion: string;
-  defaultsVersion: string;
-  overrides: PolicyRule[];
-  effective: EffectivePolicy[];
 }
 
 export interface ProjectReview {
@@ -909,6 +883,8 @@ export interface ServiceCheck {
   port: number;
   autoPort: boolean;
   observeOnly: boolean;
+  oneShot?: boolean;
+  dependsOn?: string[];
   environment: string[];
   endpointEnvironment: string[];
   executableAvailable: boolean;
@@ -988,6 +964,39 @@ export interface UpdatePreview {
   projectContent: string;
 }
 
+export interface WorkflowDefinition {
+  content: string;
+  path: string;
+  name: string;
+  triggers: string;
+  jobs: WorkflowJob[];
+}
+
+export interface WorkflowJob {
+  id: string;
+  name: string;
+  needs: string[];
+  if: string;
+  uses: string;
+  runsOn: string;
+  strategy: string;
+  steps: WorkflowStep[];
+}
+
+export interface WorkflowOverview {
+  workflows: WorkflowDefinition[];
+  warnings: string[];
+  version: string;
+}
+
+export interface WorkflowStep {
+  name: string;
+  run: string;
+  uses: string;
+  if: string;
+  workingDirectory: string;
+}
+
 // ---- Services ----
 
 /** Service persists registrations separately from the repositories it inspects. */
@@ -1029,9 +1038,6 @@ export const Service = {
   /** CancelClone stops only the clone subprocess owned by this service. */
   cancelClone(id: string): Promise<void> {
     return call("Service.CancelClone", id);
-  },
-  checkPolicies(path: string): Promise<PolicyReport> {
-    return call("Service.CheckPolicies", path);
   },
   /** CleanupGitSelection removes only explicitly selected, currently eligible targets. */
   cleanupGitSelection(path: string, version: string, targets: GitCleanupTarget[]): Promise<GitCleanupRecord> {
@@ -1087,6 +1093,13 @@ export const Service = {
   gitWorkspace(path: string): Promise<GitOverview> {
     return call("Service.GitWorkspace", path);
   },
+  /**
+   * GitWorkspaceSummary is a read-only listing. It does not wait for cleanup's
+   * process scan or write retention observations; cleanup always uses gitOverview.
+   */
+  gitWorkspaceSummary(path: string): Promise<GitOverview> {
+    return call("Service.GitWorkspaceSummary", path);
+  },
   /** Inspect only accepts registered projects and does not execute project scripts. */
   inspect(path: string): Promise<Inspection> {
     return call("Service.Inspect", path);
@@ -1114,12 +1127,16 @@ export const Service = {
   pipelineRuns(path: string): Promise<PipelineRun[]> {
     return call("Service.PipelineRuns", path);
   },
+  /**
+   * PipelineWorkflows reads repository definitions independently of GitHub auth or
+   * run history. Expressions, matrices, reusable jobs, and actions stay declarations.
+   */
+  pipelineWorkflows(path: string): Promise<WorkflowOverview> {
+    return call("Service.PipelineWorkflows", path);
+  },
   /** Pipelines reads explicit project commands. Discovery never runs them. */
   pipelines(path: string): Promise<PipelineConfig> {
     return call("Service.Pipelines", path);
-  },
-  policyDefaults(): Promise<PolicyDefaults> {
-    return call("Service.PolicyDefaults");
   },
   /** PreviewCodexResource plans one placement or removal without writing the project. */
   previewCodexResource(path: string, change: CodexResourceChange): Promise<CodexResourcePreview> {
@@ -1129,15 +1146,19 @@ export const Service = {
   previewDocumentReview(path: string, edit: DocumentReviewEdit): Promise<DocumentReviewPreview> {
     return call("Service.PreviewDocumentReview", path, edit);
   },
-  previewPolicyGuidance(path: string): Promise<UpdatePreview> {
-    return call("Service.PreviewPolicyGuidance", path);
-  },
   previewResource(path: string, id: string): Promise<UpdatePreview> {
     return call("Service.PreviewResource", path, id);
   },
   /** PreviewUpdate creates a short-lived server-owned plan, without changing a project. */
   previewUpdate(path: string): Promise<UpdatePreview> {
     return call("Service.PreviewUpdate", path);
+  },
+  /**
+   * ProjectChecks inventories existing tools and commands. Config files are read as
+   * data; ESLint JS, Make recipes, and prose are never evaluated to discover rules.
+   */
+  projectChecks(path: string): Promise<ProjectCheckOverview> {
+    return call("Service.ProjectChecks", path);
   },
   /** ProjectCodexResources lists placements owned by RepSync and their current state. */
   projectCodexResources(path: string): Promise<CodexResourcePlacements> {
@@ -1158,9 +1179,6 @@ export const Service = {
   /** ProjectMemories lists the registered project's records, including pending and archived ones. */
   projectMemories(path: string): Promise<ProjectMemory[]> {
     return call("Service.ProjectMemories", path);
-  },
-  projectPolicies(path: string): Promise<ProjectPolicies> {
-    return call("Service.ProjectPolicies", path);
   },
   /** ProposeProjectMemory records an AI inference for user review. */
   proposeProjectMemory(path: string, input: ProjectMemoryInput): Promise<ProjectMemory> {
@@ -1242,12 +1260,6 @@ export const Service = {
   savePipelines(path: string, version: string, automatic: boolean, definitions: Pipeline[]): Promise<void> {
     return call("Service.SavePipelines", path, version, automatic, definitions);
   },
-  savePolicyDefaults(version: string, rules: PolicyRule[]): Promise<void> {
-    return call("Service.SavePolicyDefaults", version, rules);
-  },
-  saveProjectPolicies(path: string, version: string, rules: PolicyRule[]): Promise<void> {
-    return call("Service.SaveProjectPolicies", path, version, rules);
-  },
   /** SaveResource edits only the catalog; consuming files require a separate preview. */
   saveResource(version: string, id: string, path: string, target: string): Promise<SharedResource> {
     return call("Service.SaveResource", version, id, path, target);
@@ -1318,6 +1330,9 @@ export const Service = {
   startProject(path: string, version: string): Promise<ServiceBatch> {
     return call("Service.StartProject", path, version);
   },
+  startProjectCheck(path: string, id: string, version: string): Promise<PipelineRun> {
+    return call("Service.StartProjectCheck", path, id, version);
+  },
   /**
    * StartProjects validates all selected projects before starting any new service.
    * Processes run concurrently after cmd.Start; a successful receipt does not assert application readiness.
@@ -1350,6 +1365,10 @@ export const Service = {
 
 /** Desktop provides the system directory picker for project registration and cloning. */
 export const Desktop = {
+  /** CheckForUpdates opens MyGo's signed updater; development builds cannot install updates. */
+  checkForUpdates(language: string): Promise<void> {
+    return call("Desktop.CheckForUpdates", language);
+  },
   chooseDirectory(defaultPath: string, title: string, buttonLabel: string): Promise<string> {
     return call("Desktop.ChooseDirectory", defaultPath, title, buttonLabel);
   },

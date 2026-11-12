@@ -20,6 +20,10 @@ import (
 const sharedStart = "<!-- repsync:shared:start -->"
 const sharedEnd = "<!-- repsync:shared:end -->"
 
+// Existing managed blocks remain protected when selecting a shared source.
+const policyStart = "<!-- repsync:policies:start -->"
+const policyEnd = "<!-- repsync:policies:end -->"
+
 type SharedSource struct {
 	Path    string `json:"path"`
 	Version string `json:"version"`
@@ -55,10 +59,11 @@ type fileSnapshot struct {
 }
 
 type updateRecord struct {
+	// Retained to distinguish existing generated-guidance history from shared-source adoption.
+	PolicyVersion string `json:"policyVersion,omitempty"`
 	ResourceID    string `json:"resourceId,omitempty"`
 	ResourceMode  uint32 `json:"resourceMode,omitempty"`
 	Conflict      bool   `json:"conflict,omitempty"`
-	PolicyVersion string `json:"policyVersion,omitempty"`
 	UpdateHistory
 	Before fileSnapshot `json:"before"`
 	After  fileSnapshot `json:"after"`
@@ -285,14 +290,6 @@ func (s *Service) ApplyUpdate(token string) (UpdateHistory, error) {
 		}
 		if source.Path != record.SourcePath || source.Version != record.Version || source.Target != record.Target || source.Mode != record.ResourceMode {
 			return UpdateHistory{}, errors.New("shared resource or adoption configuration changed; preview again")
-		}
-	} else if record.PolicyVersion != "" {
-		config, err := s.ProjectPolicies(record.Project.Path)
-		if err != nil {
-			return UpdateHistory{}, err
-		}
-		if config.Version != record.PolicyVersion {
-			return UpdateHistory{}, errors.New("project rules changed; preview again")
 		}
 	} else {
 		source, err := s.sharedSource()

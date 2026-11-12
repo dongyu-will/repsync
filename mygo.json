@@ -2,7 +2,7 @@
   "name": "repsync",
   "slug": "repsync",
   "identifier": "local.repsync.desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "icon": "resources/icon.png",
   "main": "./cmd/repsync",
   "devUrl": "http://127.0.0.1:5178",
@@ -10,5 +10,10 @@
   "buildCommand": "npm --prefix frontend run build",
   "frontendDist": "frontend/dist",
   "bindings": "frontend/src/mygo.ts",
-  "out": "build"
+  "out": "build",
+  "updates": {
+    "publicKey": "Su5iozqmBtDU6fy5NNeCwApsDT7nF/20VrpQnVRjy3M=",
+    "github": "dongyu-will/repsync",
+    "deltas": 0
+  }
 }

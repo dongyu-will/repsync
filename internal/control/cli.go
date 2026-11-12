@@ -20,7 +20,9 @@ import (
 const help = `repsync — local project control (JSON output; open starts the desktop app)
 
   repsync open                             Open desktop app and wait for the control endpoint
-  repsync check-rules PATH                  Check project rules; runs independently
+  repsync checks PATH                       Discover project check configurations and commands
+  repsync check [--wait] PATH CHECK_ID VERSION
+                                            Run a discovered check using the project tools
   repsync doctor PATH                       Check project setup without running project commands
   repsync project-map PATH                  Read feature modules and locate their implementation references
   repsync ai-resources [PATH]                Inventory Skills, MCPs, CLIs, and project fit
@@ -52,7 +54,9 @@ const help = `repsync — local project control (JSON output; open starts the de
   repsync add PATH                          Register folder without running project commands
   repsync remove PATH                       Remove registration; preserve folder and history
   repsync relocate OLD_PATH NEW_PATH        Update registration path without moving files
-  repsync git-workspace PATH                Read worktrees, branches, cleanup candidates, and version
+  repsync git-workspace PATH                Inspect worktrees, branches, cleanup candidates, and version
+  repsync git-summary PATH                  Read branches and workspaces without cleanup inspection
+  repsync git-policy PATH VERSION FILE     Save automatic cleanup settings from JSON; does not run cleanup
   repsync git-cleanup PATH VERSION          Clean up reviewed candidates with recovery records
   repsync git-restore PATH RECORD_ID         Restore cleaned local branches and worktrees
   repsync git-stashes PATH                  List repository-wide stashes
@@ -63,7 +67,8 @@ const help = `repsync — local project control (JSON output; open starts the de
   repsync stop-projects PATH [PATH ...]      Stop owned services for selected projects
   repsync stop PATH SERVICE_ID RUN_ID        Stop specified service instance
   repsync logs PATH SERVICE_ID RUN_ID        Read specified service logs
-  repsync pipelines PATH                    Read pipeline definitions and version
+  repsync pipelines PATH                    Discover local CI/CD entries and version
+  repsync workflows PATH                    Read repository GitHub Actions definitions
   repsync run [--wait] [--timeout 30s] PATH PIPELINE_ID VERSION
   repsync runs PATH                         Read pipeline run history
   repsync pipeline-logs PATH RUN_ID          Read pipeline status and logs
@@ -71,7 +76,6 @@ const help = `repsync — local project control (JSON output; open starts the de
   repsync sync-source [FILE]                 Read or connect shared rules source
   repsync sync-status                        Read project adoption status
   repsync sync-preview PATH                  Preview shared rules update
-  repsync policy-preview PATH                Preview derived AI rule guidance
   repsync sync-apply TOKEN                   Apply reviewed preview
   repsync sync-history PATH                  Read update and restore history
   repsync sync-restore RECORD_ID             Restore update if no later changes exist
@@ -122,7 +126,7 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 	if args[0] == "start" {
 		flags.BoolVar(&dryRun, "dry-run", false, "Preflight only; do not start")
 	}
-	if args[0] == "start" || args[0] == "run" {
+	if args[0] == "start" || args[0] == "run" || args[0] == "check" {
 		flags.BoolVar(&wait, "wait", false, "Wait for port readiness or pipeline completion")
 		flags.DurationVar(&timeout, "timeout", 30*time.Second, "Wait timeout")
 	}
@@ -157,6 +161,15 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		return usage("dry-run cannot be combined with wait; timeout must be positive and at most 2h")
 	}
 	switch request.Action {
+	case "git-policy":
+		if len(paths) != 3 {
+			return usage("Usage: repsync git-policy PATH POLICY_VERSION JSON_FILE")
+		}
+		request.Path, request.Version = paths[0], paths[1]
+		request.GitPolicy = &workspace.GitCleanupPolicy{}
+		if err := readInput(paths[2], request.GitPolicy); err != nil {
+			return usage(err.Error())
+		}
 	case "project-memory-propose":
 		if len(paths) != 2 {
 			return usage("Usage: repsync project-memory-propose PATH JSON_FILE")
@@ -214,7 +227,7 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		if len(paths) != 0 {
 			return usage(request.Action + " does not accept path arguments")
 		}
-	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources", "project-memory", "project-map":
+	case "add", "remove", "pipelines", "workflows", "runs", "sync-preview", "checks", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-summary", "git-stashes", "review", "codex-resources", "project-memory", "project-map":
 		if len(paths) != 1 {
 			return usage("Usage: repsync " + request.Action + " PATH")
 		}
@@ -314,9 +327,9 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 			return usage("Usage: repsync relocate OLD_PATH NEW_PATH")
 		}
 		request.Path, request.Destination = paths[0], paths[1]
-	case "run":
+	case "run", "check":
 		if len(paths) != 3 {
-			return usage("Usage: repsync run [--wait] PATH PIPELINE_ID VERSION")
+			return usage("Usage: repsync run/check [--wait] PATH COMMAND_ID VERSION")
 		}
 		request.Path, request.ServiceID, request.Version = paths[0], paths[1], paths[2]
 	case "pipeline-logs", "pipeline-stop":
@@ -423,7 +436,7 @@ func waitForResult(ctx context.Context, socket string, request Request, initial 
 		for _, item := range batch.Services {
 			poll.Runs = append(poll.Runs, workspace.ServiceRunRef{Path: item.Path, ServiceID: item.ServiceID, RunID: item.State.RunID})
 		}
-	case "run":
+	case "run", "check":
 		var run workspace.PipelineRun
 		if err := json.Unmarshal(initial.Data, &run); err != nil {
 			return Response{Error: err.Error()}

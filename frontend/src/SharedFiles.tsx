@@ -1,17 +1,16 @@
 import { formatMessage, getLocale, t } from "./i18n";
-import { useEffect, useReducer, type FormEvent } from "react";
+import { useEffect, useReducer } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Empty, Icon, Select } from "./components";
 import ActionDialog from "./ActionDialog";
+import AISetup from "./AISetup";
 import {
   Service,
   type Project,
   type ResourceOverview,
-  type SharedResourceInfo,
   type UpdateHistory,
   type UpdatePreview,
 } from "./mygo";
-import { sharedFilesPreview, sharedFilePreview } from "./shared-files-preview";
 
 const native = isMyGo();
 const message = (error: unknown) =>
@@ -24,9 +23,6 @@ const statuses: Record<string, string> = {
   error: "Needs attention",
 };
 const filename = (path: string) => path.split("/").at(-1) || path;
-const inputClass =
-  "w-full min-w-0 rounded-md border border-control bg-white px-3 py-2 text-sm";
-
 type State = {
   report: ResourceOverview | null;
   loadedPath: string;
@@ -72,7 +68,11 @@ export default function SharedFiles({
     let live = true;
     const request = native
       ? Service.sharedResources(path)
-      : Promise.resolve(sharedFilesPreview(project ? [project] : projects));
+      : Promise.resolve<ResourceOverview>({
+          version: "",
+          resources: [],
+          projects: [],
+        });
     void request
       .then((report) => {
         if (live) update({ report, loadedPath: path, loadError: "" });
@@ -86,13 +86,6 @@ export default function SharedFiles({
   }, [active, path, projects, project, state.revision]);
 
   const refresh = () => update({ revision: state.revision + 1, preview: null });
-  const registered = (id: string) =>
-    update({
-      selected: id,
-      notice: "Shared source saved. Project files have not changed.",
-      revision: state.revision + 1,
-      preview: null,
-    });
   async function perform(operation: () => Promise<unknown>, notice: string) {
     if (!native || state.busy) return;
     update({ busy: "write", error: "", notice: "", preview: null });
@@ -107,12 +100,10 @@ export default function SharedFiles({
     }
   }
   async function preview(project: Project, id: string) {
-    if (!state.report || state.busy) return;
+    if (!native || !state.report || state.busy) return;
     update({ busy: "preview", error: "", notice: "", preview: null });
     try {
-      const value = native
-        ? await Service.previewResource(project.path, id)
-        : sharedFilePreview(state.report, project, id);
+      const value = await Service.previewResource(project.path, id);
       update({ preview: value });
     } catch (error) {
       update({ error: message(error) });
@@ -130,17 +121,8 @@ export default function SharedFiles({
   return (
     <section aria-label={t("Shared file resources")} className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="min-w-0 text-sm text-muted">
-          {t("Share test scripts and check configurations across projects.")}
-        </p>
         <div className="flex flex-wrap gap-2">
-          {!project && report && (
-            <ResourceEditor
-              key={report.version}
-              version={report.version}
-              onSaved={registered}
-            />
-          )}
+          <AISetup path={path} task="shared-files" />
           <button
             className="icon-button text-muted"
             aria-label={t("Reload shared files")}
@@ -186,9 +168,6 @@ export default function SharedFiles({
         </p>
       ) : !selected ? (
         <Empty title={t("No shared files registered")} icon="layers">
-          {t(
-            "Register reusable test scripts or check configurations as shared sources.",
-          )}
           {project && t("Register a source in global shared rules.")}
         </Empty>
       ) : (
@@ -260,11 +239,13 @@ export default function SharedFiles({
               </div>
               {!project && (
                 <div className="flex flex-wrap gap-2">
-                  <ResourceEditor
-                    key={`${selected.id}:${report.version}`}
-                    version={report.version}
-                    resource={selected}
-                    onSaved={registered}
+                  <AISetup
+                    task="shared-files"
+                    context={{
+                      id: selected.id,
+                      source: selected.path,
+                      target: selected.target,
+                    }}
                   />
                   <ActionDialog
                     title={t("Remove shared resource registration")}
@@ -356,33 +337,14 @@ export default function SharedFiles({
                         </p>
                       )}
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          disabled={
-                            !native ||
-                            !!state.busy ||
-                            !!entry.error ||
-                            (!adopted && !!selected.error)
-                          }
-                          onClick={() =>
-                            void perform(
-                              () =>
-                                Service.setResourceAdoption(
-                                  entry.project.path,
-                                  entry.configVersion,
-                                  report.version,
-                                  selected.id,
-                                  !adopted,
-                                ),
-                              adopted
-                                ? "Adoption removed. Project files and history preserved."
-                                : "Adoption registered. Preview the diff before updating project files.",
-                            )
-                          }
-                        >
-                          {adopted
-                            ? t("Remove adoption")
-                            : t("Adopt this resource")}
-                        </Button>
+                        <AISetup
+                          path={entry.project.path}
+                          task="shared-files"
+                          context={{
+                            resourceId: selected.id,
+                            adopted: !!adopted,
+                          }}
+                        />
                         {adopted && (
                           <Button
                             disabled={
@@ -516,105 +478,6 @@ export default function SharedFiles({
         </div>
       )}
     </section>
-  );
-}
-
-function ResourceEditor({
-  version,
-  resource,
-  onSaved,
-}: {
-  version: string;
-  resource?: SharedResourceInfo;
-  onSaved: (id: string) => void;
-}) {
-  const [state, update] = useReducer(
-    (
-      s: { open: boolean; version: string; busy: boolean; error: string },
-      p: Partial<typeof s>,
-    ) => ({ ...s, ...p }),
-    { open: false, version, busy: false, error: "" },
-  );
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!native || state.busy) return;
-    const data = new FormData(event.currentTarget);
-    update({ busy: true, error: "" });
-    try {
-      await Service.saveResource(
-        state.version,
-        String(data.get("id")).trim(),
-        String(data.get("path")).trim(),
-        String(data.get("target")).trim(),
-      );
-      update({ open: false });
-      onSaved(String(data.get("id")).trim());
-    } catch (error) {
-      update({ error: message(error) });
-    } finally {
-      update({ busy: false });
-    }
-  }
-  return (
-    <ActionDialog
-      title={resource ? t("Edit shared source") : t("Register shared file")}
-      trigger={resource ? t("Edit source") : t("Register shared file")}
-      open={state.open}
-      onOpenChange={(open) => update({ open })}
-      onOpen={() => update({ error: "" })}
-      busy={state.busy}
-      error={state.error}
-    >
-      <form className="space-y-3" onSubmit={save}>
-        <fieldset disabled={state.busy} className="space-y-3">
-          <label className="block space-y-1 text-sm">
-            {t("Resource ID")}
-            <input
-              className={inputClass}
-              name="id"
-              required
-              maxLength={80}
-              readOnly={!!resource}
-              defaultValue={resource?.id}
-            />
-          </label>
-          <label className="block space-y-1 text-sm">
-            {t("Shared source file")}
-            <input
-              className={inputClass}
-              name="path"
-              required
-              placeholder="/absolute/path/shared/http-health.sh"
-              defaultValue={resource?.path}
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </label>
-          <label className="block space-y-1 text-sm">
-            {t("Destination in project")}
-            <input
-              className={inputClass}
-              name="target"
-              required
-              placeholder="tools/http-health.sh"
-              defaultValue={resource?.target}
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </label>
-          <p className="text-xs leading-5 text-muted">
-            {t(
-              "The source is an independent UTF-8 text file. Registration does not write to projects. The destination parent folder is prepared by AI during setup.",
-            )}
-          </p>
-          <Button type="submit" primary disabled={!native || state.busy}>
-            {state.busy ? t("Saving…") : t("Save registration")}
-          </Button>
-        </fieldset>
-      </form>
-    </ActionDialog>
   );
 }
 

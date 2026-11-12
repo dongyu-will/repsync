@@ -79,7 +79,7 @@
     },
     {
       "id": "git-workspace",
-      "name": "工作树与分支",
+      "name": "分支与工作区",
       "summary": "查看工作树和本地分支，预览清理并按记录恢复",
       "implementations": [
         {
@@ -114,30 +114,30 @@
       ]
     },
     {
-      "id": "project-rules",
-      "name": "项目规则",
-      "summary": "设置规则执行强度和例外，检查代码并生成规范说明",
+      "id": "project-checks",
+      "name": "项目检查",
+      "summary": "读取项目已有检查配置与命令并查看运行结果",
       "implementations": [
         {
-          "name": "项目规则面板",
+          "name": "项目检查面板",
           "source": {
-            "path": "frontend/src/ProjectRules.tsx",
-            "find": "export default function ProjectRules"
+            "path": "frontend/src/ProjectChecks.tsx",
+            "find": "export default function ProjectChecks"
           },
           "entry": {
             "path": "frontend/src/ProjectContent.tsx",
-            "find": "<ProjectRules"
+            "find": "<ProjectChecks"
           }
         }
       ]
     },
     {
       "id": "shared-resources",
-      "name": "公共规范与共享文件",
+      "name": "共享规范与共享文件",
       "summary": "维护公共来源，审查项目采用情况与更新差异",
       "implementations": [
         {
-          "name": "公共规范",
+          "name": "共享规范",
           "source": {
             "path": "frontend/src/SharedRules.tsx",
             "find": "export default function SharedRules"

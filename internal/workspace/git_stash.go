@@ -150,9 +150,7 @@ func (s *Service) ApplyGitStash(path, oid, version string) (GitStashApplyResult,
 			return result, errors.New("wait for or stop this project's pipeline first")
 		}
 	}
-	if s.activePolicyChecks[path] != nil {
-		return result, errors.New("wait for project rule checks to finish")
-	}
+
 	list, err := readGitStashes(path)
 	if err != nil {
 		return result, err

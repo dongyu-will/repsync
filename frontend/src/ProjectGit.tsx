@@ -2,15 +2,11 @@ import { formatMessage, getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, useRef, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
-import {
-  Service,
-  type GitOverview,
-  type GitCleanupTarget,
-  type GitCleanupPolicy,
-} from "./mygo";
-import { Button, Empty, Icon, Select } from "./components";
+import { Service, type GitOverview, type GitCleanupTarget } from "./mygo";
+import { Button, Empty, Icon } from "./components";
 import { gitPreview } from "./git-preview";
 import ProjectStashes from "./ProjectStashes";
+import AISetup from "./AISetup";
 
 const native = isMyGo();
 const message = (error: unknown) =>
@@ -25,6 +21,7 @@ type State = {
   error: string;
   notice: string;
   pending: boolean;
+  inspectingCleanup: boolean;
   revision: number;
   preview: GitOverview | null;
 };
@@ -46,18 +43,20 @@ export default function ProjectGit({
       error: "",
       notice: "",
       pending: false,
+      inspectingCleanup: false,
       revision: 0,
       preview: null,
     },
   );
-  const { view, section, error, notice, pending, preview } = state;
+  const { view, section, error, notice, pending, preview, inspectingCleanup } =
+    state;
   useEffect(() => {
     if (!native) return;
     let active = true;
     let request = 0;
     const load = () => {
       const current = ++request;
-      void Service.gitWorkspace(path)
+      void Service.gitWorkspaceSummary(path)
         .then((view) => {
           if (active && current === request) update({ view, error: "" });
         })
@@ -81,12 +80,29 @@ export default function ProjectGit({
     try {
       await operation();
       update({ preview: null, ...(success ? { notice: success } : {}) });
-      const next = await Service.gitWorkspace(path);
+      const next = await Service.gitWorkspaceSummary(path);
       update({ view: next });
     } catch (error) {
       update({ error: message(error) });
     } finally {
       update({ pending: false });
+    }
+  }
+
+  async function inspectCleanup() {
+    if (!view || pending) return;
+    if (!native) {
+      update({ preview: view, error: "", notice: "" });
+      return;
+    }
+    update({ pending: true, inspectingCleanup: true, error: "", notice: "" });
+    try {
+      const inspected = await Service.gitWorkspace(path);
+      update({ view: inspected, preview: inspected });
+    } catch (error) {
+      update({ error: message(error) });
+    } finally {
+      update({ pending: false, inspectingCleanup: false });
     }
   }
 
@@ -130,11 +146,9 @@ export default function ProjectGit({
         <div className="flex items-center gap-2">
           <Button
             disabled={!view?.git || pending}
-            onClick={() =>
-              view && update({ preview: view, error: "", notice: "" })
-            }
+            onClick={() => void inspectCleanup()}
           >
-            {t("Manual cleanup")}
+            {t(inspectingCleanup ? "Inspecting cleanup…" : "Manual cleanup")}
           </Button>
           <button
             className="icon-button text-muted disabled:opacity-45"
@@ -147,6 +161,11 @@ export default function ProjectGit({
           </button>
         </div>
       </div>
+      {view?.git && !view.cleanupChecked && (
+        <p className="text-xs text-muted">
+          {t("Cleanup checks run when you open Manual cleanup.")}
+        </p>
+      )}
       {error && (
         <p
           role="alert"
@@ -294,23 +313,16 @@ export default function ProjectGit({
               error={error}
               notice={notice}
             >
-              <CleanupSettings
-                key={view.policyVersion}
-                policy={view.policy}
-                branches={view.branches.map((b) => b.name)}
-                pending={pending}
-                onSave={(policy) =>
-                  perform(
-                    () =>
-                      Service.saveGitCleanupPolicy(
-                        path,
-                        view.policyVersion,
-                        policy,
-                      ),
-                    "Cleanup settings saved",
-                  )
-                }
-              />
+              <div className="space-y-3 text-sm">
+                <p>
+                  {t("Merged into base branch")}:{" "}
+                  {view.policy.baseBranch || t("Not provided")}
+                </p>
+                <p>
+                  {t("Retention days")}: {view.policy.retentionDays}
+                </p>
+                <AISetup path={path} task="cleanup" />
+              </div>
             </ActionDialog>
             <ActionDialog
               title={
@@ -464,94 +476,6 @@ export default function ProjectGit({
           )}
         </CleanupPreview>
       )}
-    </div>
-  );
-}
-
-function CleanupSettings({
-  policy,
-  branches,
-  pending,
-  onSave,
-}: {
-  policy: GitCleanupPolicy;
-  branches: string[];
-  pending: boolean;
-  onSave: (policy: GitCleanupPolicy) => void;
-}) {
-  const [draft, update] = useReducer(
-    (s: GitCleanupPolicy, p: Partial<GitCleanupPolicy>) => ({ ...s, ...p }),
-    policy,
-  );
-  return (
-    <div className="mt-3 space-y-3 text-sm">
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          className="size-4 accent-accent"
-          checked={draft.enabled}
-          disabled={!native || pending}
-          onChange={(e) => update({ enabled: e.target.checked })}
-        />
-        {t("Enable automatic cleanup for this repository")}
-      </label>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-0 space-y-1">
-          <span className="block text-xs text-muted">
-            {t("Merged into base branch")}
-          </span>
-          <Select
-            value={draft.baseBranch}
-            disabled={!native || pending}
-            onChange={(e) => update({ baseBranch: e.target.value })}
-          >
-            {!draft.baseBranch && (
-              <option value="">{t("Select local branch")}</option>
-            )}
-            {branches.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-muted">
-            {t("Retention days")}
-          </span>
-          <input
-            className="h-9 w-24 rounded-md border border-control px-3"
-            type="number"
-            min={1}
-            max={365}
-            value={draft.retentionDays}
-            disabled={!native || pending}
-            onChange={(e) => update({ retentionDays: Number(e.target.value) })}
-          />
-        </label>
-        <Button
-          disabled={
-            !native ||
-            pending ||
-            !draft.baseBranch ||
-            draft.retentionDays < 1 ||
-            draft.retentionDays > 365
-          }
-          onClick={() => onSave(draft)}
-        >
-          {t("Save settings")}
-        </Button>
-      </div>
-      <p className="text-xs leading-5 text-muted">
-        {t(
-          "Checks run hourly while the app is open, starting at the next scheduled check. Retention starts at first observation or latest change. Base, main, and release branches are always kept. Projects in the same repository share these settings.",
-        )}
-      </p>
-      <p className="text-xs leading-5 text-muted">
-        {t(
-          "Codex worktrees must be managed in their own chats. Uncertain file or process state prevents cleanup. Remote branches are unaffected.",
-        )}
-      </p>
     </div>
   );
 }

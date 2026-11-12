@@ -5,7 +5,6 @@ import { isMyGo } from "mygo-runtime";
 import {
   Service,
   type ProjectReview,
-  type ReviewResource,
   type ReviewCoverage,
   type ReviewIssue,
   type ReviewRequirement,
@@ -13,6 +12,7 @@ import {
 import { Button, Select } from "./components";
 import { reviewPreview } from "./review-preview";
 import ProjectDocumentReview from "./ProjectDocumentReview";
+import AISetup from "./AISetup";
 
 const native = isMyGo();
 const sections = [
@@ -309,97 +309,49 @@ export default function ProjectReviewPanel({
                 </section>
               )}
               {state.section === "settings" && (
-                <ReviewForm
-                  key={report.configVersion}
-                  pending={pending}
-                  onSubmit={(event) =>
-                    submit(
-                      event,
-                      (data) =>
-                        Service.saveReviewProfile(path, report.configVersion, {
-                          kind: value(data, "kind"),
-                          areas: data.getAll("areas").map(String),
-                          requirements: data.getAll("requirements").map(String),
-                          stages: data.getAll("stages").map(String),
-                        }),
-                      "Project applicability saved",
-                    )
-                  }
-                >
-                  <p className="text-xs leading-5 text-muted">
-                    {t(
-                      "Configure according to the project guide. Only selected scopes generate reminders. Saving does not run checks.",
-                    )}
-                  </p>
-                  <label className="block space-y-1">
-                    <span className="text-xs text-muted">
-                      {t("Project type")}
-                    </span>
-                    <Select
-                      name="kind"
-                      defaultValue={
-                        report.profile.kind === "unconfigured"
-                          ? "custom"
-                          : report.profile.kind
-                      }
-                    >
-                      <option value="web">{t("Web app")}</option>
-                      <option value="backend">{t("Backend service")}</option>
-                      <option value="desktop">{t("Desktop app")}</option>
-                      <option value="library">{t("Library / tool")}</option>
-                      <option value="notes">{t("Documents / Notes")}</option>
-                      <option value="custom">{t("Custom")}</option>
-                    </Select>
-                  </label>
-                  {Object.entries(areas).map(([area, name]) => (
-                    <fieldset
-                      key={area}
-                      className="space-y-2 border-t border-line pt-3"
-                    >
-                      <legend className="text-sm font-medium">{t(name)}</legend>
-                      <CheckBox
-                        name="areas"
-                        value={area}
-                        checked={report.profile.areas.includes(area)}
-                      >
-                        {t("This project includes")} {t(name)}
-                      </CheckBox>
-                      <p className="text-xs text-muted">
-                        {t("Checks to verify")}
-                      </p>
+                <section className="space-y-4">
+                  <AISetup path={path} task="review" />
+                  <dl className="grouped-list">
+                    <Info label={t("Project type")}>
+                      {t(
+                        (
+                          {
+                            web: "Web app",
+                            backend: "Backend service",
+                            desktop: "Desktop app",
+                            library: "Library / tool",
+                            notes: "Documents / Notes",
+                            custom: "Custom",
+                          } as Record<string, string>
+                        )[report.profile.kind] ||
+                          "Not configured or unreadable",
+                      )}
+                    </Info>
+                    <Info label={t("This project includes")}>
+                      {report.profile.areas
+                        .map((area) => t(areas[area] || area))
+                        .join(" · ") || t("Not configured or unreadable")}
+                    </Info>
+                    <Info label={t("Checks to verify")}>
                       {report.coverageOptions
-                        .filter((r) => r.area === area)
-                        .map((r) => (
-                          <CheckBox
-                            key={r.id}
-                            name="requirements"
-                            value={r.id}
-                            checked={report.profile.requirements.includes(r.id)}
-                          >
-                            {t(r.name)}
-                          </CheckBox>
-                        ))}
-                    </fieldset>
-                  ))}
-                  <fieldset className="space-y-2 border-t border-line pt-3">
-                    <legend className="text-sm font-medium">
-                      {t("Delivery stages")}
-                    </legend>
-                    {report.delivery
-                      .filter((s) => !["working", "commit"].includes(s.stage))
-                      .map((s) => (
-                        <CheckBox
-                          key={s.stage}
-                          name="stages"
-                          value={s.stage}
-                          checked={report.profile.stages.includes(s.stage)}
-                        >
-                          {t(s.name)}
-                        </CheckBox>
-                      ))}
-                  </fieldset>
-                  <Submit pending={pending}>{t("Save applicability")}</Submit>
-                </ReviewForm>
+                        .filter((item) =>
+                          report.profile.requirements.includes(item.id),
+                        )
+                        .map((item) => t(item.name))
+                        .join(" · ") || t("Not configured or unreadable")}
+                    </Info>
+                    <Info label={t("Delivery stages")}>
+                      {report.profile.stages
+                        .map((stage) =>
+                          t(
+                            report.delivery.find((item) => item.stage === stage)
+                              ?.name || stage,
+                          ),
+                        )
+                        .join(" · ") || t("Not configured or unreadable")}
+                    </Info>
+                  </dl>
+                </section>
               )}
               {state.section === "changes" && (
                 <>
@@ -519,7 +471,9 @@ export default function ProjectReviewPanel({
                   </div>
                   {!report.coverage.length && (
                     <p className="text-sm text-muted">
-                      {t("Select required checks under Applicability.")}
+                      {t(
+                        "Ask AI to declare the checks required by this project.",
+                      )}
                     </p>
                   )}
                   {report.checks.length ? (
@@ -811,29 +765,6 @@ export default function ProjectReviewPanel({
                               </Submit>
                             </ReviewForm>
                           )}
-                          <button
-                            disabled={!native || pending}
-                            className="rounded px-2 py-1 text-xs text-muted hover:bg-sidebar disabled:opacity-45"
-                            onClick={() =>
-                              perform(
-                                () =>
-                                  Service.saveReviewResources(
-                                    path,
-                                    report.configVersion,
-                                    report.resources
-                                      .filter(
-                                        (r) =>
-                                          r.state.definition.id !==
-                                          resource.state.definition.id,
-                                      )
-                                      .map((r) => r.state.definition),
-                                  ),
-                                "Verification declaration removed. Data preserved.",
-                              )
-                            }
-                          >
-                            {t("Remove declaration")}
-                          </button>
                         </div>
                       ))}
                     </div>
@@ -844,70 +775,7 @@ export default function ProjectReviewPanel({
                       )}
                     </p>
                   )}
-                  <section>
-                    <h3 className="break-words text-sm font-medium">
-                      {t("Add verification resource")}
-                    </h3>
-                    <ReviewForm
-                      pending={pending}
-                      onSubmit={(event) =>
-                        submit(
-                          event,
-                          (data) => {
-                            const resource: ReviewResource = {
-                              id: crypto.randomUUID(),
-                              name: value(data, "name"),
-                              kind: value(data, "kind"),
-                              target: value(data, "target"),
-                              guide: value(data, "guide"),
-                            };
-                            return Service.saveReviewResources(
-                              path,
-                              report.configVersion,
-                              [
-                                ...report.resources.map(
-                                  (r) => r.state.definition,
-                                ),
-                                resource,
-                              ],
-                            );
-                          },
-                          "Verification resource saved. No project commands run.",
-                        )
-                      }
-                    >
-                      <Field name="name" label={t("Name")} required />
-                      <label className="block space-y-1">
-                        <span className="text-xs text-muted">{t("Type")}</span>
-                        <Select name="kind">
-                          <option value="file">{t("Project file")}</option>
-                          <option value="directory">
-                            {t("Project folder")}
-                          </option>
-                          <option value="environment">
-                            {t("Environment variable (checks definition only)")}
-                          </option>
-                          <option value="manual">
-                            {t(
-                              "Manually verify databases, migrations, or backups",
-                            )}
-                          </option>
-                        </Select>
-                      </label>
-                      <Field
-                        name="target"
-                        label={t(
-                          "Project-relative path or environment variable name (optional for manual verification)",
-                        )}
-                      />
-                      <Field
-                        name="guide"
-                        label={t("Verification method or project guide")}
-                        multiline
-                      />
-                      <Submit pending={pending}>{t("Save resource")}</Submit>
-                    </ReviewForm>
-                  </section>
+                  <AISetup path={path} task="review" />
                 </>
               )}
               {state.section === "handover" && (

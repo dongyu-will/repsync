@@ -71,16 +71,17 @@ type GitCleanupRecord struct {
 }
 
 type GitOverview struct {
-	Git           bool               `json:"git"`
-	Worktrees     []GitWorktree      `json:"worktrees"`
-	Branches      []GitBranch        `json:"branches"`
-	Policy        GitCleanupPolicy   `json:"policy"`
-	PolicyVersion string             `json:"policyVersion"`
-	Version       string             `json:"version"`
-	History       []GitCleanupRecord `json:"history"`
-	Warnings      []string           `json:"warnings"`
-	Stashes       GitStashList       `json:"stashes"`
-	StashError    string             `json:"stashError"`
+	CleanupChecked bool               `json:"cleanupChecked"`
+	Git            bool               `json:"git"`
+	Worktrees      []GitWorktree      `json:"worktrees"`
+	Branches       []GitBranch        `json:"branches"`
+	Policy         GitCleanupPolicy   `json:"policy"`
+	PolicyVersion  string             `json:"policyVersion"`
+	Version        string             `json:"version"`
+	History        []GitCleanupRecord `json:"history"`
+	Warnings       []string           `json:"warnings"`
+	Stashes        GitStashList       `json:"stashes"`
+	StashError     string             `json:"stashError"`
 }
 
 type gitObserved struct {
@@ -142,9 +143,19 @@ func (s *Service) GitWorkspace(path string) (GitOverview, error) {
 	return s.gitOverview(path)
 }
 
+// GitWorkspaceSummary is a read-only listing. It does not wait for cleanup's
+// process scan or write retention observations; cleanup always uses gitOverview.
+func (s *Service) GitWorkspaceSummary(path string) (GitOverview, error) {
+	return s.readGitOverview(path, false)
+}
+
 func (s *Service) gitOverview(path string) (GitOverview, error) {
+	return s.readGitOverview(path, true)
+}
+
+func (s *Service) readGitOverview(path string, inspectCleanup bool) (GitOverview, error) {
 	deadline := time.Now().Add(25 * time.Second)
-	view := GitOverview{Worktrees: []GitWorktree{}, Branches: []GitBranch{}, History: []GitCleanupRecord{}, Warnings: []string{}}
+	view := GitOverview{CleanupChecked: inspectCleanup, Worktrees: []GitWorktree{}, Branches: []GitBranch{}, History: []GitCleanupRecord{}, Warnings: []string{}}
 	if _, err := s.registeredProject(path); err != nil {
 		return view, err
 	}
@@ -223,7 +234,11 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 				break
 			}
 		}
-		status, e := git(w.Path, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching")
+		untracked := "--untracked-files=all"
+		if !inspectCleanup {
+			untracked = "--untracked-files=normal"
+		}
+		status, e := git(w.Path, "status", "--porcelain=v1", untracked, "--ignored=matching")
 		w.StatusKnown, w.Dirty = e == nil, status != ""
 		if e != nil {
 			w.Reasons = append(w.Reasons, "Cannot read full file state")
@@ -233,7 +248,7 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		if w.Branch == "" {
 			w.Reasons = append(w.Reasons, "Detached HEAD; manual action required")
 		}
-		if len(w.Reasons) == 0 {
+		if inspectCleanup && len(w.Reasons) == 0 {
 			if e := worktreeIdle(w.Path); e != nil {
 				w.Reasons = append(w.Reasons, e.Error())
 			}
@@ -243,6 +258,16 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 	raw, err = git(path, "for-each-ref", "--sort=refname", "--format=%(refname:strip=2)%00%(objectname)%00%(upstream:short)%00%(committerdate:iso8601-strict)", "refs/heads/")
 	if err != nil || strings.Contains(raw, "[output exceeds 1 MiB") {
 		return view, errors.New("could not read all local branches")
+	}
+	merged := map[string]bool{}
+	if !inspectCleanup && baseErr == nil {
+		refs, err := git(path, "for-each-ref", "--merged="+strings.TrimSpace(baseOID), "--format=%(refname:strip=2)", "refs/heads/")
+		if err != nil {
+			return view, err
+		}
+		for _, name := range strings.Split(refs, "\n") {
+			merged[name] = true
+		}
 	}
 	now := time.Now().UTC()
 	seen := map[string]gitObserved{}
@@ -258,6 +283,16 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 			return view, errors.New("could not fully parse local branches")
 		}
 		b := GitBranch{Name: fields[0], Commit: fields[1], Upstream: fields[2], UpdatedAt: fields[3], Worktrees: []string{}, Reasons: []string{}}
+		if !inspectCleanup {
+			b.Merged = merged[b.Name]
+			for _, w := range view.Worktrees {
+				if w.Branch == b.Name {
+					b.Worktrees = append(b.Worktrees, w.Path)
+				}
+			}
+			view.Branches = append(view.Branches, b)
+			continue
+		}
 		b.Merged = baseErr == nil && gitAncestor(path, b.Commit, base)
 		if !b.Merged {
 			b.Reasons = append(b.Reasons, "Not merged into the base branch")
@@ -330,8 +365,10 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		}
 	}
 	state.Seen = seen
-	if err := saveJSON(filepath.Join(dir, "state.json"), state); err != nil {
-		return view, err
+	if inspectCleanup {
+		if err := saveJSON(filepath.Join(dir, "state.json"), state); err != nil {
+			return view, err
+		}
 	}
 	entries, err := os.ReadDir(filepath.Join(dir, "history"))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -350,13 +387,14 @@ func (s *Service) gitOverview(path string) (GitOverview, error) {
 		view.History = append(view.History, record)
 	}
 	view.Version = gitDigest(struct {
-		Base       string
-		Worktrees  []GitWorktree
-		Branches   []GitBranch
-		Policy     GitCleanupPolicy
-		Stashes    GitStashList
-		StashError string
-	}{strings.TrimSpace(baseOID), view.Worktrees, view.Branches, view.Policy, view.Stashes, view.StashError})
+		CleanupChecked bool
+		Base           string
+		Worktrees      []GitWorktree
+		Branches       []GitBranch
+		Policy         GitCleanupPolicy
+		Stashes        GitStashList
+		StashError     string
+	}{inspectCleanup, strings.TrimSpace(baseOID), view.Worktrees, view.Branches, view.Policy, view.Stashes, view.StashError})
 	return view, nil
 }
 

@@ -164,6 +164,19 @@ export default function PipelineFlow({
                 .map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg))
                 .join(" ")}
             </pre>
+            {pipeline.definition && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted">
+                  {t("Original declaration")}
+                </p>
+                <pre
+                  className="source-panel whitespace-pre-wrap break-words"
+                  tabIndex={0}
+                >
+                  {pipeline.definition}
+                </pre>
+              </div>
+            )}
             <p className="text-xs text-muted">
               {t("Working directory:")} {pipeline.cwd || t("Project root")}
             </p>

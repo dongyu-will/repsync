@@ -1,0 +1,68 @@
+name: Release desktop update
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Validate release version and signing key
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          test "$GITHUB_REF_NAME" = "v$(jq -r .version mygo.json)"
+          test -n "$MYGO_UPDATER_PRIVATE_KEY"
+          if gh release view "$GITHUB_REF_NAME" --json isDraft > "$RUNNER_TEMP/release.json" 2>/dev/null; then
+            test "$(jq -r .isDraft "$RUNNER_TEMP/release.json")" = true
+          fi
+      - run: npm --prefix frontend ci
+      - run: go mod download
+      - run: sh tools/shared/check-go-format.sh cmd internal
+      - run: npm --prefix frontend run check
+      - run: go vet ./...
+      - run: go test -tags=integration -race ./internal/workspace ./internal/control
+      - name: Build signed update and installer
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: go tool mygo build -platform darwin/arm64
+      - run: node tools/release/verify-update.mjs
+      - run: node tools/release/smoke-update.mjs
+      - name: Upload to draft
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            build/darwin-arm64/*.dmg \
+            build/darwin-arm64/*.tar.gz \
+            build/darwin-arm64/update-darwin-arm64.json \
+            build/darwin-arm64/install.sh \
+            build/SHA256SUMS
+      - name: Publish complete update
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-*) gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=true --latest=false ;;
+            *) gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease=false --latest ;;
+          esac

@@ -13,7 +13,7 @@ import {
   type CodexResourcePlacement,
 } from "./mygo";
 import { previewAIResources, previewAIUsage } from "./ai-preview";
-import ResourceSettings from "./ProjectCodexResources";
+import AISetup from "./AISetup";
 import ProjectMemories from "./ProjectMemories";
 import AIResourceGuide, {
   AIMaintenance,
@@ -251,16 +251,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
         {state.view === "resources" ? (
           <div className="flex flex-wrap items-center gap-2">
             <AIMaintenance path={path} />
-            <Button
-              disabled={!!state.busy}
-              onClick={() =>
-                update({
-                  busy: "inventory",
-                  error: "",
-                  revision: state.revision + 1,
-                })
-              }
-            >
+            <Button disabled={!!state.busy} onClick={refreshResources}>
               <Icon name="refresh" size={16} />
               {state.busy === "inventory" ? t("Scanning…") : t("Rescan")}
             </Button>
@@ -281,11 +272,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
       </div>
 
       {state.view === "resources" && path && (
-        <ActionDialog title={t("Add project MCP")}>
-          <div className="mt-3 max-w-xl pb-2">
-            <ResourceSettings path={path} onChanged={refreshResources} />
-          </div>
-        </ActionDialog>
+        <AISetup path={path} task="resources" />
       )}
       {state.view === "resources" && state.placementIssue && (
         <p role="status" className="break-words text-xs text-removed">
@@ -467,7 +454,6 @@ export default function AIResources({ path = "" }: { path?: string }) {
                   usageRead={!!state.usage}
                   path={path}
                   placement={placement}
-                  onChanged={refreshResources}
                 />
               ))}
           </div>
@@ -575,7 +561,6 @@ function ResourceRow({
   usageRead,
   path,
   placement,
-  onChanged,
 }: {
   resource: AIResource;
   duplicates: number;
@@ -583,7 +568,6 @@ function ResourceRow({
   usageRead: boolean;
   path: string;
   placement?: CodexResourcePlacement;
-  onChanged: () => void;
 }) {
   const [opened, setOpened] = useReducer(
     (_: boolean, next: boolean) => next,
@@ -660,11 +644,17 @@ function ResourceRow({
           resource.kind === "skill" &&
           resource.availability === "discovered")) && (
         <div className="border-t border-line-subtle bg-editor px-3 py-3">
-          <ResourceSettings
+          <AISetup
             path={path}
-            resource={resource}
-            placement={placement}
-            onChanged={onChanged}
+            task="resources"
+            context={{
+              id: resource.id,
+              kind: resource.kind,
+              name: resource.name,
+              source: resource.source,
+              location: resource.location,
+              placement: placement?.state,
+            }}
           />
         </div>
       )}

@@ -12,8 +12,9 @@ import {
 import { Button, Empty, Icon } from "./components";
 import { pipelinePreview } from "./pipeline-preview";
 
-import ProjectConfigEditor from "./ProjectConfigEditor";
+import AISetup from "./AISetup";
 import PipelineFlow from "./PipelineFlow";
+import PipelineWorkflows from "./PipelineWorkflows";
 
 const native = isMyGo();
 const message = (error: unknown) =>
@@ -61,41 +62,66 @@ function timestamp(value: string) {
 }
 
 export default function ProjectPipelines({ path }: { path: string }) {
-  const [source, setSource] = useState("local");
-  const location = (
-    <div
-      className="flex gap-1 rounded-lg bg-sidebar p-1"
-      role="group"
-      aria-label={t("Pipeline location")}
-    >
-      {[
-        ["local", "Local"],
-        ["github", "GitHub Actions"],
-      ].map(([id, name]) => (
-        <button
-          key={id}
-          onClick={() => setSource(id)}
-          aria-pressed={source === id}
-          className={`min-h-8 rounded-md px-3 text-sm ${source === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
-        >
-          {t(name)}
-        </button>
-      ))}
+  const [revision, setRevision] = useState(0);
+  const [filter, setFilter] = useState("");
+  return (
+    <div className="min-w-0 space-y-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">{t("Filter pipelines")}</span>
+          <input
+            type="search"
+            className="h-9 w-full rounded-md border border-control bg-white px-3 text-sm"
+            placeholder={t("Filter pipelines")}
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+        </label>
+        <AISetup path={path} task="pipelines" />
+        {native && (
+          <button
+            className="icon-button"
+            aria-label={t("Refresh pipelines")}
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            <Icon name="refresh" size={16} />
+          </button>
+        )}
+      </div>
+
+      <LocalPipelines
+        key={path}
+        path={path}
+        filter={filter}
+        refreshRevision={revision}
+        workflows={
+          <PipelineWorkflows
+            key={path}
+            path={path}
+            revision={revision}
+            filter={filter}
+          />
+        }
+      />
+      <RemotePipelines
+        key={`${path}:${revision}`}
+        path={path}
+        revision={revision}
+      />
     </div>
-  );
-  return source === "local" ? (
-    <LocalPipelines path={path} location={location} />
-  ) : (
-    <RemotePipelines path={path} location={location} />
   );
 }
 
 function LocalPipelines({
   path,
-  location,
+  filter,
+  refreshRevision,
+  workflows,
 }: {
   path: string;
-  location: ReactNode;
+  filter: string;
+  refreshRevision: number;
+  workflows: ReactNode;
 }) {
   const preview = pipelinePreview(path);
   const [config, setConfig] = useState<PipelineConfig | null>(
@@ -159,7 +185,7 @@ function LocalPipelines({
       active = false;
       clearTimeout(timer);
     };
-  }, [path, revision]);
+  }, [path, revision, refreshRevision]);
 
   useEffect(() => {
     if (!selected) return;
@@ -242,25 +268,6 @@ function LocalPipelines({
   }
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-        {location}
-        <div className="flex items-center gap-2">
-          <ProjectConfigEditor
-            path={path}
-            section="pipelines"
-            onSaved={() => setRevision((value) => value + 1)}
-          />
-          {native && (
-            <button
-              className="icon-button"
-              aria-label={t("Refresh pipelines")}
-              onClick={() => setRevision((value) => value + 1)}
-            >
-              <Icon name="refresh" size={16} />
-            </button>
-          )}
-        </div>
-      </div>
       {error && (
         <p role="alert" className="break-words text-sm text-removed">
           {t(error)}
@@ -269,9 +276,7 @@ function LocalPipelines({
       {configError && (
         <p role="alert" className="break-words text-sm text-removed">
           {t("Could not load configuration:")} {t(configError)}
-          {t(
-            ".Fix this in Configure pipelines. This page retries automatically.",
-          )}
+          {t(". Ask AI to repair the configuration, then refresh.")}
         </p>
       )}
       {runsError && (
@@ -282,6 +287,15 @@ function LocalPipelines({
           )}
         </p>
       )}
+      {config?.warnings?.map((warning) => (
+        <p
+          key={warning}
+          role="alert"
+          className="break-words text-sm text-removed"
+        >
+          {t(warning)}
+        </p>
+      ))}
       {!config ? (
         !configError && (
           <p role="status" className="text-sm text-muted">
@@ -291,64 +305,96 @@ function LocalPipelines({
       ) : config.pipelines.length ? (
         <>
           <div className="grouped-list">
-            {config.pipelines.map((pipeline) => {
-              const latest = runs.find((run) => run.pipelineId === pipeline.id);
-              return (
-                <div
-                  key={pipeline.id}
-                  className="border-b border-line px-3 py-3 last:border-b-0"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted">
-                      {pipeline.kind.toUpperCase()}
-                    </span>
-                    <h3 className="min-w-0 flex-1 break-words text-sm font-medium">
-                      {pipeline.name}
-                    </h3>
-                    {latest && (
-                      <Status status={runsKnown ? latest.status : "unknown"} />
-                    )}
-                    <Button
-                      disabled={
-                        !native || pending || !!running || configInvalid
-                      }
-                      aria-label={t("Run {0}", pipeline.name)}
-                      onClick={() => void run(pipeline)}
-                    >
-                      {running?.pipelineId === pipeline.id
-                        ? runsKnown
-                          ? t("Running…")
-                          : t("Run needs review")
-                        : t("Run")}
-                    </Button>
+            {config.pipelines
+              .filter((pipeline) =>
+                `${t("Local")} ${pipeline.kind} ${pipeline.name} ${pipeline.source || config.source} ${pipeline.cwd}`
+                  .toLocaleLowerCase()
+                  .includes(filter.trim().toLocaleLowerCase()),
+              )
+              .map((pipeline) => {
+                const latest = runs.find(
+                  (run) => run.pipelineId === pipeline.id,
+                );
+                return (
+                  <div
+                    key={pipeline.id}
+                    className="border-b border-line px-3 py-3 last:border-b-0"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted">
+                        {t("Local")} · {pipeline.kind.toUpperCase()}
+                      </span>
+                      <h3 className="min-w-0 flex-1 break-words text-sm font-medium">
+                        {pipeline.name}
+                      </h3>
+                      {latest && (
+                        <Status
+                          status={
+                            runsKnown &&
+                            !configInvalid &&
+                            latest.configVersion === config.version
+                              ? latest.status
+                              : "unknown"
+                          }
+                        />
+                      )}
+                      <Button
+                        disabled={
+                          !native || pending || !!running || configInvalid
+                        }
+                        aria-label={t("Run {0}", pipeline.name)}
+                        onClick={() => void run(pipeline)}
+                      >
+                        {running?.pipelineId === pipeline.id
+                          ? runsKnown
+                            ? t("Running…")
+                            : t("Run needs review")
+                          : t("Run")}
+                      </Button>
+                    </div>
+                    <p className="mt-1 break-all text-xs text-muted">
+                      {pipeline.source || config.source}
+                      {pipeline.cwd ? ` · ${pipeline.cwd}` : ""}
+                    </p>
+                    <PipelineFlow
+                      key={pipeline.id + config.version}
+                      pipeline={pipeline}
+                      run={latest}
+                      version={configInvalid ? "" : config.version}
+                      observed={runsKnown}
+                      onOpenLog={(id) => {
+                        revealLog.current = true;
+                        setSelected(id);
+                        setOutput(null);
+                        setLogError("");
+                        setLogRevision((value) => value + 1);
+                      }}
+                    />
                   </div>
-                  <PipelineFlow
-                    key={pipeline.id + config.version}
-                    pipeline={pipeline}
-                    run={latest}
-                    version={configInvalid ? "" : config.version}
-                    observed={runsKnown}
-                    onOpenLog={(id) => {
-                      revealLog.current = true;
-                      setSelected(id);
-                      setOutput(null);
-                      setLogError("");
-                      setLogRevision((value) => value + 1);
-                    }}
-                  />
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
+          {!config.pipelines.some((pipeline) =>
+            `${t("Local")} ${pipeline.kind} ${pipeline.name} ${pipeline.source || config.source} ${pipeline.cwd}`
+              .toLocaleLowerCase()
+              .includes(filter.trim().toLocaleLowerCase()),
+          ) && (
+            <p role="status" className="text-sm text-muted">
+              {t("No matching local pipelines.")}
+            </p>
+          )}
         </>
       ) : (
         <Empty icon="file" title={t("No local pipelines yet")}>
-          {t("Ask AI to connect this project's existing CI/CD pipelines.")}
+          {t(
+            "No existing CI/CD entry was discovered. Ask AI to check the project guides and connect an existing command.",
+          )}
         </Empty>
       )}
+      {workflows}
       <section aria-label={t("Local run history")}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">{t("Recent runs")}</h3>
+          <h3 className="text-sm font-semibold">{t("Local recent runs")}</h3>
           {running && (
             <Button disabled={!native || pending} onClick={() => void stop()}>
               {t("Stop run")}
@@ -467,16 +513,15 @@ function LocalPipelines({
 
 function RemotePipelines({
   path,
-  location,
+  revision,
 }: {
   path: string;
-  location: ReactNode;
+  revision: number;
 }) {
   const [result, setResult] = useState<{
     data?: ActionsOverview;
     error?: string;
   } | null>(native ? null : { data: pipelinePreview(path).actions });
-  const [revision, setRevision] = useState(0);
   useEffect(() => {
     if (!native) return;
     let active = true;
@@ -493,23 +538,12 @@ function RemotePipelines({
   }, [path, revision]);
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {location}
-        {native && (
-          <Button
-            onClick={() => {
-              setResult(null);
-              setRevision((value) => value + 1);
-            }}
-            disabled={!result}
-          >
-            {t("Refresh")}
-          </Button>
-        )}
-      </div>
-      <p className="text-sm text-muted">
-        {result?.data?.repository || t("No remote repository connected.")}
-      </p>
+      <h3 className="text-sm font-semibold">
+        {t("GitHub Actions recent runs")}
+      </h3>
+      {result?.data?.repository && (
+        <p className="text-sm text-muted">{result.data.repository}</p>
+      )}
       {!result ? (
         <p role="status" className="text-sm text-muted">
           {t("Loading GitHub Actions…")}
@@ -527,6 +561,9 @@ function RemotePipelines({
             >
               <div className="min-w-0 flex-1">
                 <h3 className="break-words text-sm font-medium">
+                  <span className="mr-2 text-xs font-normal text-muted">
+                    {t("GitHub Actions")}
+                  </span>
                   {run.workflowName || t("Workflow")} · {run.displayTitle}
                 </h3>
                 <p className="mt-1 break-all text-xs text-muted">

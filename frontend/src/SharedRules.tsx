@@ -12,26 +12,22 @@ import {
   type UpdatePreview,
 } from "./mygo";
 
-import ProjectRules from "./ProjectRules";
+import AISetup from "./AISetup";
 
 const native = isMyGo();
 
 export default function SharedRules({
   projects,
   project,
-  showProjectRules = true,
-  onOpenShared,
   onUpdated,
 }: {
   projects: Project[];
   project?: Project;
-  showProjectRules?: boolean;
-  onOpenShared?: () => void;
   onUpdated?: () => void;
 }) {
   const [source, setSource] = useState<SharedSource | null>(null);
   const [ready, setReady] = useState(!native);
-  const [draft, setDraft] = useState<string | null>(null);
+  const [sourceRevision, setSourceRevision] = useState(0);
   const [projectPath, setProjectPath] = useState(projects[0]?.path || "");
   const path =
     project?.path ??
@@ -60,27 +56,7 @@ export default function SharedRules({
     return () => {
       active = false;
     };
-  }, []);
-
-  async function connect(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy("connect");
-    setError("");
-    setNotice("");
-    try {
-      const value = await Service.connectSharedSource(
-        draft ?? source?.path ?? "",
-      );
-      setSource(value);
-      setDraft(null);
-      setPreview(null);
-      setNotice("Shared rules connected. Project files have not changed.");
-    } catch (error) {
-      setError(String(error));
-    } finally {
-      setBusy("");
-    }
-  }
+  }, [sourceRevision]);
 
   async function previewUpdate() {
     setBusy("preview");
@@ -143,15 +119,13 @@ export default function SharedRules({
   if (!native && project)
     return (
       <div className="space-y-5">
-        {showProjectRules && (
-          <ProjectRules path={project.path} onUpdated={onUpdated} />
-        )}
         <section aria-label={t("Shared rules")} className="space-y-3">
           <p className="text-sm text-muted">
             {t(
               "Connect a shared rules source to preview and apply project updates.",
             )}
           </p>
+          <AISetup path={project.path} task="shared-source" />
           <Button disabled>{t("Preview diff")}</Button>
         </section>
       </div>
@@ -159,7 +133,7 @@ export default function SharedRules({
   if (!native)
     return (
       <div className="space-y-5">
-        {showProjectRules && <ProjectRules />}
+        <AISetup task="shared-source" />
         <Empty icon="layers" title={t("No shared rules connected")}>
           {t("Connect a rules file to preview changes for each project.")}
         </Empty>
@@ -169,9 +143,6 @@ export default function SharedRules({
 
   return (
     <div className="space-y-5">
-      {showProjectRules && (
-        <ProjectRules path={project?.path} onUpdated={onUpdated} />
-      )}
       {error && (
         <p
           role="alert"
@@ -189,44 +160,19 @@ export default function SharedRules({
         <section aria-label={t("Shared rules source")} className="space-y-3">
           <div className="section-heading">
             <h2>{t("Shared rules source")}</h2>
-            <p>
-              {t(
-                "Choose a shared rules Markdown file. Preview each project before syncing to AGENTS.md shared block.",
-              )}
-            </p>
           </div>
-          <form onSubmit={connect} className="space-y-3">
-            <label
-              htmlFor="shared-source"
-              className="block text-sm font-medium"
+          <div className="flex flex-wrap gap-2">
+            <AISetup task="shared-source" context={{ source: source?.path }} />
+            <Button
+              onClick={() => {
+                setReady(false);
+                setSourceRevision((value) => value + 1);
+              }}
             >
-              {t("Shared rules file")}
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="shared-source"
-                className="min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
-                placeholder="/Users/you/Rules/COMMON.md"
-                value={draft ?? source?.path ?? ""}
-                onChange={(event) => {
-                  setDraft(event.target.value);
-                  setPreview(null);
-                }}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                required
-                disabled={!!busy}
-              />
-              <Button
-                type="submit"
-                primary
-                disabled={!!busy || !(draft ?? source?.path ?? "").trim()}
-              >
-                {busy === "connect" ? t("Connecting…") : t("Connect file")}
-              </Button>
-            </div>
-          </form>
+              {t("Reload")}
+            </Button>
+          </div>
+          {source?.path && <p className="break-all text-sm">{source.path}</p>}
           {source?.path && (
             <>
               <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -246,25 +192,13 @@ export default function SharedRules({
         aria-label={project ? t("Shared rules") : t("Project rule updates")}
         className={`space-y-4 ${project ? "" : "border-t border-line pt-5"}`}
       >
-        <div className="section-heading">
-          {!project && <h2>{t("Project rule updates")}</h2>}
-          <div className="space-y-3">
-            <p className="mt-2 leading-5">
-              {t(
-                "Project content outside the shared block is preserved. Source and project files are rechecked before applying; backups stay on this device.",
-              )}
-            </p>
-          </div>
-        </div>
         {!source?.path &&
           (project ? (
             <>
               <p className="text-sm text-muted">
                 {t("No shared rules source connected.")}
               </p>
-              <Button onClick={onOpenShared}>
-                {t("Connect shared rules")}
-              </Button>
+              <AISetup path={project.path} task="shared-source" />
             </>
           ) : (
             <p className="text-sm text-muted">
@@ -339,6 +273,11 @@ export default function SharedRules({
             {project && source?.path && <RuleContent source={source} />}
             {preview && (
               <section aria-label={t("Update preview")} className="space-y-3">
+                <p className="text-sm text-muted">
+                  {t(
+                    "Only the shared block in AGENTS.md is updated. Other content is preserved; a local backup is saved before applying.",
+                  )}
+                </p>
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="min-w-0 flex-1 text-sm font-semibold">
                     {preview.project.name} / AGENTS.md
@@ -508,15 +447,14 @@ function Adoptions({
                   >
                     {item.project.path}
                   </p>
-                  <p className="mt-1 break-all text-xs text-muted">
-                    {t("Source")}{" "}
-                    {item.sourceVersion.slice(0, 12) || t("Unknown")}{" "}
-                    {t("· Adoption")}{" "}
-                    {item.adoptedVersion.slice(0, 12) || t("Unknown")}
-                    {item.hasProjectContent
-                      ? t(" · Preserve project content")
-                      : ""}
-                  </p>
+                  {item.adoptedVersion && (
+                    <p
+                      className="mt-1 break-all text-xs text-muted"
+                      title={item.adoptedVersion}
+                    >
+                      {t("Adopted version")} {item.adoptedVersion.slice(0, 12)}
+                    </p>
+                  )}
                   {item.error && (
                     <p
                       role="alert"
