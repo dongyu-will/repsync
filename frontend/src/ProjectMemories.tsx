@@ -1,3 +1,4 @@
+import { formatMessage, getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, type FormEvent } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -47,7 +48,7 @@ const field = "grid gap-1 text-xs text-muted";
 const control =
   "w-full min-h-9 rounded-md border border-line bg-white px-2 py-1.5 text-sm text-ink";
 const date = (value: string) =>
-  new Date(value).toLocaleString("en-US", { hour12: false });
+  new Date(value).toLocaleString(getLocale(), { hour12: false });
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
@@ -147,11 +148,11 @@ export default function ProjectMemories({ path }: { path: string }) {
 
   const visible = items.filter((item) => item.status === filter);
   return (
-    <section aria-label="Project memory" className="space-y-3">
+    <section aria-label={t("Project memory")} className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div
           role="group"
-          aria-label="Memory status"
+          aria-label={t("Memory status")}
           className="flex flex-wrap gap-1 rounded-lg bg-sidebar p-1"
         >
           {tabs.map(([id, title]) => (
@@ -162,7 +163,7 @@ export default function ProjectMemories({ path }: { path: string }) {
               className={`min-h-8 rounded-md px-3 ${filter === id ? "bg-white font-medium" : "text-muted hover:text-ink"}`}
               onClick={() => update({ filter: id })}
             >
-              {title} {items.filter((item) => item.status === id).length}
+              {t(title)} {items.filter((item) => item.status === id).length}
             </button>
           ))}
         </div>
@@ -178,25 +179,25 @@ export default function ProjectMemories({ path }: { path: string }) {
             })
           }
         >
-          Reload
+          {t("Reload")}
         </Button>
       </div>
       {error && (
         <p role="alert" className="break-words text-removed">
-          {error}
+          {t(error)}
         </p>
       )}
       {notice && (
         <div className="flex flex-wrap items-center gap-2">
           <p role="status" className="text-muted">
-            {notice}
+            {t(notice)}
           </p>
           {undo && (
             <Button
               disabled={busy}
               onClick={() => void change(undo, "restore")}
             >
-              Unarchive
+              {t("Unarchive")}
             </Button>
           )}
         </div>
@@ -212,7 +213,7 @@ export default function ProjectMemories({ path }: { path: string }) {
         }
       />
       <ActionDialog
-        title="Add memory"
+        title={t("Add memory")}
         busy={busy}
         error={state.error}
         notice={state.notice}
@@ -222,7 +223,7 @@ export default function ProjectMemories({ path }: { path: string }) {
           onSubmit={record}
         >
           <label className={field}>
-            Memory statement
+            {t("Memory statement")}
             <textarea
               name="statement"
               className={control}
@@ -233,19 +234,19 @@ export default function ProjectMemories({ path }: { path: string }) {
             />
           </label>
           <label className={field}>
-            Source
+            {t("Source")}
             <input
               name="source"
               className={control}
               required
               maxLength={1024}
-              placeholder="Link, file location, or session reference"
+              placeholder={t("Link, file location, or session reference")}
               disabled={!native || busy}
             />
           </label>
           <div className="grid gap-3 md:grid-cols-2">
             <label className={field}>
-              Environment (optional)
+              {t("Environment (optional)")}
               <input
                 name="environment"
                 className={control}
@@ -254,19 +255,19 @@ export default function ProjectMemories({ path }: { path: string }) {
               />
             </label>
             <label className={field}>
-              Document review keywords (optional)
+              {t("Document review keywords (optional)")}
               <input
                 name="keywords"
                 className={control}
                 maxLength={1000}
-                placeholder="Old names, separated by commas"
+                placeholder={t("Old names, separated by commas")}
                 disabled={!native || busy}
               />
             </label>
           </div>
           <div className="flex justify-end">
             <Button type="submit" primary disabled={!native || busy}>
-              Save as confirmed
+              {t("Save as confirmed")}
             </Button>
           </div>
         </form>
@@ -283,18 +284,18 @@ export default function ProjectMemories({ path }: { path: string }) {
               </p>
               <dl className="space-y-1 break-words text-xs text-muted">
                 <div className="flex flex-wrap gap-x-2">
-                  <dt>Source</dt>
+                  <dt>{t("Source")}</dt>
                   <dd className="min-w-0 break-all">{item.source}</dd>
                 </div>
                 {item.environment && (
                   <div className="flex flex-wrap gap-x-2">
-                    <dt>Environment</dt>
+                    <dt>{t("Environment")}</dt>
                     <dd>{item.environment}</dd>
                   </div>
                 )}
                 {item.keywords.length > 0 && (
                   <div className="flex flex-wrap gap-x-2">
-                    <dt>Document keywords</dt>
+                    <dt>{t("Document keywords")}</dt>
                     <dd>{item.keywords.join(", ")}</dd>
                   </div>
                 )}
@@ -302,14 +303,15 @@ export default function ProjectMemories({ path }: { path: string }) {
               {item.session && (
                 <section className="space-y-2 text-xs">
                   <h3 className="break-words text-sm font-medium">
-                    Original session and user quote
+                    {t("Original session and user quote")}
                   </h3>
                   <p className="break-all text-muted">
                     {item.session.file}:{item.session.line}
                   </p>
                   {item.session.extractor && (
                     <p className="text-muted">
-                      by {memoryToolName(item.session.extractor)} Extract
+                      {t("by")} {memoryToolName(item.session.extractor)}{" "}
+                      {t("Extract")}
                     </p>
                   )}
                   <blockquote className="whitespace-pre-wrap break-words border-l-2 border-line pl-2">
@@ -319,8 +321,8 @@ export default function ProjectMemories({ path }: { path: string }) {
               )}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted">
-                  {item.origin === "ai" ? "AI Inferred" : "Manual entry"} ·{" "}
-                  {date(item.updatedAt)}
+                  {item.origin === "ai" ? t("AI Inferred") : t("Manual entry")}{" "}
+                  · {date(item.updatedAt)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {item.status === "pending" && (
@@ -329,7 +331,7 @@ export default function ProjectMemories({ path }: { path: string }) {
                       disabled={!native || busy}
                       onClick={() => void change(item, "confirm")}
                     >
-                      Confirm memory
+                      {t("Confirm memory")}
                     </Button>
                   )}
                   {item.status === "archived" ? (
@@ -337,14 +339,14 @@ export default function ProjectMemories({ path }: { path: string }) {
                       disabled={!native || busy}
                       onClick={() => void change(item, "restore")}
                     >
-                      Unarchive
+                      {t("Unarchive")}
                     </Button>
                   ) : (
                     <Button
                       disabled={!native || busy}
                       onClick={() => void change(item, "archive")}
                     >
-                      Archive
+                      {t("Archive")}
                     </Button>
                   )}
                 </div>
@@ -355,7 +357,7 @@ export default function ProjectMemories({ path }: { path: string }) {
       ) : (
         <p role="status" className="py-3 text-muted">
           {busy
-            ? "Loading project memories…"
+            ? t("Loading project memories…")
             : {
                 confirmed: "No confirmed memories yet",
                 pending: "No memories awaiting confirmation",
@@ -381,7 +383,7 @@ function ProjectMemoryExtract({
     selected: string;
     busy: "list" | "extract" | "";
     error: string;
-    notice: string;
+    notice: string[];
   };
   const [state, update] = useReducer(
     (previous: ExtractState, next: Partial<ExtractState>) => ({
@@ -395,12 +397,12 @@ function ProjectMemoryExtract({
       selected: "",
       busy: "",
       error: "",
-      notice: "",
+      notice: [],
     },
   );
   async function load(provider = state.provider) {
     if (state.busy) return;
-    update({ busy: "list", error: "", notice: "" });
+    update({ busy: "list", error: "", notice: [] });
     try {
       const report: MemorySessions = native
         ? await Service.listMemorySessions(path, provider)
@@ -426,7 +428,7 @@ function ProjectMemoryExtract({
       (session) => session.file === state.selected,
     );
     if (!native || !session || state.busy) return;
-    update({ busy: "extract", error: "", notice: "" });
+    update({ busy: "extract", error: "", notice: [] });
     try {
       const result = await Service.extractProjectMemories(
         path,
@@ -437,20 +439,28 @@ function ProjectMemoryExtract({
       );
       const details = [
         result.added.length
-          ? `New ${result.added.length}  memories awaiting confirmation`
+          ? formatMessage(
+              "New {0}  memories awaiting confirmation",
+              result.added.length,
+            )
           : "No new memories awaiting confirmation",
         result.messages === 0
           ? "No completed turns to extract in this session"
           : "",
-        result.existing ? `${result.existing}  already exist` : "",
+        result.existing
+          ? formatMessage("{0} already exist", result.existing)
+          : "",
         result.rejected
-          ? `${result.rejected}  records failed quote or field validation`
+          ? formatMessage(
+              "{0} records failed quote or field validation",
+              result.rejected,
+            )
           : "",
         result.partial
           ? "Only messages within the read limits were processed"
           : "",
       ].filter(Boolean);
-      update({ notice: details.join(" · ") });
+      update({ notice: details });
       if (result.added.length > 0) onAdded();
     } catch (error) {
       update({ error: message(error) });
@@ -461,7 +471,7 @@ function ProjectMemoryExtract({
 
   return (
     <ActionDialog
-      title="Extract from AI sessions"
+      title={t("Extract from AI sessions")}
       onOpen={() => {
         if (!state.report && !state.error) void load();
       }}
@@ -472,13 +482,15 @@ function ProjectMemoryExtract({
         onSubmit={extract}
       >
         <p className="text-xs leading-5 text-muted">
-          Send user messages from completed turns in the selected session to
+          {t(
+            "Send user messages from completed turns in the selected session to",
+          )}
           {memoryToolName(state.extractor)}
-          's default model. Extracted memories await confirmation.
+          {t("'s default model. Extracted memories await confirmation.")}
         </p>
         <div className="grid grid-cols-2 gap-3">
           <label className={field}>
-            Session source
+            {t("Session source")}
             <Select
               className="w-full"
               value={state.provider}
@@ -490,48 +502,50 @@ function ProjectMemoryExtract({
                   report: null,
                   selected: "",
                   error: "",
-                  notice: "",
+                  notice: [],
                 });
                 void load(provider);
               }}
             >
               {memoryTools.map(([id, label]) => (
                 <option key={id} value={id}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </Select>
           </label>
           <label className={field}>
-            Extraction tool
+            {t("Extraction tool")}
             <Select
               className="w-full"
               value={state.extractor}
               disabled={!!state.busy}
               onChange={(event) =>
-                update({ extractor: event.target.value, error: "", notice: "" })
+                update({ extractor: event.target.value, error: "", notice: [] })
               }
             >
               {memoryTools.map(([id, label]) => (
                 <option key={id} value={id}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </Select>
           </label>
         </div>
         <label className={field}>
-          Recently modified project sessions
+          {t("Recently modified project sessions")}
           <Select
             className="w-full"
             disabled={!native || !!state.busy}
             value={state.selected}
             onChange={(event) =>
-              update({ selected: event.target.value, error: "", notice: "" })
+              update({ selected: event.target.value, error: "", notice: [] })
             }
           >
             <option value="">
-              {state.busy === "list" ? "Loading sessions…" : "Choose a session"}
+              {state.busy === "list"
+                ? t("Loading sessions…")
+                : t("Choose a session")}
             </option>
             {state.report?.sessions.map((session) => (
               <option key={session.file} value={session.file}>
@@ -544,19 +558,22 @@ function ProjectMemoryExtract({
         {state.report && (
           <p role="status" className="text-xs text-muted">
             {state.report.sessions.length === 0 &&
-              `Recent 30  days: no sessions found for this project from ${memoryToolName(state.provider)}  sessions.`}
+              t(
+                "Recent 30  days: no sessions found for this project from {0}  sessions.",
+                memoryToolName(state.provider),
+              )}
             {state.report.partial &&
-              " Some sessions exceed scan limits or could not be read."}
+              t(" Some sessions exceed scan limits or could not be read.")}
           </p>
         )}
         {state.error && (
           <p role="alert" className="break-words text-removed">
-            {state.error}
+            {t(state.error)}
           </p>
         )}
-        {state.notice && (
+        {state.notice.length > 0 && (
           <p role="status" className="text-muted">
-            {state.notice}
+            {state.notice.map((notice) => t(notice)).join(" · ")}
           </p>
         )}
         <div className="flex flex-wrap justify-end gap-2">
@@ -565,7 +582,7 @@ function ProjectMemoryExtract({
             disabled={!native || !!state.busy}
             onClick={() => void load()}
           >
-            Refresh sessions
+            {t("Refresh sessions")}
           </Button>
           <Button
             type="submit"
@@ -573,8 +590,8 @@ function ProjectMemoryExtract({
             disabled={!native || !!state.busy || !state.selected}
           >
             {state.busy === "extract"
-              ? "Extracting…"
-              : "Extract for confirmation"}
+              ? t("Extracting…")
+              : t("Extract for confirmation")}
           </Button>
         </div>
       </form>

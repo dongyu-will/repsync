@@ -1,6 +1,11 @@
 import { useLayoutEffect, useReducer } from "react";
-import { isMyGo } from "mygo-runtime";
 import { projectTabs, type ProjectTab } from "./project-tabs";
+import {
+  preferenceStorageKey,
+  readLanguage,
+  setLanguage,
+  type Language,
+} from "./i18n";
 
 export type Preferences = {
   rememberProject: boolean;
@@ -9,6 +14,7 @@ export type Preferences = {
   refreshSeconds: 0 | 30 | 60 | 300;
   textSize: "standard" | "larger";
   motion: "system" | "reduced";
+  language: Language;
 };
 
 export const defaultPreferences: Preferences = {
@@ -18,11 +24,10 @@ export const defaultPreferences: Preferences = {
   refreshSeconds: 60,
   textSize: "standard",
   motion: "system",
+  language: "system",
 };
 
-const storageKey = isMyGo()
-  ? "repsync:preferences"
-  : "repsync:preview:preferences";
+const storageKey = preferenceStorageKey;
 
 type State = { values: Preferences; error: string; notice: string };
 
@@ -52,6 +57,7 @@ function load(): State {
           : defaultPreferences.refreshSeconds,
         textSize: saved.textSize === "larger" ? "larger" : "standard",
         motion: saved.motion === "reduced" ? "reduced" : "system",
+        language: readLanguage(saved.language),
       },
       error: "",
       notice: "",
@@ -79,6 +85,7 @@ export function usePreferences() {
   }, [state.values.textSize, state.values.motion]);
 
   function save(values: Preferences, notice = "Preferences saved") {
+    setLanguage(values.language);
     try {
       localStorage.setItem(storageKey, JSON.stringify(values));
       update({ values, error: "", notice });

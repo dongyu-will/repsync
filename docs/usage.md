@@ -69,17 +69,62 @@ repsync runs /absolute/path/to/project
 Settings saves preferences automatically for the current desktop app or browser. Desktop and browser preferences are separate.
 
 - **Startup:** reopen the last project, remember each project's tab, and choose a default page. The default applies when there is no remembered tab, or whenever tab restoration is disabled.
-- **Appearance:** choose standard or larger text, and follow system motion preferences or reduce motion explicitly.
+- **Appearance:** choose the interface language (Follow system, 简体中文, or English), standard or larger text, and system or reduced motion. Language changes apply immediately and are remembered after reopening. Follow system uses the system/WebView language (Chinese maps to Simplified Chinese; other languages use English) and responds to language-change events. Project names, paths, commands, logs, diffs, and document or memory content keep their original text.
 - **Project status:** choose how often to refresh the project overview. Focus and manual refresh remain available. Other views retain their own update schedules.
 - **About:** view the current app version and open documentation, issues, releases, or source code.
 
 Reset preferences restores these defaults without changing project registrations, document drafts, or history. A storage error leaves changes active for the current window and shows an error in Settings.
+
+## Project map
+
+The project's **Project map** tab groups implementations by user-facing feature. Open a module to see its implementations and entry references. **Ask AI to organize** copies an instruction for your existing AI chat; refresh after it writes `.repsync-map.json` in the project root. The app does not call a model or change project code.
+
+```json
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "corrections",
+      "name": "Essay correction",
+      "summary": "Submit an essay and read feedback",
+      "overlap": "Both pages submit essays; check whether the older page is still needed.",
+      "implementations": [
+        {
+          "name": "Correction page",
+          "source": { "path": "src/pages/Correction.tsx", "find": "function Correction(" },
+          "entry": { "path": "src/App.tsx", "find": "<Correction" }
+        },
+        {
+          "name": "Earlier correction page",
+          "source": { "path": "src/legacy/Essay.tsx", "find": "function Essay(" }
+        }
+      ]
+    }
+  ]
+}
+```
+
+Names, summaries, and `overlap` are authored project content. `overlap` is optional: provide a specific reason only for suspected duplication. Multiple implementations can be intentional. `source` identifies the primary implementation; `entry` is optional and should cite an actual mount, route, or navigation connection. An import alone does not establish user reachability. An omitted entry means **not recorded**, not confirmed unreachable or unused.
+
+Use project-relative file paths and a short single-line `find` that matches exactly one current line. `find` is optional for a source file and required for an entry. On each read, the app resolves line numbers and marks missing, unreadable, ambiguous, or changed references. It recomputes `line` and `issue`; supplied values are not evidence. References stay within the registered project, including symbolic links. This locates declared references; it neither discovers all modules nor verifies runtime behavior, permissions, or complete user flows. AI should report its inspection scope and omissions separately.
+
+The map is limited to 256 KiB, 64 modules, 1–8 implementations per module, and 256 references. Each referenced file uses the existing 256 KiB text limit; at most roughly 8 MiB of unique reference content is read per request. Read limits and unresolved references are shown without hiding other modules. Names are limited to 256 bytes, module IDs to 128 bytes, summaries and duplicate notes to 2048 bytes, paths to 2048 bytes, and `find` to 256 bytes.
+
+Read the same map through the desktop control service with `repsync project-map PATH`. This returns modules and current reference locations without running project commands. Regenerate maps through the project's existing AI workflow when features or entry points change. The repsync repository includes its own map; other registered projects are not modified automatically.
 
 ## Shared rules and files
 
 Shared rules use a managed block inside `AGENTS.md`; surrounding project content is preserved. Shared files have explicit source and destination registrations. Preview changes before applying them. Backups support restore as long as later edits have not replaced the update.
 
 Worktree cleanup retains modified, ignored, active, protected, and uncertain entries. It does not delete remote branches. Stash apply preserves the original stash and leaves conflicts for review.
+
+## AI resource updates and manuals
+
+Before adopting a Skill, choose **Assess suitability and conflicts** in **Ask AI to maintain** and provide the original source in your existing AI chat. AI compares project rules, tasks and existing resources, then records a scoped recommendation with separate overlap, conflict, prerequisite and unknown findings. Candidates appear in the existing resource list without installation. Use `repsync ai-resource-assess [PATH] FILE` to write reports; existing resource and project snapshots protect freshness. Global reports remain references when viewed inside a project. See [the assessment format and limits](guide.zh-CN.md#安装前适配与冲突评估).
+
+Open an existing AI resource to see AI-authored update findings, new capabilities, a practical manual, check time, and sources. Use **Ask AI to maintain** to copy a scoped instruction into your existing AI chat. Choose checking, updating through the existing installation channel, or writing a manual. Rescan after completion; rescanning itself only inventories local resources.
+
+AI reads `repsync ai-resources [PATH]` and saves each report through `repsync ai-resource-record [PATH] FILE`. Omit PATH for global records. Reports protect resource snapshots and existing records; project reports can override global guidance. Local Skill text or MCP configuration changes mark guidance as stale. Remote tool changes and companion documents still require a fresh AI check. The app does not run an updater, call a model, or schedule checks. See [the report format and limits](guide.zh-CN.md#资源更新与说明书).
 
 ## Local data
 

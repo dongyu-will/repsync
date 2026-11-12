@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -42,11 +43,11 @@ export default function MarkdownPreview({
         img({ alt, src }) {
           return typeof src === "string" && /^https?:\/\//i.test(src) ? (
             <a href={src} target="_blank" rel="noreferrer">
-              {alt || "Open image"}
+              {alt || t("Open image")}
             </a>
           ) : (
             <span className="text-muted">
-              {alt || "Local images are not supported yet"}
+              {alt || t("Local images are not supported yet")}
             </span>
           );
         },

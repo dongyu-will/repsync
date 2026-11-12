@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useReducer, useRef, type FormEvent } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Select } from "./components";
@@ -156,14 +157,14 @@ export default function ResourceSettings({
         <div className="space-y-2">
           {placement && (
             <p className="text-xs text-muted">
-              {placementLabels[placement.state]}
+              {t(placementLabels[placement.state])}
             </p>
           )}
           {!readOnly && ((userMCP && (!placement || override)) || override) ? (
             <div className="flex flex-wrap items-end gap-2">
               <label className="grid gap-1">
                 <span className="text-xs text-muted">
-                  {path ? "Project settings" : "User defaults"}
+                  {path ? t("Project settings") : t("User defaults")}
                 </span>
                 <Select
                   value={selected}
@@ -172,19 +173,19 @@ export default function ResourceSettings({
                 >
                   {path && (
                     <option value="remove">
-                      Inherit defaults
+                      {t("Inherit defaults")}
                       {userMCP
                         ? globalDefault === "enable"
-                          ? "(enabled)"
-                          : "(disabled)"
+                          ? t("(enabled)")
+                          : t("(disabled)")
                         : ""}
                     </option>
                   )}
                   {(userMCP || current === "enable") && (
-                    <option value="enable">Enable</option>
+                    <option value="enable">{t("Enable")}</option>
                   )}
                   {(userMCP || current === "disable") && (
-                    <option value="disable">Disable</option>
+                    <option value="disable">{t("Disable")}</option>
                   )}
                 </Select>
               </label>
@@ -193,7 +194,7 @@ export default function ResourceSettings({
                 disabled={pending || selected === current}
                 onClick={() => planResource(selected)}
               >
-                Preview changes
+                {t("Preview changes")}
               </Button>
             </div>
           ) : !readOnly && placement ? (
@@ -203,8 +204,8 @@ export default function ResourceSettings({
               onClick={() => planResource("remove")}
             >
               {resource.kind === "skill"
-                ? "Preview removing project link"
-                : "Preview removing project configuration"}
+                ? t("Preview removing project link")
+                : t("Preview removing project configuration")}
             </Button>
           ) : !readOnly && path && resource.kind === "skill" ? (
             <Button
@@ -212,7 +213,7 @@ export default function ResourceSettings({
               disabled={pending}
               onClick={() => planResource("add")}
             >
-              Preview project connection
+              {t("Preview project connection")}
             </Button>
           ) : null}
         </div>
@@ -225,7 +226,7 @@ export default function ResourceSettings({
         >
           <div className="flex flex-wrap gap-3">
             <label className="grid flex-1 gap-1">
-              <span className="text-xs text-muted">Server name</span>
+              <span className="text-xs text-muted">{t("Server name")}</span>
               <input
                 className={inputClass}
                 required
@@ -235,21 +236,21 @@ export default function ResourceSettings({
               />
             </label>
             <label className="grid gap-1">
-              <span className="text-xs text-muted">Transport</span>
+              <span className="text-xs text-muted">{t("Transport")}</span>
               <Select
                 value={state.transport}
                 disabled={pending}
                 onChange={(e) => update({ transport: e.target.value })}
               >
-                <option value="http">Streamable HTTP</option>
-                <option value="stdio">Standard input/output</option>
+                <option value="http">{t("Streamable HTTP")}</option>
+                <option value="stdio">{t("Standard input/output")}</option>
               </Select>
             </label>
           </div>
           {state.transport === "http" ? (
             <>
               <label className="grid gap-1">
-                <span className="text-xs text-muted">Server URL</span>
+                <span className="text-xs text-muted">{t("Server URL")}</span>
                 <input
                   className={inputClass}
                   required
@@ -260,7 +261,7 @@ export default function ResourceSettings({
               </label>
               <label className="grid gap-1">
                 <span className="text-xs text-muted">
-                  Token environment variable (optional)
+                  {t("Token environment variable (optional)")}
                 </span>
                 <input
                   className={inputClass}
@@ -272,7 +273,7 @@ export default function ResourceSettings({
           ) : (
             <>
               <label className="grid gap-1">
-                <span className="text-xs text-muted">Executable</span>
+                <span className="text-xs text-muted">{t("Executable")}</span>
                 <input
                   className={inputClass}
                   required
@@ -282,7 +283,7 @@ export default function ResourceSettings({
               </label>
               <label className="grid gap-1">
                 <span className="text-xs text-muted">
-                  Arguments (one per line)
+                  {t("Arguments (one per line)")}
                 </span>
                 <textarea
                   className={inputClass}
@@ -294,25 +295,25 @@ export default function ResourceSettings({
             </>
           )}
           <Button type="submit" disabled={pending}>
-            Preview addition
+            {t("Preview addition")}
           </Button>
         </form>
       )}
       {state.error && (
         <p role="alert" className="break-words text-removed">
-          {state.error}
+          {t(state.error)}
         </p>
       )}
       {state.notice && (
         <p role="status" className="text-muted">
-          {state.notice}
+          {t(state.notice)}
         </p>
       )}
       {preview && (
         <div
           ref={previewRef}
           tabIndex={-1}
-          aria-label="Resource change preview"
+          aria-label={t("Resource change preview")}
           className="space-y-2 border-t border-line-subtle pt-3"
         >
           <p className="break-all text-xs text-muted">
@@ -331,14 +332,14 @@ export default function ResourceSettings({
               disabled={pending}
               onClick={() => update({ preview: null })}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               primary
               disabled={!native || pending}
               onClick={() => void apply()}
             >
-              Apply changes
+              {t("Apply changes")}
             </Button>
           </div>
         </div>

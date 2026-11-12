@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useReducer } from "react";
 import type { Project } from "./mygo";
 import SharedRules from "./SharedRules";
@@ -12,7 +13,7 @@ export default function SharedWorkspace({ projects }: { projects: Project[] }) {
     <div className="space-y-5">
       <div
         role="group"
-        aria-label="Shared resource sections"
+        aria-label={t("Shared resource sections")}
         className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
       >
         {[
@@ -27,7 +28,7 @@ export default function SharedWorkspace({ projects }: { projects: Project[] }) {
             onClick={() => select(id)}
             className={`min-h-8 rounded-md px-3 text-sm ${section === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
           >
-            {label}
+            {t(label)}
           </button>
         ))}
       </div>

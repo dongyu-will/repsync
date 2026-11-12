@@ -31,7 +31,7 @@ go tool mygo dev
 
 `go tool mygo dev` 生成绑定、启动 Vite 与桌面应用，退出应用或 Ctrl+C 停止。界面开发地址为 [http://127.0.0.1:5178](http://127.0.0.1:5178)。端口由 mygo.json 与 frontend/package.json 共同配置；占用时先核对进程归属，不停止其他项目服务。
 
-仅浏览器预览：`npm --prefix frontend run dev`，然后打开上述地址。浏览器恢复上次查看的示例项目，首次默认打开第一个示例。三个示例项目可切换概览、工作树、CI/CD、规范和文档；数据源为 `frontend/src/preview.ts`，不调用桌面服务、不登记或读取本地目录。公共规范在浏览器提示使用桌面应用，不模拟写入或成功结果。不要同时启动第二个 Vite 实例。
+仅浏览器预览：`npm --prefix frontend run dev`，然后打开上述地址。浏览器恢复上次查看的示例项目，首次默认打开第一个示例。三个示例项目可切换概览、项目地图、工作树、CI/CD、规范、AI 资源和文档；数据源为 `frontend/src/preview.ts`，不调用桌面服务、不登记或读取本地目录。公共规范在浏览器提示使用桌面应用，不模拟写入或成功结果。不要同时启动第二个 Vite 实例。
 
 ## 检查与构建
 
@@ -69,9 +69,19 @@ go tool mygo build
 
 项目登记保存在系统用户配置目录（macOS 为 `~/Library/Application Support/repsync/projects.json`）。最近项目与页签偏好保存在 WebView localStorage（桌面最近项目使用 `repsync:last-project`，浏览器示例使用独立的 `repsync:preview:last-project`）；不自动登记当前目录或其他真实仓库。
 
+## 项目地图
+
+项目页签中的「项目地图」以功能模块为主。列表只显示功能、简短用途与必要提示；点开模块查看对应实现和入口。多份实现不自动判重，疑似重复需要具体理由；未记录入口保留待核对，不能据此判定代码已废弃。
+
+点击「让 AI 整理」将说明复制到已有 AI 聊天。AI 检查项目后维护根目录 `.repsync-map.json`，回到地图刷新即可。应用只读取地图并核对引用，不内置 AI，不改动业务代码，也不自动维护其他项目。引用定位与流程验收分别判断；地图的覆盖范围由整理者说明。
+
+通过 `repsync project-map PATH` 可读取相同结果。完整字段、示例与读取限制见 [Project map](usage.md#project-map)，统一在该处维护。
+
 ## 设置
 
 设置中可控制最近项目与页签恢复、默认项目页、概览刷新频率、文字大小与减少动态效果。偏好自动保存，桌面与浏览器分别保存；修改启动偏好不切走当前项目。概览刷新可选每 30 秒、每分钟、每 5 分钟或仅重新聚焦，其他页面沿用自己的刷新周期。
+
+「外观 → 语言」提供跟随系统、简体中文和 English，默认跟随系统；切换即时生效，重新打开后保留选择。跟随系统读取系统 / WebView 的语言，中文使用简体中文，其他语言使用英文，并响应语言变更事件。项目名、路径、命令、日志、差异以及文档和记忆原文保留原始文本。
 
 重置只恢复上述偏好，保留项目登记、文档草稿与历史。保存失败时当前窗口仍采用修改，并显示错误；版本与文档、问题反馈、下载入口位于设置底部。英文说明见 [Settings](usage.md#settings)。
 
@@ -549,6 +559,101 @@ repsync ai-usage [PATH]
 ```
 
 专项验收：`go test -tags=integration -race ./internal/workspace ./internal/control -run 'TestAIResources|TestAIUsage|TestDoctor|TestControlAI'`，使用临时资源、项目与 JSONL，验证来源区分、符号链接去重、项目筛选、读取失败、探测/拒绝/取消、记录去重、隐私投影和大小限制。
+
+### 安装前适配与冲突评估
+
+「AI 资源」支持先评估、后接入。将候选 Skill 的链接或仓库交给现有 AI，或在资源详情的「交给 AI 处理」中选择「评估适配与冲突」。AI 读取来源及项目指南，对比任务、项目规则、已有 Skill/MCP/CLI，写回报告；候选无需先安装，即可作为「未接入」资源出现在现有列表。全局与项目列表均保留候选，项目报告优先；筛选可查看「尚未接入」或「评估缺失或已过期」。现有资源也能重新评估。
+
+结论分建议接入、按条件接入、不建议接入、信息不足。详情先显示一句话结论，再列适合任务、独有收益、接入成本与撤回方式、已检查范围和缺口。发现项分别标为功能重复、明确冲突、前提不足、待确认；每条包含具体依据、处理建议和来源。明确冲突需要双方要求的不同引用；存在未解决冲突、前提或未知项时不能无条件推荐。未发现具体问题仅针对报告声明的范围，不代表完全兼容。保存评估不安装、不启用资源，也不修改项目规则。
+
+AI 读取清单的 `contextVersion` 后，用同一范围写回，省略 PATH 为全局：
+
+```sh
+repsync ai-resources [PATH]
+repsync ai-resource-assess [PATH] /absolute/path/assessment.json
+```
+
+候选报告格式：
+
+```json
+{
+  "resourceId": "",
+  "resourceRevision": "",
+  "contextVersion": "从当前清单 data.contextVersion 复制",
+  "expectedVersion": "新报告为空；已有报告取对应 assessment.version",
+  "candidate": {
+    "name": "release-helper",
+    "source": "https://example.invalid/release-helper/SKILL.md",
+    "sourceVersion": "已检查的版本、提交或内容摘要",
+    "description": "候选用途"
+  },
+  "verdict": "conditional",
+  "summary": "建议按条件接入：适合发布准备，但需保留项目验证门禁",
+  "fit": "Markdown：适合哪些任务、独有收益及已有能力覆盖",
+  "adoptionCost": "Markdown：准备条件、配置改动、维护方和撤回方式",
+  "coverage": "Markdown：实际检查的任务、文件、项目和资源，及尚未覆盖的范围",
+  "findings": [
+    {
+      "kind": "conflict",
+      "resource": "项目验证规则",
+      "evidence": "候选要求每次完整 CI，项目规则允许日常改动采用针对性验证",
+      "recommendation": "限定发布任务触发，并遵循项目门禁",
+      "sources": ["候选 SKILL.md 中的要求及位置", "项目 AGENTS.md 中的要求及位置"]
+    }
+  ],
+  "sources": ["实际读取的原始来源"],
+  "checkedAt": "2026-11-12T00:00:00Z"
+}
+```
+
+`verdict` 为 `recommended`、`conditional`、`not_recommended`、`unknown`；`findings[].kind` 为 `overlap`、`conflict`、`prerequisite`、`unknown`。没有具体发现时使用空数组。来源不可读或未核对候选版本时保留 `unknown`。说明使用中文，保留原始来源及实际检查时间，不编造兼容性。
+
+未安装候选填写 `candidate`，`source` 必须是无凭据的 HTTP(S) URL 或绝对本地来源路径；ID 按来源生成，快照按候选说明生成，不以名称判断同一资源。`sourceVersion` 是 AI 核对的来源版本，不是应用实时检查结果。评估现有资源时省略 `candidate`，从清单复制 `resourceId` 和 `resourceRevision`。候选经另外要求的安装流程接入后，AI 比对实际来源，再在候选中填写 `installedResourceId` 为确切的已盘点 Skill ID，并提供该安装项的当前 `resourceRevision`；同名不会自动关联。有效关联后报告出现在安装项详情，候选不重复显示。目标未盘点到时保留候选和过期提示，不宣称已安装。
+
+写回同时校验项目上下文及已有报告版本。上下文包括本次盘点资源的身份/快照，以及登记项目根目录 `AGENTS.md`、`README.md`、`PRODUCT.md`、`DESIGN.md`、`.repsync.json`、`.codex/config.toml`、`package.json`、`go.mod`，和 Codex 用户目录的 `AGENTS.md`、`config.toml`；只保留内容摘要，不返回配置正文。采用已有 256 KiB 文件读取限制，缺失/读取错误也进入快照。全局最多 64 个项目，沿用清单扫描限制；未被盘点的工具、外链/被引用文档、其他 AI 工具配置、远端来源变化、CLI 二进制及聊天目标变化需要 AI 重新核对。报告的 coverage 应明确这些缺口，不把有界快照当作完整环境检查。
+
+项目规则或已盘点资源变化后，报告保留旧结论并提示重新评估。全局报告在项目中只作参考，始终需要按本项目重新评估；项目写回不会覆盖全局。报告存于本地数据目录 `ai-resource-assessments/`，每范围最多 128 条、整个文件最多 1 MiB；单份最多 64 KiB、32 条发现、根来源及每条发现来源各最多 16 个，每个引用最多 2048 字节。读取失败单列缺口，不转成兼容或无问题。
+
+专项验收复用 `go test -tags=integration -race ./internal/workspace ./internal/control -run 'TestAIResource|TestControlAI'`，覆盖未安装候选、分类与双方依据、项目/资源快照、并发保护、全局与项目范围、明确安装关联、来源损坏及 CLI 写回读取。
+
+### 资源更新与说明书
+
+资源详情集中显示更新状态、当前与上游版本、新能力摘要、中文说明书、AI 检查时间及原始来源。列表显示已有报告的状态；筛选中可选择「有可用更新」或「说明缺失或已过期」。未检查、版本未知、检查失败及报告过期分别呈现。「重新扫描」只盘点本地资源，不检查上游或调用 AI。
+
+点击全局或资源详情的「交给 AI 处理」，可复制检查更新并补齐说明、执行更新并刷新说明、仅编写使用说明三类指令，交给已有 AI 聊天执行。完成后重新扫描查看结果。检查模式不升级；更新模式沿用资源已有安装渠道，插件内 Skill 随所属插件维护，保留本地修改。MCP 区分本地程序升级与远程服务工具变化；没有版本或上游证据时保留未知。应用本身不调用模型、不执行升级命令、不创建定期检查任务。
+
+AI 先读取当前范围的清单，再逐项写回；全局省略 PATH，项目范围使用已登记目录：
+
+```sh
+repsync ai-resources [PATH]
+repsync ai-resource-record [PATH] /absolute/path/report.json
+```
+
+JSON 字段约定：
+
+```json
+{
+  "resourceId": "从清单复制 resource.id",
+  "resourceRevision": "从清单复制 resource.revision",
+  "expectedVersion": "从清单复制 resource.note.version；没有 note 时为空字符串",
+  "installedVersion": "已核对的安装版本；未知时为空字符串",
+  "latestVersion": "已核对的上游版本；未知时为空字符串",
+  "updateStatus": "unknown",
+  "checkedAt": "2026-11-12T00:00:00Z",
+  "summary": "一句话说明更新结论及对相关项目的用途",
+  "changes": "Markdown：新增、改变、升级后才能使用的能力及配置要求",
+  "manual": "Markdown：能做什么、何时使用、准备条件、可直接对 AI 说的话、结果与限制",
+  "sources": ["原仓库发布记录 URL", "本地 SKILL.md 或实际引用的文档路径"]
+}
+```
+
+`updateStatus` 仅允许 `current`（检查时为最新）、`available`（有更新）、`unknown`（无法判断）和 `failed`（检查失败）。前两种必须提供安装版本、上游版本及来源；`checkedAt` 是实际检查时间，使用 RFC3339，不以保存说明的时间冒充上游检查时间。仅补说明时，只有原报告资源快照仍匹配才能保留原更新结论与检查时间；否则标为未知并说明未检查上游。说明书描述当前安装版，新版专有能力单列。报告属于附来源的 AI 整理结果，不视为独立核验或升级执行回执。资源安装、配置启用、会话可见及调用成功继续分别核验。
+
+报告保存在 repsync 本地数据目录的 `ai-resource-notes/`，按范围与资源 ID 区分；不修改 Skill 源码、MCP 配置或项目仓库。单份输入最多 64 KiB、最多 16 个来源，每个来源最多 2048 字节；资源读取沿用清单总预算。写回前重新盘点并核对 `resourceRevision`，已有报告的 `expectedVersion` 不匹配时拒绝覆盖。全局报告可供项目引用，项目报告优先且不覆盖全局；同名不同来源 Skill 不混用。同名 MCP 仅在配置快照一致时继承全局报告。
+
+当前自动过期判断覆盖 Skill 的 `SKILL.md` 正文和 Codex 返回的 MCP 配置；不是完整目录版本检查。附属文档、CLI 二进制、远程 MCP 的实际工具列表和版本变化需 AI 重新核对。报告保留检查时间，不将旧报告显示为实时状态；本地变更后保留旧内容并提示刷新。没有记录或读取失败不显示成最新。浏览器只读取隔离预览数据，复制指令不触发本机更新。
+
+专项验收：`go test -tags=integration -race ./internal/workspace ./internal/control -run 'TestAIResource|TestControlAI'`，覆盖写回/读取、持久化、同名隔离、范围继承、旧快照与并发覆盖保护，以及失败和损坏记录。
 
 ### 调整 AI 资源
 

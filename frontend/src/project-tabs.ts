@@ -1,5 +1,6 @@
 export const projectTabs = [
   "Overview",
+  "Project map",
   "Worktrees",
   "CI/CD",
   "Rules",

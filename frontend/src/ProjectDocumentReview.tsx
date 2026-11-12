@@ -1,3 +1,4 @@
+import { formatMessage, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, useRef, type FormEvent } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -152,7 +153,10 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
             (item) => item.path !== preview.edit.path,
           ),
         },
-        notice: `Updated ${preview.edit.path}.Rescan to continue reviewing this document.`,
+        notice: formatMessage(
+          "Updated {0}.Rescan to continue reviewing this document.",
+          preview.edit.path,
+        ),
       });
     } catch (error) {
       update({ error: message(error) });
@@ -165,7 +169,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
     <ActionDialog
       title={
         <>
-          Document review
+          {t("Document review")}
           {report?.findings.length ? ` · ${report.findings.length}` : ""}
         </>
       }
@@ -173,7 +177,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
       <div className="space-y-3 border-t border-line-subtle p-3">
         <form className="flex flex-wrap items-end gap-2" onSubmit={scan}>
           <label className="grid gap-1 text-xs text-muted">
-            Change scope
+            {t("Change scope")}
             <Select
               value={state.scope}
               disabled={!native || pending}
@@ -181,15 +185,15 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                 update({ ...clear, scope: event.target.value, report: null })
               }
             >
-              <option value="worktree">Uncommitted changes</option>
-              <option value="commit">Latest commit</option>
+              <option value="worktree">{t("Uncommitted changes")}</option>
+              <option value="commit">{t("Latest commit")}</option>
             </Select>
           </label>
           <label className="grid min-w-32 flex-1 gap-1 text-xs text-muted">
-            Additional keywords
+            {t("Additional keywords")}
             <input
               className="min-h-9 w-full rounded-md border border-line bg-white px-2 text-sm text-ink"
-              placeholder="Separate old names with commas"
+              placeholder={t("Separate old names with commas")}
               value={state.keywords}
               maxLength={256}
               disabled={!native || pending}
@@ -199,12 +203,12 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
             />
           </label>
           <Button type="submit" disabled={!native || pending}>
-            {pending && !report ? "Scanning…" : "Scan documents"}
+            {pending && !report ? t("Scanning…") : t("Scan documents")}
           </Button>
         </form>
         {state.notice && (
           <p role="status" className="break-words text-sm">
-            {state.notice}
+            {t(state.notice)}
           </p>
         )}
         {state.error && (
@@ -212,24 +216,24 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
             role="alert"
             className="break-words rounded-md bg-red-50 p-2 text-sm text-red-800"
           >
-            {state.error}
+            {t(state.error)}
           </p>
         )}
         {report && (
           <>
             <p role="status" className="text-xs leading-5 text-muted">
-              Loaded {report.files} documents · {report.graph}
+              {t("Loaded")} {report.files} {t("documents ·")} {t(report.graph)}
             </p>
             {report.warnings.length > 0 && (
               <ul className="space-y-1 text-xs text-muted">
                 {report.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
+                  <li key={warning}>{t(warning)}</li>
                 ))}
               </ul>
             )}
             {report.findings.length === 0 && !state.notice && (
               <p className="text-sm text-muted">
-                No matching paragraphs in this scope.
+                {t("No matching paragraphs in this scope.")}
               </p>
             )}
             <ul className="grouped-list">
@@ -262,7 +266,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                   {finding === item && (
                     <div className="space-y-3 px-3 pb-3">
                       <div className="space-y-1 text-xs leading-5">
-                        <p className="font-medium">Evidence</p>
+                        <p className="font-medium">{t("Evidence")}</p>
                         <ul className="space-y-1 text-muted">
                           {item.evidence.map((e, index) => (
                             <li
@@ -270,11 +274,11 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                               className="break-all"
                               title={
                                 e.memoryId
-                                  ? `Memory ID ${e.memoryId}`
+                                  ? t("Memory ID {0}", e.memoryId)
                                   : undefined
                               }
                             >
-                              {e.source} ·{" "}
+                              {t(e.source)} ·{" "}
                               {e.path &&
                                 `${e.path}${e.line > 0 ? `:${e.line}` : ""} · `}
                               {e.detail}
@@ -282,30 +286,31 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                           ))}
                         </ul>
                       </div>
-                      <p className="text-sm leading-6">{item.suggestion}</p>
+                      <p className="text-sm leading-6">{t(item.suggestion)}</p>
                       <p className="text-xs text-muted">
-                        Verify production status and retention needs before
-                        rewriting.
+                        {t(
+                          "Verify production status and retention needs before rewriting.",
+                        )}
                       </p>
                       {preview ? (
                         <div
                           ref={previewRef}
                           tabIndex={-1}
                           className="space-y-2"
-                          aria-label="Change preview"
+                          aria-label={t("Change preview")}
                         >
-                          <p className="text-xs font-medium">Before</p>
+                          <p className="text-xs font-medium">{t("Before")}</p>
                           <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-md bg-red-50 p-2 font-mono text-xs text-red-900">
                             {preview.before}
                           </pre>
-                          <p className="text-xs font-medium">After</p>
+                          <p className="text-xs font-medium">{t("After")}</p>
                           {preview.after ? (
                             <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-md bg-green-50 p-2 font-mono text-xs text-green-900">
                               {preview.after}
                             </pre>
                           ) : (
                             <p className="text-xs text-muted">
-                              Remove paragraph
+                              {t("Remove paragraph")}
                             </p>
                           )}
                           <div className="flex flex-wrap justify-end gap-2">
@@ -315,21 +320,21 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                                 update({ preview: null, error: "" })
                               }
                             >
-                              Back to editor
+                              {t("Back to editor")}
                             </Button>
                             <Button
                               primary
                               disabled={!native || pending}
                               onClick={apply}
                             >
-                              Apply changes
+                              {t("Apply changes")}
                             </Button>
                           </div>
                         </div>
                       ) : (
                         <>
                           <label className="grid gap-1 text-xs text-muted">
-                            Revised paragraph
+                            {t("Revised paragraph")}
                             <textarea
                               value={replacement}
                               rows={Math.min(
@@ -351,7 +356,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                               disabled={pending}
                               onClick={() => showPreview("")}
                             >
-                              Preview deletion
+                              {t("Preview deletion")}
                             </Button>
                             <Button
                               primary
@@ -361,7 +366,7 @@ export default function ProjectDocumentReview({ path }: { path: string }) {
                               }
                               onClick={() => showPreview(replacement)}
                             >
-                              Preview changes
+                              {t("Preview changes")}
                             </Button>
                           </div>
                         </>

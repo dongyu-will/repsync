@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -190,7 +191,7 @@ export default function ProjectCommands({
   return (
     <div className="min-w-0 space-y-4">
       <div className="section-heading flex items-center justify-between gap-3">
-        <h2>Local services</h2>
+        <h2>{t("Local services")}</h2>
         <div className="flex items-center gap-2">
           <ProjectConfigEditor
             path={path}
@@ -200,7 +201,7 @@ export default function ProjectCommands({
           {native && (
             <button
               className="icon-button"
-              aria-label="Refresh services"
+              aria-label={t("Refresh services")}
               onClick={() => setRevision((value) => value + 1)}
             >
               <Icon name="refresh" size={16} />
@@ -210,13 +211,13 @@ export default function ProjectCommands({
       </div>
       {(loadError || actionError || overview?.error) && (
         <p role="alert" className="break-words text-sm text-removed">
-          {actionError || loadError || overview?.error}
+          {t(actionError || loadError || overview?.error)}
         </p>
       )}
       {!overview ? (
         !loadError && (
           <p role="status" className="text-sm text-muted">
-            Loading local services…
+            {t("Loading local services…")}
           </p>
         )
       ) : overview.services.length ? (
@@ -241,14 +242,14 @@ export default function ProjectCommands({
                           role="status"
                           className={`text-xs ${state.status === "failure" ? "text-removed" : state.status === "running" ? "text-green-700" : "text-muted"}`}
                         >
-                          {statusLabels[state.status] || state.status}
+                          {t(statusLabels[state.status] || state.status)}
                         </span>
                       </div>
                       <p className="mt-1 break-all text-xs text-muted">
-                        {d.port ? `Port ${d.port} · ` : ""}
-                        {portLabels[state.portState] || state.portState}
+                        {d.port ? t("Port {0} · ", d.port) : ""}
+                        {t(portLabels[state.portState] || state.portState)}
                         {!active && state.exitCode >= 0
-                          ? ` · Last exit code ${state.exitCode}`
+                          ? t(" · Last exit code {0}", state.exitCode)
                           : ""}
                       </p>
                     </div>
@@ -256,7 +257,7 @@ export default function ProjectCommands({
                       {active ? (
                         <>
                           <Button
-                            aria-label={`Stop ${d.name}`}
+                            aria-label={t("Stop {0}", d.name)}
                             disabled={
                               !native ||
                               !!pending ||
@@ -264,10 +265,10 @@ export default function ProjectCommands({
                             }
                             onClick={() => void action(state, "stop")}
                           >
-                            Stop
+                            {t("Stop")}
                           </Button>
                           <Button
-                            aria-label={`Restart ${d.name}`}
+                            aria-label={t("Restart {0}", d.name)}
                             disabled={
                               !native ||
                               !!pending ||
@@ -277,20 +278,20 @@ export default function ProjectCommands({
                             }
                             onClick={() => void action(state, "restart")}
                           >
-                            Restart
+                            {t("Restart")}
                           </Button>
                         </>
                       ) : (
                         <Button
-                          aria-label={`Start ${d.name}`}
+                          aria-label={t("Start {0}", d.name)}
                           disabled={!native || !!pending || !canStart}
                           onClick={() => void action(state, "start")}
                         >
-                          {pending === d.id ? "Working…" : "Start"}
+                          {pending === d.id ? t("Working…") : t("Start")}
                         </Button>
                       )}
                       <Button
-                        aria-label={`View ${d.name} logs`}
+                        aria-label={t("View {0} logs", d.name)}
                         disabled={!state.runId}
                         onClick={() => {
                           setSelected((current) =>
@@ -300,7 +301,7 @@ export default function ProjectCommands({
                           setLogError("");
                         }}
                       >
-                        Logs
+                        {t("Logs")}
                       </Button>
                     </div>
                   </div>
@@ -315,7 +316,7 @@ export default function ProjectCommands({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Open page
+                          {t("Open page")}
                           <Icon name="arrow" size={13} />
                         </a>
                       )}
@@ -324,42 +325,52 @@ export default function ProjectCommands({
                         className="min-h-7 text-accent"
                         onClick={() => void inspectPort(state)}
                       >
-                        View port usage
+                        {t("View port usage")}
                       </button>
                     )}
-                    <ActionDialog title="Start command" className="min-w-0">
+                    <ActionDialog
+                      title={t("Start command")}
+                      className="min-w-0"
+                    >
                       <pre tabIndex={0} className="source-panel mt-2">
                         {(d.command || [])
                           .map((arg) =>
                             /\s/.test(arg) ? JSON.stringify(arg) : arg,
                           )
                           .join(" ")}
-                        {`\nWorking directory: ${d.cwd || "Project root"}`}
+                        {t(
+                          "\nWorking directory: {0}",
+                          d.cwd || t("Project root"),
+                        )}
                         {Object.keys(d.env || {}).length
-                          ? `\nEnvironment variables: ${Object.keys(d.env).join(", ")}`
+                          ? t(
+                              "\nEnvironment variables: {0}",
+                              Object.keys(d.env).join(", "),
+                            )
                           : ""}
                         {d.url ? `\n${d.url}` : ""}
-                        {state.pid ? `\nProcess PID: ${state.pid}` : ""}
+                        {state.pid ? t("\nProcess PID: {0}", state.pid) : ""}
                       </pre>
                     </ActionDialog>
                   </div>
                   {state.configChanged && (
                     <p className="mt-2 text-xs text-muted">
-                      Configuration changed. Stop, refresh, and review the
-                      command before restarting.
+                      {t(
+                        "Configuration changed. Stop, refresh, and review the command before restarting.",
+                      )}
                     </p>
                   )}
                   {state.error && (
                     <p className="mt-2 break-words text-xs text-removed">
-                      {state.error}
+                      {t(state.error)}
                     </p>
                   )}
                   {ownerID === d.id && (
                     <div className="mt-2 text-xs text-muted">
                       {!owners ? (
-                        <span role="status">Loading port usage…</span>
+                        <span role="status">{t("Loading port usage…")}</span>
                       ) : owners.error ? (
-                        <span role="alert">{owners.error}</span>
+                        <span role="alert">{t(owners.error)}</span>
                       ) : owners.data?.length ? (
                         owners.data.map((owner) => (
                           <p key={owner.pid}>
@@ -367,7 +378,9 @@ export default function ProjectCommands({
                           </p>
                         ))
                       ) : (
-                        "No listening process found. The port may have changed; refresh to check."
+                        t(
+                          "No listening process found. The port may have changed; refresh to check.",
+                        )
                       )}
                     </div>
                   )}
@@ -378,42 +391,47 @@ export default function ProjectCommands({
         </>
       ) : (
         !overview.error && (
-          <Empty icon="file" title="No local services yet">
-            Ask AI to connect existing start commands, or add them in Configure
-            services.
+          <Empty icon="file" title={t("No local services yet")}>
+            {t(
+              "Ask AI to connect existing start commands, or add them in Configure services.",
+            )}
           </Empty>
         )
       )}
       {selectedState?.runId && (
-        <section aria-label="Service logs">
+        <section aria-label={t("Service logs")}>
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold">
-              {selectedState.definition.name} · Logs
+              {selectedState.definition.name} {t("· Logs")}
             </h3>
-            <span className="text-xs text-muted">Recent 256 KiB</span>
+            <span className="text-xs text-muted">{t("Recent 256 KiB")}</span>
           </div>
           {logError ? (
             <p role="alert" className="text-sm text-removed">
-              {logError}
+              {t(logError)}
             </p>
           ) : output?.state.runId === selectedState.runId ? (
             <pre
               tabIndex={0}
               className="source-panel max-h-64"
-              aria-label="Service log content"
+              aria-label={t("Service log content")}
             >
-              {output.log || "No output yet"}
+              {output.log || t("No output yet")}
             </pre>
           ) : (
             <p role="status" className="text-sm text-muted">
-              Loading logs…
+              {t("Loading logs…")}
             </p>
           )}
         </section>
       )}
       {!!Object.keys(scripts).length && (
         <ActionDialog
-          title={<>package.json Script · {Object.keys(scripts).length}</>}
+          title={
+            <>
+              {t("package.json Script ·")} {Object.keys(scripts).length}
+            </>
+          }
           className="min-w-0"
         >
           <div className="grouped-list mt-3">

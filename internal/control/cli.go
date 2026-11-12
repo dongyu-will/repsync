@@ -22,7 +22,10 @@ const help = `repsync — local project control (JSON output; open starts the de
   repsync open                             Open desktop app and wait for the control endpoint
   repsync check-rules PATH                  Check project rules; runs independently
   repsync doctor PATH                       Check project setup without running project commands
+  repsync project-map PATH                  Read feature modules and locate their implementation references
   repsync ai-resources [PATH]                Inventory Skills, MCPs, CLIs, and project fit
+  repsync ai-resource-record [PATH] FILE     Save AI update findings and manual from JSON
+  repsync ai-resource-assess [PATH] FILE     Save candidate or installed-resource assessment from JSON
   repsync ai-usage [PATH]                    Read 30 days of local usage evidence and coverage
   repsync project-memory PATH               Read confirmed project memories and sources
   repsync project-memory-propose PATH FILE  Propose AI-inferred memories from JSON
@@ -182,6 +185,24 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		if err := readInput(paths[expected-1], request.CodexResource); err != nil {
 			return usage(err.Error())
 		}
+	case "ai-resource-record", "ai-resource-assess":
+		if len(paths) < 1 || len(paths) > 2 {
+			return usage("Usage: repsync " + request.Action + " [PATH] JSON_FILE")
+		}
+		if len(paths) == 2 {
+			request.Path = paths[0]
+		}
+		var input any
+		if request.Action == "ai-resource-assess" {
+			request.AIResourceAssessment = &workspace.AIResourceAssessmentInput{}
+			input = request.AIResourceAssessment
+		} else {
+			request.AIResourceNote = &workspace.AIResourceNoteInput{}
+			input = request.AIResourceNote
+		}
+		if err := readInput(paths[len(paths)-1], input); err != nil {
+			return usage(err.Error())
+		}
 	case "ai-resources", "ai-usage":
 		if len(paths) > 1 {
 			return usage("Usage: repsync " + request.Action + " [PATH]")
@@ -193,7 +214,7 @@ func RunCLI(ctx context.Context, args []string, out, diagnostics io.Writer) int 
 		if len(paths) != 0 {
 			return usage(request.Action + " does not accept path arguments")
 		}
-	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources", "project-memory":
+	case "add", "remove", "pipelines", "runs", "sync-preview", "policy-preview", "sync-history", "doctor", "resource-status", "resource-history", "git-workspace", "git-stashes", "review", "codex-resources", "project-memory", "project-map":
 		if len(paths) != 1 {
 			return usage("Usage: repsync " + request.Action + " PATH")
 		}

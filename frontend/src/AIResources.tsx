@@ -1,3 +1,4 @@
+import { getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useId, useReducer } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -14,6 +15,11 @@ import {
 import { previewAIResources, previewAIUsage } from "./ai-preview";
 import ResourceSettings from "./ProjectCodexResources";
 import ProjectMemories from "./ProjectMemories";
+import AIResourceGuide, {
+  AIMaintenance,
+  ResourceUpdateStatus,
+  AssessmentVerdict,
+} from "./AIResourceGuide";
 
 const native = isMyGo();
 const kindNames: Record<string, string> = {
@@ -29,6 +35,7 @@ const availability: Record<string, string> = {
   missing: "Not found",
   error: "Read failed",
   unknown: "Unverified",
+  candidate: "Not connected",
 };
 const applicability: Record<string, string> = {
   adopted: "Adopted by project",
@@ -48,8 +55,8 @@ const message = (error: unknown) =>
 const date = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf())
-    ? "Time unknown"
-    : parsed.toLocaleString("en-US", {
+    ? t("Time unknown")
+    : parsed.toLocaleString(getLocale(), {
         month: "2-digit",
         day: "2-digit",
         hour: "2-digit",
@@ -65,6 +72,7 @@ type State = {
   kind: string;
   filter: string;
   filtersOpen: boolean;
+  knowledge: string;
   query: string;
   page: number;
   revision: number;
@@ -84,6 +92,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
       kind: "all",
       filter: path ? "relevant" : "all",
       filtersOpen: false,
+      knowledge: "all",
       query: "",
       page: 0,
       revision: 0,
@@ -129,6 +138,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
   const filterPanelId = useId();
   const filtersChanged =
     state.kind !== "all" ||
+    (state.view === "resources" && state.knowledge !== "all") ||
     (state.view === "resources" && !!path && state.filter !== "relevant");
   const query = state.query.trim().toLowerCase();
   function refreshResources() {
@@ -167,14 +177,27 @@ export default function AIResources({ path = "" }: { path?: string }) {
         reason: "",
         tasks: "",
         projects: [path],
+        revision: "",
       },
     });
   }
   const resources = inventory.filter(
     ({ resource, placement }) =>
       (state.kind === "all" || state.kind === resource.kind) &&
+      (state.knowledge === "all" ||
+        (state.knowledge === "updates" &&
+          resource.note?.updateStatus === "available" &&
+          !resource.note.stale) ||
+        (state.knowledge === "manual" &&
+          resource.availability !== "candidate" &&
+          (!resource.note?.manual || resource.note.stale)) ||
+        (state.knowledge === "assessment" &&
+          (!resource.assessment || resource.assessment.stale)) ||
+        (state.knowledge === "candidates" &&
+          resource.availability === "candidate")) &&
       (state.filter === "all" ||
         !!placement ||
+        resource.availability === "candidate" ||
         ["adopted", "recommended"].includes(resource.applicability)) &&
       `${resource.name} ${resource.description} ${resource.location} ${resource.reason}`
         .toLowerCase()
@@ -206,7 +229,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="group"
-          aria-label="AI resource sections"
+          aria-label={t("AI resource sections")}
           className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
         >
           {[
@@ -221,24 +244,27 @@ export default function AIResources({ path = "" }: { path?: string }) {
               onClick={() => update({ view: id, page: 0 })}
               className={`min-h-8 rounded-md px-3 ${state.view === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         {state.view === "resources" ? (
-          <Button
-            disabled={!!state.busy}
-            onClick={() =>
-              update({
-                busy: "inventory",
-                error: "",
-                revision: state.revision + 1,
-              })
-            }
-          >
-            <Icon name="refresh" size={16} />
-            {state.busy === "inventory" ? "Scanning…" : "Rescan"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <AIMaintenance path={path} />
+            <Button
+              disabled={!!state.busy}
+              onClick={() =>
+                update({
+                  busy: "inventory",
+                  error: "",
+                  revision: state.revision + 1,
+                })
+              }
+            >
+              <Icon name="refresh" size={16} />
+              {state.busy === "inventory" ? t("Scanning…") : t("Rescan")}
+            </Button>
+          </div>
         ) : state.view === "usage" ? (
           <Button
             primary
@@ -246,16 +272,16 @@ export default function AIResources({ path = "" }: { path?: string }) {
             onClick={() => void readUsage()}
           >
             {state.busy === "usage"
-              ? "Loading…"
+              ? t("Loading…")
               : state.usage
-                ? "Reload records"
-                : "Load usage records"}
+                ? t("Reload records")
+                : t("Load usage records")}
           </Button>
         ) : null}
       </div>
 
       {state.view === "resources" && path && (
-        <ActionDialog title="Add project MCP">
+        <ActionDialog title={t("Add project MCP")}>
           <div className="mt-3 max-w-xl pb-2">
             <ResourceSettings path={path} onChanged={refreshResources} />
           </div>
@@ -263,7 +289,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
       )}
       {state.view === "resources" && state.placementIssue && (
         <p role="status" className="break-words text-xs text-removed">
-          {state.placementIssue}
+          {t(state.placementIssue)}
         </p>
       )}
       {state.view === "memory" && <ProjectMemories path={path} />}
@@ -272,7 +298,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
           role="alert"
           className="break-words rounded-md bg-red-50 p-3 text-removed"
         >
-          {state.error}
+          {t(state.error)}
         </p>
       )}
 
@@ -280,39 +306,42 @@ export default function AIResources({ path = "" }: { path?: string }) {
         <>
           {!state.usage ? (
             <p className="py-3 leading-5 text-muted">
-              Load recent records on demand: 30 days of Codex sessions and
-              RepSync pipeline receipts.
+              {t(
+                "Load recent records on demand: 30 days of Codex sessions and RepSync pipeline receipts.",
+              )}
             </p>
           ) : (
-            <ActionDialog title="Last  30  days · Coverage">
+            <ActionDialog title={t("Last  30  days · Coverage")}>
               <div className="mt-2 space-y-3 border-b border-line-subtle pb-3">
                 <p>
                   {date(state.usage.since)} — {date(state.usage.until)}
                 </p>
                 <p>
-                  Unconnected data sources remain unknown. Skill reads and
-                  compliance are evaluated separately.
+                  {t(
+                    "Unconnected data sources remain unknown. Skill reads and compliance are evaluated separately.",
+                  )}
                 </p>
                 {state.usage.coverage.map((coverage) => (
                   <div key={coverage.source} className="space-y-1">
                     <p className="font-medium text-ink">
-                      {coverage.source} ·{" "}
+                      {t(coverage.source)} ·{" "}
                       {coverage.status === "unavailable"
-                        ? "Not connected"
-                        : "Partial coverage"}
+                        ? t("Not connected")
+                        : t("Partial coverage")}
                       {" · "}
-                      {coverage.files} files · {coverage.sessions} linked
-                      sessions
+                      {coverage.files} {t("files ·")} {coverage.sessions}{" "}
+                      {t("linked sessions")}
                     </p>
-                    <p>{coverage.detail}</p>
+                    <p>{t(coverage.detail)}</p>
                     {coverage.partialFiles > 0 && (
                       <p>
-                        {coverage.partialFiles} files could not be fully read.
+                        {coverage.partialFiles}{" "}
+                        {t("files could not be fully read.")}
                       </p>
                     )}
                     {coverage.versions.length > 0 && (
                       <p className="break-words">
-                        Recorded version: {coverage.versions.join(", ")}
+                        {t("Recorded version:")} {coverage.versions.join(", ")}
                       </p>
                     )}
                   </div>
@@ -328,7 +357,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <label className="relative min-w-0 flex-1">
-              <span className="sr-only">Search AI resources</span>
+              <span className="sr-only">{t("Search AI resources")}</span>
               <span className="pointer-events-none absolute left-2.5 top-2.5 text-muted">
                 <Icon name="search" size={16} />
               </span>
@@ -337,7 +366,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
                 onChange={(event) =>
                   update({ query: event.target.value, page: 0 })
                 }
-                placeholder="Search resources"
+                placeholder={t("Search resources")}
                 className="h-9 w-full min-w-0 rounded-md border border-control bg-white pl-8 pr-3"
               />
             </label>
@@ -348,33 +377,54 @@ export default function AIResources({ path = "" }: { path?: string }) {
               onClick={() => update({ filtersOpen: !state.filtersOpen })}
             >
               <Icon name="settings" size={16} />
-              {filtersChanged ? "Filter · Customized" : "Filter"}
+              {filtersChanged ? t("Filter · Customized") : t("Filter")}
             </Button>
           </div>
           <div id={filterPanelId} hidden={!state.filtersOpen}>
             <div className="flex flex-wrap items-center gap-2 rounded-md bg-sidebar p-2">
               <Select
-                aria-label="Resource type"
+                aria-label={t("Resource type")}
                 value={state.kind}
                 onChange={(event) =>
                   update({ kind: event.target.value, page: 0 })
                 }
               >
-                <option value="all">All types</option>
+                <option value="all">{t("All types")}</option>
                 <option value="skill">Skill</option>
                 <option value="mcp">MCP</option>
                 <option value="cli">CLI</option>
               </Select>
               {state.view === "resources" && path && (
                 <Select
-                  aria-label="Filter by project fit"
+                  aria-label={t("Filter by project fit")}
                   value={state.filter}
                   onChange={(event) =>
                     update({ filter: event.target.value, page: 0 })
                   }
                 >
-                  <option value="relevant">Recommended and adopted</option>
-                  <option value="all">All resources</option>
+                  <option value="relevant">
+                    {t("Recommended, adopted and candidates")}
+                  </option>
+                  <option value="all">{t("All resources")}</option>
+                </Select>
+              )}
+              {state.view === "resources" && (
+                <Select
+                  aria-label={t("Resource information")}
+                  value={state.knowledge}
+                  onChange={(event) =>
+                    update({ knowledge: event.target.value, page: 0 })
+                  }
+                >
+                  <option value="all">{t("All information states")}</option>
+                  <option value="updates">{t("Updates available")}</option>
+                  <option value="manual">
+                    {t("Manual missing or outdated")}
+                  </option>
+                  <option value="assessment">
+                    {t("Assessment missing or outdated")}
+                  </option>
+                  <option value="candidates">{t("Not connected yet")}</option>
                 </Select>
               )}
             </div>
@@ -389,7 +439,7 @@ export default function AIResources({ path = "" }: { path?: string }) {
           : undefined
       )?.map((issue) => (
         <p key={issue} className="break-words text-xs leading-5 text-removed">
-          {issue}
+          {t(issue)}
         </p>
       ))}
 
@@ -397,8 +447,8 @@ export default function AIResources({ path = "" }: { path?: string }) {
         !state.report ? (
           <p role="status" className="py-6 text-muted">
             {state.busy
-              ? "Loading resource sources and project declarations…"
-              : "Inventory incomplete. Try again."}
+              ? t("Loading resource sources and project declarations…")
+              : t("Inventory incomplete. Try again.")}
           </p>
         ) : resources.length ? (
           <div className="grouped-list">
@@ -423,17 +473,24 @@ export default function AIResources({ path = "" }: { path?: string }) {
           </div>
         ) : (
           <div className="grouped-list space-y-2 p-4 leading-6">
-            <p className="font-medium">No matching resources</p>
+            <p className="font-medium">{t("No matching resources")}</p>
             <p className="text-muted">
-              Project fit is based on AGENTS.md and .repsync.json, View
-              stack-based suggestions under All resources.
+              {t(
+                "Project fit is based on AGENTS.md and .repsync.json, View stack-based suggestions under All resources.",
+              )}
             </p>
             <Button
               onClick={() =>
-                update({ query: "", kind: "all", filter: "all", page: 0 })
+                update({
+                  query: "",
+                  kind: "all",
+                  filter: "all",
+                  knowledge: "all",
+                  page: 0,
+                })
               }
             >
-              View all resources
+              {t("View all resources")}
             </Button>
           </div>
         )
@@ -457,10 +514,10 @@ export default function AIResources({ path = "" }: { path?: string }) {
         ) : (
           <div className="grouped-list p-4 leading-6">
             <p className="font-medium">
-              No matching usage evidence observed in these records
+              {t("No matching usage evidence observed in these records")}
             </p>
             <p className="text-muted">
-              Coverage lists readable sources and known gaps.
+              {t("Coverage lists readable sources and known gaps.")}
             </p>
           </div>
         ))
@@ -469,20 +526,20 @@ export default function AIResources({ path = "" }: { path?: string }) {
       {total > 20 && (
         <div className="flex items-center justify-between gap-3 text-xs text-muted">
           <span>
-            Page {currentPage + 1} / {Math.ceil(total / 20)} page
+            {t("Page")} {currentPage + 1} / {Math.ceil(total / 20)} {t("page")}
           </span>
           <div className="flex gap-2">
             <Button
               disabled={currentPage === 0}
               onClick={() => update({ page: currentPage - 1 })}
             >
-              Previous page
+              {t("Previous page")}
             </Button>
             <Button
               disabled={(currentPage + 1) * 20 >= total}
               onClick={() => update({ page: currentPage + 1 })}
             >
-              Next page
+              {t("Next page")}
             </Button>
           </div>
         </div>
@@ -490,16 +547,19 @@ export default function AIResources({ path = "" }: { path?: string }) {
       {state.view === "resources" && state.report && (
         <section className="text-xs leading-5 text-muted">
           <h3 className="break-words text-sm font-medium">
-            {resources.length} resources · Inventory details
+            {resources.length} {t("resources · Inventory details")}
           </h3>
           <div className="mt-2 max-w-2xl space-y-2">
             <p>
-              Last inventory: {date(state.report.checkedAt)}. Availability in
-              the current session requires separate verification.
+              {t("Last inventory:")} {date(state.report.checkedAt)}
+              {t(
+                ". Availability in the current session requires separate verification.",
+              )}
             </p>
             <p>
-              Ask AI to maintain resource selection and task conditions in
-              .repsync.json, following the project guide.
+              {t(
+                "Ask AI to maintain resource selection and task conditions in .repsync.json, following the project guide.",
+              )}
             </p>
           </div>
         </section>
@@ -525,29 +585,36 @@ function ResourceRow({
   placement?: CodexResourcePlacement;
   onChanged: () => void;
 }) {
+  const [opened, setOpened] = useReducer(
+    (_: boolean, next: boolean) => next,
+    false,
+  );
   const availabilityLabel = availability[resource.availability] || "Unverified";
   const availabilityDetail = resource.detail.startsWith(availabilityLabel)
-    ? resource.detail
-    : [availabilityLabel, resource.detail].filter(Boolean).join(" · ");
+    ? t(resource.detail)
+    : [t(availabilityLabel), t(resource.detail)].filter(Boolean).join(" · ");
   const fitLabel = applicability[resource.applicability] || "Needs evaluation";
   const hasIssue = ["missing", "error", "disabled", "unknown"].includes(
     resource.availability,
   );
   const needsAttention = ["missing", "error"].includes(resource.availability);
   const rowStatus =
-    placement?.state === "disabled"
-      ? "Disabled for project"
-      : placement?.state === "applied"
-        ? "Enabled for project"
-        : hasIssue
-          ? availabilityLabel
-          : resource.applicability === "unassigned"
-            ? ""
-            : fitLabel;
+    resource.availability === "candidate"
+      ? "Not connected"
+      : placement?.state === "disabled"
+        ? "Disabled for project"
+        : placement?.state === "applied"
+          ? "Enabled for project"
+          : hasIssue
+            ? availabilityLabel
+            : resource.applicability === "unassigned"
+              ? ""
+              : fitLabel;
 
   return (
     <ActionDialog
       title={resource.name}
+      onOpenChange={setOpened}
       className="border-b border-line-subtle last:border-0"
       triggerClassName="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-editor"
       trigger={
@@ -558,19 +625,34 @@ function ResourceRow({
             </span>
             <span className="text-xs text-muted">
               {kindNames[resource.kind] || resource.kind}
-              {duplicates > 1 && " · Same name"}
+              {duplicates > 1 && t(" · Same name")}
             </span>
+            {resource.note && (
+              <span
+                className={`text-xs ${resource.note.stale ? "text-removed" : "text-accent"}`}
+              >
+                <ResourceUpdateStatus resource={resource} />
+              </span>
+            )}
+            {resource.assessment && (
+              <span
+                className={`text-xs ${resource.assessment.stale || resource.assessment.verdict === "not_recommended" ? "text-removed" : "text-muted"}`}
+              >
+                <AssessmentVerdict assessment={resource.assessment} />
+              </span>
+            )}
           </span>
           {rowStatus && (
             <span
               className={`shrink-0 text-xs ${needsAttention ? "text-removed" : "text-muted"}`}
             >
-              {rowStatus}
+              {t(rowStatus)}
             </span>
           )}
         </>
       }
     >
+      {opened && <AIResourceGuide resource={resource} path={path} />}
       {(placement ||
         (resource.kind === "mcp" &&
           resource.source === "Codex CLI Current configuration") ||
@@ -590,12 +672,14 @@ function ResourceRow({
         {[
           [
             "Project fit",
-            [fitLabel, resource.reason].filter(Boolean).join(" · "),
+            [t(fitLabel), t(resource.reason)].filter(Boolean).join(" · "),
           ],
           [
             "When to use",
             resource.tasks ||
-              "Follow task conditions in the project guide. If unspecified, ask AI Evaluate per task",
+              t(
+                "Follow task conditions in the project guide. If unspecified, ask AI Evaluate per task",
+              ),
           ],
           [
             "Purpose",
@@ -607,34 +691,39 @@ function ResourceRow({
           [
             "Source",
             [
-              resource.source,
-              duplicates > 1 ? `${duplicates}  sources with this name` : "",
+              t(resource.source),
+              duplicates > 1 ? t("{0} sources with this name", duplicates) : "",
             ]
               .filter(Boolean)
               .join(" · "),
           ],
-          ["Location", resource.location || "No source path provided"],
+          ["Location", resource.location || t("No source path provided")],
           [
-            "Content version",
+            resource.availability === "candidate"
+              ? "Candidate source version:"
+              : "Content version",
             resource.version
               ? resource.version.slice(0, 12)
-              : "Version not collected",
+              : t("Version not collected"),
           ],
           [
             "Adopting projects",
             resource.projects.length
               ? resource.projects.join("\n")
-              : "No explicit adoption record",
+              : t("No explicit adoption record"),
           ],
           [
             "Usage evidence",
             usage
               ? resource.kind === "skill"
-                ? `${usage.sessions}  sessions with read evidence; compliance not verified`
-                : `${usage.calls}  calls; latest ${date(usage.lastUsed)}`
+                ? t(
+                    "{0} sessions with read evidence; compliance not verified",
+                    usage.sessions,
+                  )
+                : t("{0} calls; latest {1}", usage.calls, date(usage.lastUsed))
               : usageRead
-                ? "No matching evidence observed in these records"
-                : "Usage records not loaded",
+                ? t("No matching evidence observed in these records")
+                : t("Usage records not loaded"),
           ],
         ]
           .filter(([, value]) => value)
@@ -643,7 +732,7 @@ function ResourceRow({
               key={label}
               className="grid grid-cols-[72px_minmax(0,1fr)] gap-3"
             >
-              <dt className="text-muted">{label}</dt>
+              <dt className="text-muted">{t(label)}</dt>
               <dd className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                 {value}
               </dd>
@@ -663,16 +752,28 @@ function UsageRow({
 }) {
   const count =
     summary.kind === "skill"
-      ? `${summary.sessions}  sessions`
+      ? t("{0} sessions", summary.sessions)
       : summary.appRuns
-        ? `${summary.appRuns}  entry runs`
-        : `${summary.calls}  times${summary.kind === "mcp" ? "Requests" : "Execution records"}`;
+        ? t("{0}  entry runs", summary.appRuns)
+        : t(
+            "{0}  times{1}",
+            summary.calls,
+            summary.kind === "mcp" ? t("Requests") : t("Execution records"),
+          );
   const breakdown =
     summary.kind === "skill"
       ? "Read-command evidence found. Content completeness and compliance were not verified."
       : summary.appRuns
         ? "RepSync entry receipts; not attributed to AI."
-        : `Succeeded ${summary.succeeded} · Failed ${summary.failed} · Unknown ${summary.unknown} · Rejected ${summary.declined} · Cancel ${summary.cancelled}${summary.probes ? ` · includes probes ${summary.probes}` : ""}`;
+        : t(
+            "Succeeded {0} · Failed {1} · Unknown {2} · Rejected {3} · Cancel {4}{5}",
+            summary.succeeded,
+            summary.failed,
+            summary.unknown,
+            summary.declined,
+            summary.cancelled,
+            summary.probes ? t(" · includes probes {0}", summary.probes) : "",
+          );
 
   return (
     <ActionDialog
@@ -686,7 +787,7 @@ function UsageRow({
               {summary.name}
             </span>
             <span className="text-xs text-muted">
-              {kindNames[summary.kind]}
+              {t(kindNames[summary.kind])}
             </span>
           </span>
           <span className="shrink-0 text-right text-xs text-muted">
@@ -696,7 +797,7 @@ function UsageRow({
       }
     >
       <p className="border-t border-line-subtle bg-editor px-3 pt-3 text-xs leading-5 text-muted">
-        {breakdown} Recent records {date(summary.lastUsed)}
+        {t(breakdown)} {t("Recent records")} {date(summary.lastUsed)}
       </p>
       <UsageEvidence events={events} />
     </ActionDialog>
@@ -716,16 +817,16 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
           <li key={event.id} className="space-y-1 text-xs leading-5">
             <p className="flex flex-wrap gap-x-3">
               <span className="font-medium">
-                {event.action === "read" ? "Read Skill" : event.action}
+                {event.action === "read" ? t("Read Skill") : event.action}
               </span>
-              <span>{statuses[event.status] || "Unknown"}</span>
+              <span>{t(statuses[event.status] || t("Unknown"))}</span>
               <span className="text-muted">
                 {date(event.timestamp)} · {event.actor}
-                {event.purpose === "probe" ? " · Environment probe" : ""}
+                {event.purpose === "probe" ? t(" · Environment probe") : ""}
               </span>
             </p>
             <p className="break-words [overflow-wrap:anywhere]">
-              {event.detail}
+              {t(event.detail)}
             </p>
             <dl className="text-muted">
               {[
@@ -741,7 +842,7 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
                   key={label}
                   className="grid grid-cols-[40px_minmax(0,1fr)] gap-2"
                 >
-                  <dt>{label}</dt>
+                  <dt>{t(label)}</dt>
                   <dd className="break-words [overflow-wrap:anywhere]">
                     {value}
                   </dd>
@@ -754,20 +855,21 @@ function UsageEvidence({ events }: { events: AIUsageEvent[] }) {
       {events.length > 10 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
           <span>
-            {events.length} evidence records · Page {currentPage + 1} page
+            {events.length} {t("evidence records · Page")} {currentPage + 1}{" "}
+            {t("page")}
           </span>
           <div className="flex gap-2">
             <Button
               disabled={currentPage === 0}
               onClick={() => setPage(currentPage - 1)}
             >
-              Before 10 records
+              {t("Before 10 records")}
             </Button>
             <Button
               disabled={(currentPage + 1) * 10 >= events.length}
               onClick={() => setPage(currentPage + 1)}
             >
-              After 10 records
+              {t("After 10 records")}
             </Button>
           </div>
         </div>

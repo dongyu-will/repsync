@@ -1,3 +1,4 @@
+import { getLocale, t } from "./i18n";
 import { useEffect, useReducer, useRef } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
@@ -105,20 +106,24 @@ export default function ProjectStashes({
   if (error)
     return (
       <p role="alert" className="p-3 text-sm text-removed">
-        stash Read failed: {error}.Refresh and try again.
+        {t("stash Read failed:")} {t(error)}
+        {t(".Refresh and try again.")}
       </p>
     );
   if (!list.entries.length)
     return (
-      <Empty icon="file" title="No pending stash">
-        These entries are shared by all worktrees in this repository: stash.
+      <Empty icon="file" title={t("No pending stash")}>
+        {t(
+          "These entries are shared by all worktrees in this repository: stash.",
+        )}
       </Empty>
     );
   return (
     <div className="space-y-4">
       <p className="text-xs leading-5 text-muted">
-        All worktrees in the repository share these stash.Review the contents
-        before applying to this worktree. The original stash is preserved.
+        {t(
+          "All worktrees in the repository share these stash.Review the contents before applying to this worktree. The original stash is preserved.",
+        )}
       </p>
       <div className="grouped-list">
         {list.entries.map((stash) => (
@@ -130,7 +135,7 @@ export default function ProjectStashes({
               <p className="break-words text-sm font-medium">{stash.subject}</p>
               <p className="mt-1 break-all text-xs text-muted">
                 {stash.selector} ·{" "}
-                {new Date(stash.createdAt).toLocaleString("en-US", {
+                {new Date(stash.createdAt).toLocaleString(getLocale(), {
                   hour12: false,
                 })}{" "}
                 · {stash.oid.slice(0, 8)}
@@ -140,7 +145,7 @@ export default function ProjectStashes({
               disabled={state.pending || state.loading}
               onClick={() => show(stash)}
             >
-              View contents
+              {t("View contents")}
             </Button>
           </div>
         ))}
@@ -150,12 +155,12 @@ export default function ProjectStashes({
           role="alert"
           className="break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
         >
-          {state.error}
+          {t(state.error)}
         </p>
       )}
       {state.loading && (
         <p role="status" className="text-sm text-muted">
-          Loading stash changes…
+          {t("Loading stash changes…")}
         </p>
       )}
       {state.notice && (
@@ -163,17 +168,17 @@ export default function ProjectStashes({
           role={state.conflict ? "alert" : "status"}
           className={`rounded-md p-3 text-sm leading-6 ${state.conflict ? "bg-amber-50 text-amber-900" : "bg-sidebar text-ink"}`}
         >
-          {state.notice}
+          {t(state.notice)}
         </p>
       )}
       {state.preview && (
         <section
-          aria-label="stash Content"
+          aria-label={t("stash Content")}
           className="space-y-3 border-t border-line pt-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">
-              {state.preview.stash.selector} · Changes
+              {state.preview.stash.selector} {t("· Changes")}
             </h2>
             <Button
               disabled={
@@ -184,24 +189,26 @@ export default function ProjectStashes({
               }
               onClick={apply}
             >
-              {state.pending ? "Restoring…" : "Apply to this worktree"}
+              {state.pending ? t("Restoring…") : t("Apply to this worktree")}
             </Button>
           </div>
           <p className="break-all text-xs leading-5 text-muted">
-            Apply to: {path} ·{" "}
-            {state.preview.branch || "Detached HEAD, Switch branches first"}
-            .The current worktree must be clean. Conflicts preserve the worktree
-            and original stash, Resolve this in the project.
+            {t("Apply to:")} {path} ·{" "}
+            {state.preview.branch || t("Detached HEAD, Switch branches first")}
+            {t(
+              ".The current worktree must be clean. Conflicts preserve the worktree and original stash, Resolve this in the project.",
+            )}
           </p>
           {state.preview.truncated && (
             <p role="status" className="text-xs text-removed">
-              Changes exceed 1 MiB, Only the beginning is shown. Use Git to
-              review the full diff before applying.
+              {t(
+                "Changes exceed 1 MiB, Only the beginning is shown. Use Git to review the full diff before applying.",
+              )}
             </p>
           )}
           <pre
             tabIndex={0}
-            aria-label="stash File diff"
+            aria-label={t("stash File diff")}
             className="source-panel max-h-80"
           >
             {state.preview.patch}

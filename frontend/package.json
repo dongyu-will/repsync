@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5178 --strictPort",
     "build": "npm run icons && tsc -b && vite build",
-    "check": "tsc -b && eslint .",
+    "check": "tsc -b && eslint . && npm run check:i18n",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "format": "prettier --write src index.html *.json *.ts *.js",
     "icons": "node scripts/generate-icons.mjs"
   },

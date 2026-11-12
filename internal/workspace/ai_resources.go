@@ -18,26 +18,30 @@ import (
 
 // AIResource describes discovery and project intent, never model compliance.
 type AIResource struct {
-	ID            string   `json:"id"`
-	Kind          string   `json:"kind"`
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	Source        string   `json:"source"`
-	Location      string   `json:"location"`
-	Version       string   `json:"version"`
-	Availability  string   `json:"availability"`
-	Detail        string   `json:"detail"`
-	Applicability string   `json:"applicability"`
-	Reason        string   `json:"reason"`
-	Tasks         string   `json:"tasks"`
-	Projects      []string `json:"projects"`
+	ID            string                `json:"id"`
+	Kind          string                `json:"kind"`
+	Name          string                `json:"name"`
+	Description   string                `json:"description"`
+	Source        string                `json:"source"`
+	Location      string                `json:"location"`
+	Version       string                `json:"version"`
+	Availability  string                `json:"availability"`
+	Detail        string                `json:"detail"`
+	Applicability string                `json:"applicability"`
+	Reason        string                `json:"reason"`
+	Tasks         string                `json:"tasks"`
+	Projects      []string              `json:"projects"`
+	Revision      string                `json:"revision"`
+	Note          *AIResourceNote       `json:"note,omitempty"`
+	Assessment    *AIResourceAssessment `json:"assessment,omitempty"`
 }
 
 type AIResourceReport struct {
-	Resources []AIResource `json:"resources"`
-	Issues    []string     `json:"issues"`
-	CheckedAt string       `json:"checkedAt"`
-	Scope     string       `json:"scope"`
+	Resources      []AIResource `json:"resources"`
+	Issues         []string     `json:"issues"`
+	CheckedAt      string       `json:"checkedAt"`
+	Scope          string       `json:"scope"`
+	ContextVersion string       `json:"contextVersion"`
 }
 
 // AIResourceAdoption is explicit project intent maintained by the project's AI.
@@ -145,6 +149,8 @@ func (s *Service) AIResources(path string) (AIResourceReport, error) {
 			report.Resources = append(report.Resources, resource)
 		}
 	}
+	s.attachAIResourceNotes(&report)
+	s.attachAIResourceAssessments(&report, projects, paths)
 	completeAIInventory(&report, projects)
 	return report, nil
 }
@@ -154,6 +160,9 @@ func completeAIInventory(report *AIResourceReport, projects []Project) {
 		for _, adoption := range info.adoptions {
 			matches := []int{}
 			for i, resource := range report.Resources {
+				if resource.Availability == "candidate" {
+					continue
+				}
 				if resource.Kind == adoption.Kind && resource.Name == adoption.Name && (adoption.Source == "" || resource.Location == adoption.Source) {
 					matches = append(matches, i)
 				}
@@ -460,9 +469,19 @@ func readCodexMCP(directory string) ([]AIResource, error) {
 	if len(servers) > 128 {
 		return nil, errors.New("MCP configuration exceeds 128 entries")
 	}
+	// Hash the full configuration without returning connection parameters or secrets.
+	var snapshots []json.RawMessage
+	if err := json.Unmarshal(stdout.Bytes(), &snapshots); err != nil {
+		return nil, err
+	}
 	resources := []AIResource{}
-	for _, server := range servers {
+	for i, server := range servers {
 		resource := AIResource{ID: "mcp:codex:" + server.Name, Kind: "mcp", Name: server.Name, Source: "Current Codex CLI configuration", Availability: "configured", Detail: "Enabled in configuration; connection, authentication, and current AI session visibility not verified", Location: "Codex MCP / " + server.Name, Projects: []string{}}
+		var snapshot any
+		if err := json.Unmarshal(snapshots[i], &snapshot); err != nil {
+			return nil, err
+		}
+		resource.Revision = gitDigest(snapshot)
 		if !server.Enabled {
 			resource.Availability, resource.Detail = "disabled", "Disabled in CLI configuration; desktop plugins and historical sessions may differ"
 		}

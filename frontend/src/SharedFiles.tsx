@@ -1,3 +1,4 @@
+import { formatMessage, getLocale, t } from "./i18n";
 import { useEffect, useReducer, type FormEvent } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Button, Empty, Icon, Select } from "./components";
@@ -127,10 +128,10 @@ export default function SharedFiles({
   const selectResource = (selected: string) =>
     update({ selected, preview: null, error: "", notice: "" });
   return (
-    <section aria-label="Shared file resources" className="space-y-4">
+    <section aria-label={t("Shared file resources")} className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="min-w-0 text-sm text-muted">
-          Share test scripts and check configurations across projects.
+          {t("Share test scripts and check configurations across projects.")}
         </p>
         <div className="flex flex-wrap gap-2">
           {!project && report && (
@@ -142,7 +143,7 @@ export default function SharedFiles({
           )}
           <button
             className="icon-button text-muted"
-            aria-label="Reload shared files"
+            aria-label={t("Reload shared files")}
             disabled={!!state.busy}
             onClick={refresh}
           >
@@ -152,17 +153,17 @@ export default function SharedFiles({
       </div>
       {(state.error || state.loadError) && (
         <p role="alert" className="break-words text-sm text-removed">
-          {state.error || state.loadError}
+          {t(state.error || state.loadError)}
         </p>
       )}
       {state.notice && (
         <p role="status" className="text-sm text-muted">
-          {state.notice}
+          {t(state.notice)}
         </p>
       )}
       {state.busy && (
         <p role="status" className="text-sm text-muted">
-          {state.busy === "preview" ? "Generating diff…" : "Saving…"}
+          {state.busy === "preview" ? t("Generating diff…") : t("Saving…")}
         </p>
       )}
       {!selected &&
@@ -174,25 +175,26 @@ export default function SharedFiles({
               role="alert"
               className="break-words text-sm text-removed"
             >
-              {item.project.name}: {item.error}
+              {item.project.name}: {t(item.error)}
             </p>
           ))}
       {!report ? (
         <p role="status" className="text-sm text-muted">
           {state.loadError
-            ? "Could not load shared resources. Try reloading."
-            : "Loading shared resources…"}
+            ? t("Could not load shared resources. Try reloading.")
+            : t("Loading shared resources…")}
         </p>
       ) : !selected ? (
-        <Empty title="No shared files registered" icon="layers">
-          Register reusable test scripts or check configurations as shared
-          sources.
-          {project && "Register a source in global shared rules."}
+        <Empty title={t("No shared files registered")} icon="layers">
+          {t(
+            "Register reusable test scripts or check configurations as shared sources.",
+          )}
+          {project && t("Register a source in global shared rules.")}
         </Empty>
       ) : (
         <div className="grid min-w-0 gap-5 min-[900px]:grid-cols-[176px_minmax(0,1fr)]">
           <label className="grid gap-1 text-xs text-muted min-[900px]:hidden">
-            Shared files
+            {t("Shared files")}
             <Select
               className="w-full"
               value={selected.id}
@@ -208,7 +210,7 @@ export default function SharedFiles({
           <div
             className="grouped-list hidden self-start min-[900px]:block"
             role="group"
-            aria-label="Shared files"
+            aria-label={t("Shared files")}
           >
             {report.resources.map((resource) => {
               const count = report.projects.filter((p) =>
@@ -227,14 +229,17 @@ export default function SharedFiles({
                   </span>
                   <span className="mt-1 block text-xs text-muted">
                     {resource.error
-                      ? "Source needs attention"
+                      ? t("Source needs attention")
                       : report.projects.some((item) => item.error)
-                        ? `${count}  known adoptions · Some statuses unknown`
+                        ? t(
+                            "{0}  known adoptions · Some statuses unknown",
+                            count,
+                          )
                         : project
                           ? count
-                            ? "Adopted by this project"
-                            : "Not adopted by this project"
-                          : `${count}  projects using this`}
+                            ? t("Adopted by this project")
+                            : t("Not adopted by this project")
+                          : t("{0} projects using this", count)}
                   </span>
                 </button>
               );
@@ -247,8 +252,10 @@ export default function SharedFiles({
                   {selected.id}
                 </h2>
                 <p className="mt-1 text-xs text-muted" title={selected.version}>
-                  Source version{" "}
-                  {selected.version ? selected.version.slice(0, 12) : "Unknown"}
+                  {t("Source version")}{" "}
+                  {selected.version
+                    ? selected.version.slice(0, 12)
+                    : t("Unknown")}
                 </p>
               </div>
               {!project && (
@@ -260,16 +267,17 @@ export default function SharedFiles({
                     onSaved={registered}
                   />
                   <ActionDialog
-                    title="Remove shared resource registration"
-                    trigger="Remove registration"
+                    title={t("Remove shared resource registration")}
+                    trigger={t("Remove registration")}
                     busy={!!state.busy}
                     error={state.error}
                     notice={state.notice}
                   >
                     <p className="text-sm leading-6">
-                      Remove {selected.id} from shared resources? Adopted
-                      project files and history are preserved. Register the
-                      source again to resume updates.
+                      {t("Remove")} {selected.id}{" "}
+                      {t(
+                        "from shared resources? Adopted project files and history are preserved. Register the source again to resume updates.",
+                      )}
                     </p>
                     <Button
                       disabled={!native || !!state.busy || !selected.path}
@@ -281,7 +289,7 @@ export default function SharedFiles({
                         )
                       }
                     >
-                      Remove registration
+                      {t("Remove registration")}
                     </Button>
                   </ActionDialog>
                 </div>
@@ -289,23 +297,23 @@ export default function SharedFiles({
             </div>
             <dl className="space-y-2 text-xs leading-5">
               <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                <dt className="text-muted">Shared source</dt>
+                <dt className="text-muted">{t("Shared source")}</dt>
                 <dd className="break-all">
-                  {selected.path || "Not registered"}
+                  {selected.path || t("Not registered")}
                 </dd>
               </div>
               <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-2">
-                <dt className="text-muted">Project location</dt>
-                <dd className="break-all">{selected.target || "Unknown"}</dd>
+                <dt className="text-muted">{t("Project location")}</dt>
+                <dd className="break-all">{selected.target || t("Unknown")}</dd>
               </div>
             </dl>
             {selected.error && (
               <p role="alert" className="break-words text-sm text-removed">
-                {selected.error}
+                {t(selected.error)}
               </p>
             )}
             {report.projects.length ? (
-              <div className="grouped-list" aria-label="Project adoption">
+              <div className="grouped-list" aria-label={t("Project adoption")}>
                 {report.projects.map((entry) => {
                   const adopted = entry.adoptions.find(
                     (item) => item.id === selected.id,
@@ -327,7 +335,7 @@ export default function SharedFiles({
                         <span
                           className={`text-xs ${entry.error || adopted?.error || adopted?.status === "modified" ? "text-removed" : "text-muted"}`}
                         >
-                          {status}
+                          {t(status)}
                         </span>
                       </div>
                       <p className="break-all text-xs text-muted">
@@ -338,12 +346,13 @@ export default function SharedFiles({
                           className="text-xs text-muted"
                           title={adopted.adoptedVersion}
                         >
-                          Adopted version {adopted.adoptedVersion.slice(0, 12)}
+                          {t("Adopted version")}{" "}
+                          {adopted.adoptedVersion.slice(0, 12)}
                         </p>
                       )}
                       {(entry.error || adopted?.error) && (
                         <p className="break-words text-xs text-removed">
-                          {entry.error || adopted?.error}
+                          {t(entry.error || adopted?.error)}
                         </p>
                       )}
                       <div className="flex flex-wrap gap-2">
@@ -370,7 +379,9 @@ export default function SharedFiles({
                             )
                           }
                         >
-                          {adopted ? "Remove adoption" : "Adopt this resource"}
+                          {adopted
+                            ? t("Remove adoption")
+                            : t("Adopt this resource")}
                         </Button>
                         {adopted && (
                           <Button
@@ -381,12 +392,15 @@ export default function SharedFiles({
                               void preview(entry.project, selected.id)
                             }
                           >
-                            Preview diff
+                            {t("Preview diff")}
                           </Button>
                         )}
                         <ActionDialog
-                          title={`${entry.project.name} · Shared file history`}
-                          trigger="Update history"
+                          title={t(
+                            "{0} · Shared file history",
+                            entry.project.name,
+                          )}
+                          trigger={t("Update history")}
                           onOpen={() =>
                             update({ historyPath: entry.project.path })
                           }
@@ -402,7 +416,11 @@ export default function SharedFiles({
                               onRestore={(record) =>
                                 void perform(
                                   () => Service.restoreUpdate(record.id),
-                                  `Restored ${record.project.name}   ${record.target}`,
+                                  formatMessage(
+                                    "Restored {0}   {1}",
+                                    record.project.name,
+                                    record.target,
+                                  ),
                                 )
                               }
                             />
@@ -414,7 +432,9 @@ export default function SharedFiles({
                 })}
               </div>
             ) : (
-              <p className="text-sm text-muted">No registered projects.</p>
+              <p className="text-sm text-muted">
+                {t("No registered projects.")}
+              </p>
             )}
             {state.preview && (
               <ActionDialog
@@ -428,7 +448,7 @@ export default function SharedFiles({
                 error={state.error}
               >
                 <section
-                  aria-label="Shared file update preview"
+                  aria-label={t("Shared file update preview")}
                   className="space-y-3"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -436,7 +456,7 @@ export default function SharedFiles({
                       className="text-xs text-muted"
                       title={state.preview.version}
                     >
-                      Source version {state.preview.version.slice(0, 12)}
+                      {t("Source version")} {state.preview.version.slice(0, 12)}
                     </p>
                     <Button
                       primary
@@ -451,29 +471,33 @@ export default function SharedFiles({
                         if (plan)
                           void perform(
                             () => Service.applyUpdate(plan.token),
-                            `Updated ${plan.project.name}   ${plan.target}, Backup saved`,
+                            formatMessage(
+                              "Updated {0}   {1}, Backup saved",
+                              plan.project.name,
+                              plan.target,
+                            ),
                           );
                       }}
                     >
-                      Apply update
+                      {t("Apply update")}
                     </Button>
                   </div>
                   {state.preview.conflict && (
                     <p role="alert" className="text-sm text-removed">
-                      The project file has local edits and cannot be
-                      overwritten. Preserve project differences, or ask AI
-                      Connect an independent shared file.
+                      {t(
+                        "The project file has local edits and cannot be overwritten. Preserve project differences, or ask AI Connect an independent shared file.",
+                      )}
                     </p>
                   )}
                   {!state.preview.changed ? (
                     <p role="status" className="text-sm text-muted">
-                      File matches the shared source.
+                      {t("File matches the shared source.")}
                     </p>
                   ) : (
                     <pre
                       className="source-panel"
                       tabIndex={0}
-                      aria-label="Shared file diff"
+                      aria-label={t("Shared file diff")}
                     >
                       {state.preview.diff.split("\n").map((line, i) => (
                         <span
@@ -533,8 +557,8 @@ function ResourceEditor({
   }
   return (
     <ActionDialog
-      title={resource ? "Edit shared source" : "Register shared file"}
-      trigger={resource ? "Edit source" : "Register shared file"}
+      title={resource ? t("Edit shared source") : t("Register shared file")}
+      trigger={resource ? t("Edit source") : t("Register shared file")}
       open={state.open}
       onOpenChange={(open) => update({ open })}
       onOpen={() => update({ error: "" })}
@@ -544,7 +568,7 @@ function ResourceEditor({
       <form className="space-y-3" onSubmit={save}>
         <fieldset disabled={state.busy} className="space-y-3">
           <label className="block space-y-1 text-sm">
-            Resource ID
+            {t("Resource ID")}
             <input
               className={inputClass}
               name="id"
@@ -555,7 +579,7 @@ function ResourceEditor({
             />
           </label>
           <label className="block space-y-1 text-sm">
-            Shared source file
+            {t("Shared source file")}
             <input
               className={inputClass}
               name="path"
@@ -568,7 +592,7 @@ function ResourceEditor({
             />
           </label>
           <label className="block space-y-1 text-sm">
-            Destination in project
+            {t("Destination in project")}
             <input
               className={inputClass}
               name="target"
@@ -581,12 +605,12 @@ function ResourceEditor({
             />
           </label>
           <p className="text-xs leading-5 text-muted">
-            The source is an independent UTF-8 text file. Registration does not
-            write to projects. The destination parent folder is prepared by AI
-            during setup.
+            {t(
+              "The source is an independent UTF-8 text file. Registration does not write to projects. The destination parent folder is prepared by AI during setup.",
+            )}
           </p>
           <Button type="submit" primary disabled={!native || state.busy}>
-            {state.busy ? "Saving…" : "Save registration"}
+            {state.busy ? t("Saving…") : t("Save registration")}
           </Button>
         </fieldset>
       </form>
@@ -631,12 +655,15 @@ function ResourceHistory({
   if (state.error)
     return (
       <p role="alert" className="text-sm text-removed">
-        {state.error}
+        {t(state.error)}
       </p>
     );
-  if (!state.records) return <p role="status">Loading update history…</p>;
+  if (!state.records)
+    return <p role="status">{t("Loading update history…")}</p>;
   if (!state.records.length)
-    return <p className="text-sm text-muted">No shared file updates yet.</p>;
+    return (
+      <p className="text-sm text-muted">{t("No shared file updates yet.")}</p>
+    );
   return (
     <div className="grouped-list">
       {state.records.map((record) => (
@@ -646,25 +673,28 @@ function ResourceHistory({
         >
           <p className="break-all text-sm font-medium">{record.target}</p>
           <p className="break-all text-xs text-muted">
-            {new Date(record.createdAt).toLocaleString()} · Source{" "}
-            {record.sourcePath} · Version {record.version.slice(0, 12)}
+            {new Date(record.createdAt).toLocaleString(getLocale())}{" "}
+            {t("· Source")} {record.sourcePath} {t("· Version")}{" "}
+            {record.version.slice(0, 12)}
           </p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-muted">
-              {(
-                {
-                  applied: "Restorable",
-                  restored: "Restored",
-                  changed: "File changed since this update",
-                  "not-applied": "Not applied",
-                } as Record<string, string>
-              )[record.state] || record.state}
+              {t(
+                (
+                  {
+                    applied: "Restorable",
+                    restored: "Restored",
+                    changed: "File changed since this update",
+                    "not-applied": "Not applied",
+                  } as Record<string, string>
+                )[record.state] || record.state,
+              )}
             </span>
             <Button
               disabled={!native || busy || record.state !== "applied"}
               onClick={() => onRestore(record)}
             >
-              Restore previous content
+              {t("Restore previous content")}
             </Button>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -216,23 +217,28 @@ export default function ProjectRules({
       JSON.stringify(path ? state.project?.overrides : state.defaults.rules);
   return (
     <section
-      aria-label={path ? "Project rules" : "Default project rules"}
+      aria-label={path ? t("Project rules") : t("Default project rules")}
       className="space-y-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         {path ? (
-          <h2 className="sr-only">Project rules</h2>
+          <h2 className="sr-only">{t("Project rules")}</h2>
         ) : (
-          <h2 className="text-base font-semibold">Default project rules</h2>
+          <h2 className="text-base font-semibold">
+            {t("Default project rules")}
+          </h2>
         )}
         <div className="flex items-center gap-2">
           <button
             className="icon-button"
-            aria-label="Reload rules"
-            title="Reload rules"
+            aria-label={t("Reload rules")}
+            title={t("Reload rules")}
             disabled={!!state.busy}
             onClick={() => {
-              if (dirty && !window.confirm("Discard unsaved rules and reload?"))
+              if (
+                dirty &&
+                !window.confirm(t("Discard unsaved rules and reload?"))
+              )
                 return;
               update({
                 revision: state.revision + 1,
@@ -252,7 +258,7 @@ export default function ProjectRules({
               disabled={!native || !!state.busy || !!dirty || !state.project}
               onClick={() => void check()}
             >
-              {state.busy === "check" ? "Checking…" : "Check rules"}
+              {state.busy === "check" ? t("Checking…") : t("Check rules")}
             </Button>
           )}
           <Button
@@ -260,29 +266,29 @@ export default function ProjectRules({
             disabled={!native || !!state.busy || !state.defaults || !dirty}
             onClick={() => void save()}
           >
-            {state.busy === "save" ? "Saving…" : "Save rules"}
+            {state.busy === "save" ? t("Saving…") : t("Save rules")}
           </Button>
         </div>
       </div>
       {!path && (
         <p className="text-sm text-muted">
-          as project defaults. Each project can define exceptions.
+          {t("as project defaults. Each project can define exceptions.")}
         </p>
       )}
       {state.error && (
         <p role="alert" className="break-words text-sm text-removed">
-          {state.error}
+          {t(state.error)}
         </p>
       )}
       {state.notice && (
         <p role="status" className="text-sm text-muted">
-          {state.notice}
+          {t(state.notice)}
         </p>
       )}
       {!state.defaults ? (
         !state.error && (
           <p role="status" className="text-sm text-muted">
-            Loading rules…
+            {t("Loading rules…")}
           </p>
         )
       ) : (
@@ -303,20 +309,24 @@ export default function ProjectRules({
               <div key={rule.id} className="space-y-3 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-medium">{titles[rule.id]}</h3>
+                    <h3 className="text-sm font-medium">
+                      {t(titles[rule.id])}
+                    </h3>
                     {path && !effective?.applies && rule.scope === "react" && (
                       <p className="mt-1 text-xs text-muted">
-                        Not detected in the working directory: React
-                        Dependencies
+                        {t(
+                          "Not detected in the working directory: React Dependencies",
+                        )}
                       </p>
                     )}
                   </div>
                   <label className="text-sm">
                     <span className="sr-only">
-                      {titles[rule.id]}Enforcement
+                      {t(titles[rule.id])}
+                      {t("Enforcement")}
                     </span>
                     <Select
-                      aria-label={`${titles[rule.id]} enforcement`}
+                      aria-label={t("{0} enforcement", t(titles[rule.id]))}
                       disabled={!!state.busy}
                       value={level}
                       onChange={(event) => {
@@ -334,24 +344,24 @@ export default function ProjectRules({
                     >
                       {path && (
                         <option value="inherit">
-                          Inherit ·{" "}
-                          {
+                          {t("Inherit ·")}{" "}
+                          {t(
                             levels.find(
                               ([value]) => value === inherited.level,
-                            )?.[1]
-                          }
+                            )?.[1] || inherited.level,
+                          )}
                         </option>
                       )}
                       {levels.map(([value, label]) => (
                         <option key={value} value={value}>
-                          {label}
+                          {t(label)}
                         </option>
                       ))}
                     </Select>
                   </label>
                 </div>
                 <ActionDialog
-                  title="Scope and exceptions"
+                  title={t("Scope and exceptions")}
                   busy={!!state.busy}
                   error={state.error}
                   notice={state.notice}
@@ -361,30 +371,32 @@ export default function ProjectRules({
                     className="mt-3 space-y-3"
                   >
                     <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                      Applicable projects
+                      {t("Applicable projects")}
                       <Select
                         value={rule.scope}
                         onChange={(event) =>
                           change(rule.id, { scope: event.target.value })
                         }
                       >
-                        <option value="all">All projects</option>
-                        <option value="react">React Project</option>
+                        <option value="all">{t("All projects")}</option>
+                        <option value="react">{t("React Project")}</option>
                       </Select>
                     </label>
                     {path && !override && (
                       <p className="text-xs text-muted">
-                        Choose project enforcement to edit exceptions.
+                        {t("Choose project enforcement to edit exceptions.")}
                       </p>
                     )}
                     {rule.id === "react-no-use-state" && (
                       <label className="block space-y-1 text-sm">
-                        ESLint Working directory
+                        {t("ESLint Working directory")}
                         <input
-                          aria-label="ESLint Working directory"
+                          aria-label={t("ESLint Working directory")}
                           className={`${field} w-full`}
                           value={rule.cwd}
-                          placeholder="Leave blank for the project root, e.g. frontend"
+                          placeholder={t(
+                            "Leave blank for the project root, e.g. frontend",
+                          )}
                           onChange={(event) =>
                             change(rule.id, { cwd: event.target.value })
                           }
@@ -393,17 +405,19 @@ export default function ProjectRules({
                     )}
                     <label className="block space-y-1 text-sm">
                       {rule.id === "no-unit-tests"
-                        ? "Unit test paths (one per line)"
-                        : "Source paths (leave blank to check all JS / TS  source files)"}
+                        ? t("Unit test paths (one per line)")
+                        : t(
+                            "Source paths (leave blank to check all JS / TS  source files)",
+                          )}
                       <textarea
-                        aria-label={`${titles[rule.id]} detected paths`}
+                        aria-label={t("{0} detected paths", t(titles[rule.id]))}
                         rows={2}
                         className={`${field} w-full resize-y font-mono`}
                         value={(rule.include || []).join("\n")}
                         placeholder={
                           rule.id === "no-unit-tests"
-                            ? "e.g. **/*.unit.test.ts"
-                            : "e.g. frontend/src/**"
+                            ? t("e.g. **/*.unit.test.ts")
+                            : t("e.g. frontend/src/**")
                         }
                         onChange={(event) =>
                           change(rule.id, {
@@ -413,13 +427,16 @@ export default function ProjectRules({
                       />
                     </label>
                     <label className="block space-y-1 text-sm">
-                      Path exceptions
+                      {t("Path exceptions")}
                       <textarea
-                        aria-label={`${titles[rule.id]} path exceptions`}
+                        aria-label={t(
+                          "{0} path exceptions",
+                          t(titles[rule.id]),
+                        )}
                         rows={2}
                         className={`${field} w-full resize-y font-mono`}
                         value={(rule.exclude || []).join("\n")}
-                        placeholder="e.g. **/integration/**"
+                        placeholder={t("e.g. **/integration/**")}
                         onChange={(event) =>
                           change(rule.id, {
                             exclude: lines(event.target.value),
@@ -428,13 +445,13 @@ export default function ProjectRules({
                       />
                     </label>
                     <label className="block space-y-1 text-sm">
-                      File exception marker (whole line match)
+                      {t("File exception marker (whole line match)")}
                       <textarea
-                        aria-label={`${titles[rule.id]}Exception marker`}
+                        aria-label={t("{0}Exception marker", titles[rule.id])}
                         rows={2}
                         className={`${field} w-full resize-y font-mono`}
                         value={(rule.excludeMarkers || []).join("\n")}
-                        placeholder="e.g. //go:build integration"
+                        placeholder={t("e.g. //go:build integration")}
                         onChange={(event) =>
                           change(rule.id, {
                             excludeMarkers: lines(event.target.value),
@@ -448,8 +465,9 @@ export default function ProjectRules({
                   rule.id === "no-unit-tests" &&
                   !(rule.include || []).length && (
                     <p className="text-xs text-removed">
-                      Declare unit test paths and integration test exceptions
-                      before checking code.
+                      {t(
+                        "Declare unit test paths and integration test exceptions before checking code.",
+                      )}
                     </p>
                   )}
               </div>
@@ -461,23 +479,25 @@ export default function ProjectRules({
         <>
           {dirty && (
             <p role="status" className="text-xs text-muted">
-              Save rule changes before checking or updating AI rules.
+              {t("Save rule changes before checking or updating AI rules.")}
             </p>
           )}
           {state.report && (
-            <section aria-label="Rule check results" className="space-y-3">
+            <section aria-label={t("Rule check results")} className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">
                   {!state.report.rulesChecked.length
-                    ? "Code checks disabled"
+                    ? t("Code checks disabled")
                     : !state.report.complete
-                      ? "Checks incomplete"
+                      ? t("Checks incomplete")
                       : state.report.passed
-                        ? "Checks passed"
-                        : "Checks failed"}
+                        ? t("Checks passed")
+                        : t("Checks failed")}
                 </h3>
                 <span className="text-xs text-muted">
-                  {new Date(state.report.checkedAt).toLocaleTimeString("en-US")}
+                  {new Date(state.report.checkedAt).toLocaleTimeString(
+                    getLocale(),
+                  )}
                 </span>
               </div>
               {state.report.errors.map((error, index) => (
@@ -486,15 +506,15 @@ export default function ProjectRules({
                   role="alert"
                   className="break-words text-sm text-removed"
                 >
-                  {error}
+                  {t(error)}
                 </p>
               ))}
               {state.report.skipped.length > 0 && (
                 <ActionDialog
                   title={
                     <>
-                      {state.report.skipped.length} files by ESLint Skipped by
-                      configuration
+                      {state.report.skipped.length}{" "}
+                      {t("files by ESLint Skipped by configuration")}
                     </>
                   }
                   busy={!!state.busy}
@@ -508,13 +528,14 @@ export default function ProjectRules({
               )}
               {state.report.baseline === "unavailable" && (
                 <p className="text-xs text-muted">
-                  Missing Git HEAD baseline. Existing and new violations cannot
-                  yet be distinguished.
+                  {t(
+                    "Missing Git HEAD baseline. Existing and new violations cannot yet be distinguished.",
+                  )}
                 </p>
               )}
               <div
                 role="group"
-                aria-label="Violation scope"
+                aria-label={t("Violation scope")}
                 className="flex flex-wrap gap-2"
               >
                 {[
@@ -528,7 +549,7 @@ export default function ProjectRules({
                     className={`min-h-8 rounded-md px-3 text-sm ${state.filter === kind ? "bg-selection text-accent" : "bg-surface text-muted"}`}
                     onClick={() => update({ filter: kind })}
                   >
-                    {label} ·{" "}
+                    {t(label)} ·{" "}
                     {
                       state.report!.findings.filter(
                         (finding) => finding.kind === kind,
@@ -548,7 +569,7 @@ export default function ProjectRules({
                       <p
                         className={`text-sm ${finding.level === "error" ? "text-removed" : "text-muted"}`}
                       >
-                        {finding.message}
+                        {t(finding.message)}
                       </p>
                     </div>
                   ))}
@@ -557,13 +578,13 @@ export default function ProjectRules({
                 (finding) => finding.kind === state.filter,
               ) && (
                 <p className="text-sm text-muted">
-                  No violations in this scope.
+                  {t("No violations in this scope.")}
                 </p>
               )}
             </section>
           )}
           <ActionDialog
-            title="AI Rule guidance"
+            title={t("AI Rule guidance")}
             busy={!!state.busy}
             error={state.error}
             notice={state.notice}
@@ -573,24 +594,26 @@ export default function ProjectRules({
               onClick={() => void preview()}
             >
               {state.busy === "preview"
-                ? "Generating preview…"
-                : "Preview AGENTS.md Update"}
+                ? t("Generating preview…")
+                : t("Preview AGENTS.md Update")}
             </Button>
             {state.preview && (
               <div className="space-y-3">
                 <pre
                   className="source-panel max-h-80"
                   tabIndex={0}
-                  aria-label="Project rule diff"
+                  aria-label={t("Project rule diff")}
                 >
-                  {state.preview.diff || "Rule guidance is up to date."}
+                  {state.preview.diff || t("Rule guidance is up to date.")}
                 </pre>
                 <Button
                   primary
                   disabled={!!state.busy || !state.preview.changed}
                   onClick={() => void apply()}
                 >
-                  {state.busy === "apply" ? "Applying…" : "Apply rule update"}
+                  {state.busy === "apply"
+                    ? t("Applying…")
+                    : t("Apply rule update")}
                 </Button>
               </div>
             )}

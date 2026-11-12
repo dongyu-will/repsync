@@ -1,3 +1,4 @@
+import { t, useLanguage } from "./i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Service, type Project, type Inspection } from "./mygo";
@@ -67,6 +68,7 @@ function savedTab(path: string, preferences: Preferences): ProjectTab {
 }
 
 export default function App() {
+  useLanguage();
   const settings = usePreferences();
   const preferences = settings.values;
   const [page, setPage] = useState<Page>("project");
@@ -343,7 +345,7 @@ export default function App() {
           </div>
           <button
             className="icon-button ml-auto"
-            aria-label="Search projects"
+            aria-label={t("Search projects")}
             onClick={focusSearch}
           >
             <Icon name="search" size={16} />
@@ -351,7 +353,7 @@ export default function App() {
         </div>
         <nav
           className="flex min-h-0 flex-col px-2"
-          aria-label="Project navigation"
+          aria-label={t("Project navigation")}
         >
           <div className="mb-2 flex shrink-0 items-center gap-1">
             <button
@@ -364,7 +366,7 @@ export default function App() {
             >
               <Icon name="folder" />
               <span className="min-w-0 flex-1">
-                <span className="block">Projects</span>
+                <span className="block">{t("Projects")}</span>
                 {!projectsExpanded && project && (
                   <span
                     className="block truncate text-xs font-normal text-muted"
@@ -383,7 +385,7 @@ export default function App() {
             {native && (
               <button
                 className="icon-button"
-                aria-label="Add project"
+                aria-label={t("Add project")}
                 onClick={openAdd}
               >
                 <Icon name="plus" size={18} />
@@ -415,7 +417,7 @@ export default function App() {
               ))}
               {listing ? (
                 <p role="status" className="px-3 py-3 text-xs text-muted">
-                  Loading projects…
+                  {t("Loading projects…")}
                 </p>
               ) : listError ? (
                 <button
@@ -425,26 +427,29 @@ export default function App() {
                     reloadProjects();
                   }}
                 >
-                  Could not load projects. Click to retry.
+                  {t("Could not load projects. Click to retry.")}
                 </button>
               ) : (
                 !projects.length && (
                   <p className="px-3 py-3 text-xs leading-6 text-muted">
-                    No projects added
+                    {t("No projects added")}
                   </p>
                 )
               )}
             </div>
           </div>
         </nav>
-        <nav className="shrink-0 px-2 pb-3 pt-3" aria-label="Global navigation">
+        <nav
+          className="shrink-0 px-2 pb-3 pt-3"
+          aria-label={t("Global navigation")}
+        >
           <button
             className={`nav-item ${page === "shared" ? "selected" : ""}`}
             aria-current={page === "shared" ? "page" : undefined}
             onClick={() => setPage("shared")}
           >
             <Icon name="layers" />
-            Shared rules
+            {t("Shared rules")}
           </button>
           <button
             className={`nav-item ${page === "ai-resources" ? "selected" : ""}`}
@@ -452,7 +457,7 @@ export default function App() {
             onClick={() => setPage("ai-resources")}
           >
             <Icon name="file" />
-            AI resources
+            {t("AI resources")}
           </button>
           <button
             className={`nav-item ${page === "settings" ? "selected" : ""}`}
@@ -460,7 +465,7 @@ export default function App() {
             onClick={() => setPage("settings")}
           >
             <Icon name="settings" />
-            Settings
+            {t("Settings")}
           </button>
         </nav>
       </aside>
@@ -484,8 +489,8 @@ export default function App() {
                 </div>
                 <button
                   className="flex min-h-7 max-w-[30%] items-center gap-2 rounded-md bg-surface px-2 text-sm hover:bg-nav-hover"
-                  title="View worktrees and branches"
-                  aria-label="View worktrees and branches"
+                  title={t("View worktrees and branches")}
+                  aria-label={t("View worktrees and branches")}
                   onClick={() => {
                     setGitSection("worktrees");
                     chooseTab("Worktrees");
@@ -494,18 +499,18 @@ export default function App() {
                   <Icon name="branch" size={17} />
                   <span className="truncate">
                     {loading
-                      ? "Loading…"
+                      ? t("Loading…")
                       : details
-                        ? details.branch || "Non-Git project"
-                        : "Not loaded"}
+                        ? details.branch || t("Non-Git project")
+                        : t("Not loaded")}
                   </span>
                 </button>
                 {native && (
                   <button
                     className="icon-button text-muted hover:text-ink"
                     onClick={() => setManaging(true)}
-                    aria-label="Manage project"
-                    title="Manage project"
+                    aria-label={t("Manage project")}
+                    title={t("Manage project")}
                   >
                     <Icon name="settings" size={16} />
                   </button>
@@ -515,8 +520,8 @@ export default function App() {
                     className="icon-button text-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
                     onClick={reloadProject}
                     disabled={loading}
-                    aria-label="Refresh project"
-                    title="Refresh project"
+                    aria-label={t("Refresh project")}
+                    title={t("Refresh project")}
                   >
                     <Icon name="refresh" size={16} />
                   </button>
@@ -524,7 +529,7 @@ export default function App() {
               </div>
               <div
                 role="tablist"
-                aria-label="Project pages"
+                aria-label={t("Project pages")}
                 className="flex gap-1 overflow-x-auto whitespace-nowrap border-b border-line"
               >
                 {tabs.map((name, index) => (
@@ -559,7 +564,7 @@ export default function App() {
                     onClick={() => chooseTab(name)}
                     className={`flex min-h-9 shrink-0 items-center border-b-2 px-3 text-sm ${tab === name ? "border-accent text-ink" : "border-transparent text-muted hover:text-ink"}`}
                   >
-                    {name}
+                    {t(name)}
                   </button>
                 ))}
               </div>
@@ -573,16 +578,16 @@ export default function App() {
             >
               {loading ? (
                 <p role="status" className="py-8 text-sm text-muted">
-                  Loading {project.name}…
+                  {t("Loading")} {project.name}…
                 </p>
               ) : error ? (
                 <div
                   role="alert"
                   className="rounded-md bg-red-50 p-4 text-sm leading-7 text-red-800"
                 >
-                  {error}
+                  {t(error)}
                   <button className="ml-3 underline" onClick={reloadProject}>
-                    Retry
+                    {t("Retry")}
                   </button>
                 </div>
               ) : details ? (
@@ -599,8 +604,8 @@ export default function App() {
                   }}
                 />
               ) : (
-                <Empty title="No project content yet">
-                  Refresh to try again.
+                <Empty title={t("No project content yet")}>
+                  {t("Refresh to try again.")}
                 </Empty>
               )}
             </section>
@@ -608,46 +613,49 @@ export default function App() {
         ) : (
           <>
             <header className="window-toolbar workspace-gutter flex shrink-0 items-center gap-3 border-b border-line">
-              <h1 className="text-base font-semibold">{heading}</h1>
+              <h1 className="text-base font-semibold">{t(heading)}</h1>
             </header>
             <section
               className="workspace-gutter min-h-0 flex-1 overflow-auto py-4"
               tabIndex={0}
-              aria-label={heading}
+              aria-label={t(heading)}
             >
               {page === "project" ? (
                 listing ? (
                   <p role="status" className="py-8 text-sm text-muted">
-                    Loading projects…
+                    {t("Loading projects…")}
                   </p>
                 ) : listError ? (
                   <div role="alert" className="space-y-3 text-sm text-red-800">
-                    <p>{listError}</p>
-                    <Button onClick={reloadProjects}>Retry</Button>
+                    <p>{t(listError)}</p>
+                    <Button onClick={reloadProjects}>{t("Retry")}</Button>
                   </div>
                 ) : (
                   <Empty
                     title={
                       projects.length
-                        ? "Choose a project"
-                        : "Add your first project"
+                        ? t("Choose a project")
+                        : t("Add your first project")
                     }
                   >
                     {projects.length ? (
-                      <Button onClick={focusSearch}>Select project</Button>
+                      <Button onClick={focusSearch}>
+                        {t("Select project")}
+                      </Button>
                     ) : native ? (
                       <>
-                        Add a local folder to browse project documents and
-                        manage shared rules.
+                        {t(
+                          "Add a local folder to browse project documents and manage shared rules.",
+                        )}
                         <div className="mt-4">
                           <Button primary onClick={openAdd}>
                             <Icon name="plus" size={16} />
-                            Add project
+                            {t("Add project")}
                           </Button>
                         </div>
                       </>
                     ) : (
-                      "Use the desktop app to add local projects."
+                      t("Use the desktop app to add local projects.")
                     )}
                   </Empty>
                 )
@@ -683,11 +691,11 @@ export default function App() {
             id="search-project-title"
             className="flex-1 text-lg font-semibold"
           >
-            Find a project
+            {t("Find a project")}
           </h2>
           <button
             className="icon-button"
-            aria-label="Close search"
+            aria-label={t("Close search")}
             onClick={closeSearch}
           >
             <Icon name="close" size={18} />
@@ -709,18 +717,18 @@ export default function App() {
                 choose(filtered[0]);
               }
             }}
-            placeholder="Project name or path…"
-            aria-label="Find a project"
+            placeholder={t("Project name or path…")}
+            aria-label={t("Find a project")}
             className="h-9 w-full rounded-md border border-control px-3 text-sm"
           />
           <div className="mt-4 max-h-[40dvh] overflow-y-auto">
             {listing ? (
               <p role="status" className="py-3 text-sm text-muted">
-                Loading projects…
+                {t("Loading projects…")}
               </p>
             ) : listError ? (
               <p role="alert" className="py-3 text-sm text-removed">
-                {listError}
+                {t(listError)}
               </p>
             ) : filtered.length ? (
               <div className="grouped-list">
@@ -745,7 +753,9 @@ export default function App() {
               </div>
             ) : (
               <p role="status" className="py-3 text-sm text-muted">
-                {projects.length ? "No matching projects" : "No projects added"}
+                {projects.length
+                  ? t("No matching projects")
+                  : t("No projects added")}
               </p>
             )}
           </div>

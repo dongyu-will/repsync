@@ -1,6 +1,8 @@
+import { t } from "./i18n";
 import { useState } from "react";
 import type { Inspection } from "./mygo";
 import ProjectDocuments from "./ProjectDocuments";
+import ProjectMap from "./ProjectMap";
 import SharedRules from "./SharedRules";
 import SharedFiles from "./SharedFiles";
 import ProjectPipelines from "./ProjectPipelines";
@@ -41,10 +43,12 @@ export default function ProjectContent({
           key={i}
           className="mb-4 shrink-0 break-words rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-900"
         >
-          {warning}
+          {t(warning)}
         </p>
       ))}
-      {tab === "Worktrees" ? (
+      {tab === "Project map" ? (
+        <ProjectMap key={details.project.path} path={details.project.path} />
+      ) : tab === "Worktrees" ? (
         <ProjectGit
           key={details.project.path}
           path={details.project.path}
@@ -73,7 +77,7 @@ export default function ProjectContent({
         />
       ) : (
         <>
-          <section aria-label="Local services">
+          <section aria-label={t("Local services")}>
             <ProjectCommands
               key={details.project.path}
               path={details.project.path}
@@ -88,12 +92,12 @@ export default function ProjectContent({
             stashCount={details.stashKnown ? details.stashCount : 0}
             workspaceStatus={
               !details.git
-                ? "Git status unavailable"
+                ? t("Git status unavailable")
                 : !details.statusKnown
-                  ? "Could not read workspace status"
+                  ? t("Could not read workspace status")
                   : details.status
-                    ? "Uncommitted changes"
-                    : "Clean workspace"
+                    ? t("Uncommitted changes")
+                    : t("Clean workspace")
             }
           />
         </>
@@ -116,7 +120,7 @@ function ProjectStandards({
     <div className="space-y-5">
       <div
         role="group"
-        aria-label="Rules sections"
+        aria-label={t("Rules sections")}
         className="flex w-fit gap-1 rounded-lg bg-sidebar p-1"
       >
         {[
@@ -132,7 +136,7 @@ function ProjectStandards({
             onClick={() => setSection(id)}
             className={`min-h-8 rounded-md px-3 text-sm ${section === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
           >
-            {title}
+            {t(title)}
           </button>
         ))}
       </div>

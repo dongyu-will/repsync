@@ -1,3 +1,4 @@
+import { formatMessage, getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useReducer, useRef, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -10,7 +11,7 @@ const native = isMyGo();
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 const date = (value: string) =>
-  new Date(value).toLocaleString("en-US", { hour12: false });
+  new Date(value).toLocaleString(getLocale(), { hour12: false });
 
 export type GitSection = "worktrees" | "branches" | "stashes";
 type State = {
@@ -98,7 +99,7 @@ export default function ProjectGit({
         <div
           className="flex gap-1 rounded-lg bg-sidebar p-1"
           role="group"
-          aria-label="Git View scope"
+          aria-label={t("Git View scope")}
         >
           {(
             [
@@ -113,7 +114,7 @@ export default function ProjectGit({
               onClick={() => update({ section: id })}
               className={`min-h-8 rounded-md px-3 text-sm ${section === id ? "bg-white font-medium" : "text-muted hover:text-ink"}`}
             >
-              {label}
+              {t(label)}
               {view?.git
                 ? ` · ${id === "worktrees" ? view.worktrees.length : id === "branches" ? view.branches.length : view.stashError ? "?" : view.stashes.entries.length}`
                 : ""}
@@ -127,12 +128,12 @@ export default function ProjectGit({
               view && update({ preview: view, error: "", notice: "" })
             }
           >
-            Preview cleanup
+            {t("Preview cleanup")}
           </Button>
           <button
             className="icon-button text-muted disabled:opacity-45"
-            aria-label="Refresh worktrees and branches"
-            title="Refresh worktrees and branches"
+            aria-label={t("Refresh worktrees and branches")}
+            title={t("Refresh worktrees and branches")}
             disabled={!native || pending}
             onClick={() => update({ revision: state.revision + 1, error: "" })}
           >
@@ -145,7 +146,7 @@ export default function ProjectGit({
           role="alert"
           className="break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
         >
-          {error}
+          {t(error)}
           <button
             className="ml-2 underline"
             disabled={pending}
@@ -153,28 +154,28 @@ export default function ProjectGit({
               update({ revision: state.revision + 1, preview: null })
             }
           >
-            Reload
+            {t("Reload")}
           </button>
         </p>
       )}
       {notice && (
         <p role="status" className="text-sm text-muted">
-          {notice}
+          {t(notice)}
         </p>
       )}
       {!view ? (
         <p role="status" className="py-8 text-sm text-muted">
-          Loading worktrees and branches…
+          {t("Loading worktrees and branches…")}
         </p>
       ) : !view.git ? (
-        <Empty title="This folder is not a Git Repository">
-          Worktrees and branches require Git project.
+        <Empty title={t("This folder is not a Git Repository")}>
+          {t("Worktrees and branches require Git project.")}
         </Empty>
       ) : (
         <>
           {view.warnings.map((w) => (
             <p key={w} role="status" className="text-sm text-removed">
-              {w}
+              {t(w)}
             </p>
           ))}
           {section === "stashes" ? (
@@ -193,7 +194,7 @@ export default function ProjectGit({
                 view.worktrees.map((w) => (
                   <GitRow
                     key={w.path}
-                    name={w.branch || "Detached HEAD"}
+                    name={w.branch || t("Detached HEAD")}
                     marker={
                       w.primary ? "Main worktree" : w.locked ? "Locked" : ""
                     }
@@ -211,18 +212,19 @@ export default function ProjectGit({
                     eligible={w.eligible}
                   >
                     <p className="break-all">{w.path}</p>
-                    {w.locked && w.primary && <p>Locked</p>}
+                    {w.locked && w.primary && <p>{t("Locked")}</p>}
                     <p>
                       {w.eligible
-                        ? "Merged and past retention"
+                        ? t("Merged and past retention")
                         : w.primary
-                          ? "Main worktree is always kept"
+                          ? t("Main worktree is always kept")
                           : w.missing
-                            ? "Folder missing. Registration kept for repair."
+                            ? t("Folder missing. Registration kept for repair.")
                             : w.reasons
                                 .filter(
                                   (reason) => !view.warnings.includes(reason),
                                 )
+                                .map((reason) => t(reason))
                                 .join("; ")}
                     </p>
                   </GitRow>
@@ -243,26 +245,29 @@ export default function ProjectGit({
                   >
                     <p className="break-all">
                       {b.commit.slice(0, 8)}
-                      {b.upstream ? ` · Track ${b.upstream}` : " · No upstream"}
+                      {b.upstream
+                        ? t(" · Track {0}", b.upstream)
+                        : t(" · No upstream")}
                       {b.updatedAt ? ` · ${date(b.updatedAt)}` : ""}
                     </p>
                     {b.worktrees.length > 0 && (
                       <p className="break-all">
-                        Checked out at {b.worktrees.join(", ")}
+                        {t("Checked out at")} {b.worktrees.join(", ")}
                       </p>
                     )}
                     <p>
                       {b.eligible
-                        ? "Merged and past retention"
+                        ? t("Merged and past retention")
                         : b.reasons
                             .filter((reason) => !view.warnings.includes(reason))
+                            .map((reason) => t(reason))
                             .join("; ")}
                     </p>
                   </GitRow>
                 ))
               ) : (
                 <p className="p-3 text-sm text-muted">
-                  No local branches yet. Create the first commit.
+                  {t("No local branches yet. Create the first commit.")}
                 </p>
               )}
             </div>
@@ -271,11 +276,11 @@ export default function ProjectGit({
             <ActionDialog
               title={
                 <>
-                  Automatic cleanup
+                  {t("Automatic cleanup")}
                   <span className="ml-2 text-xs font-normal text-muted">
                     {view.policy.enabled
-                      ? `Enabled · Keep ${view.policy.retentionDays}  days`
-                      : "Disabled"}
+                      ? t("Enabled · Keep {0}  days", view.policy.retentionDays)
+                      : t("Disabled")}
                   </span>
                 </>
               }
@@ -304,7 +309,7 @@ export default function ProjectGit({
             <ActionDialog
               title={
                 <>
-                  Cleanup history and restore
+                  {t("Cleanup history and restore")}
                   {view.history.length ? ` · ${view.history.length}` : ""}
                 </>
               }
@@ -322,7 +327,9 @@ export default function ProjectGit({
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span>
                           {date(r.createdAt)} ·{" "}
-                          {r.automatic ? "Automatic cleanup" : "Manual cleanup"}
+                          {r.automatic
+                            ? t("Automatic cleanup")
+                            : t("Manual cleanup")}
                         </span>
                         <Button
                           disabled={
@@ -342,30 +349,36 @@ export default function ProjectGit({
                             )
                           }
                         >
-                          {r.restoredAt ? "Restored" : "Restore"}
+                          {r.restoredAt ? t("Restored") : t("Restore")}
                         </Button>
                       </div>
                       <ul className="mt-2 space-y-1 text-xs text-muted">
                         {r.items.map((item, i) => (
                           <li key={i} className="break-all">
-                            {item.kind === "worktree" ? "Worktrees" : "Branch"}{" "}
+                            {item.kind === "worktree"
+                              ? t("Worktrees")
+                              : t("Branch")}{" "}
                             · {item.target} ·{" "}
-                            {(
-                              {
-                                removed: "Removed",
-                                restored: "Restored",
-                                skipped: "Kept",
-                                pending: "Needs review",
-                              } as Record<string, string>
-                            )[item.status] || item.status}
-                            {item.error ? `: ${item.error}` : ""}
+                            {t(
+                              (
+                                {
+                                  removed: "Removed",
+                                  restored: "Restored",
+                                  skipped: "Kept",
+                                  pending: "Needs review",
+                                } as Record<string, string>
+                              )[item.status] || item.status,
+                            )}
+                            {item.error ? `: ${t(item.error)}` : ""}
                           </li>
                         ))}
                       </ul>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted">No cleanup history yet.</p>
+                  <p className="text-sm text-muted">
+                    {t("No cleanup history yet.")}
+                  </p>
                 )}
               </div>
             </ActionDialog>
@@ -390,15 +403,19 @@ export default function ProjectGit({
                 (i) => i.status !== "removed",
               ).length;
               update({
-                notice: `Removed ${removed}  items${skipped ? `, Keep ${skipped}  items. See cleanup history for details.` : ""}`,
+                notice: formatMessage(
+                  "Removed {0} items; kept {1}. See cleanup history for details.",
+                  removed,
+                  skipped,
+                ),
               });
             }, "")
           }
         >
           <p className="text-sm leading-6 text-muted">
-            Remove only the worktrees and local branches below. Recovery refs
-            preserve commits. Modified, ignored, unmerged, or active worktrees
-            are kept.
+            {t(
+              "Remove only the worktrees and local branches below. Recovery refs preserve commits. Modified, ignored, unmerged, or active worktrees are kept.",
+            )}
           </p>
           {candidates(preview).length ? (
             <ul className="grouped-list mt-4 max-h-[40dvh] overflow-auto">
@@ -407,14 +424,14 @@ export default function ProjectGit({
                   key={`${c.kind}:${c.name}`}
                   className="break-all border-b border-line-subtle p-3 text-sm last:border-0"
                 >
-                  <span className="mr-2 text-muted">{c.kind}</span>
+                  <span className="mr-2 text-muted">{t(c.kind)}</span>
                   {c.name}
                 </li>
               ))}
             </ul>
           ) : (
             <p className="py-5 text-sm">
-              Nothing to clean up. See the list for retention reasons.
+              {t("Nothing to clean up. See the list for retention reasons.")}
             </p>
           )}
         </CleanupPreview>
@@ -448,19 +465,21 @@ function CleanupSettings({
           disabled={!native || pending}
           onChange={(e) => update({ enabled: e.target.checked })}
         />
-        Enable automatic cleanup for this repository
+        {t("Enable automatic cleanup for this repository")}
       </label>
       <div className="flex flex-wrap items-end gap-3">
         <label className="min-w-0 space-y-1">
           <span className="block text-xs text-muted">
-            Merged into base branch
+            {t("Merged into base branch")}
           </span>
           <Select
             value={draft.baseBranch}
             disabled={!native || pending}
             onChange={(e) => update({ baseBranch: e.target.value })}
           >
-            {!draft.baseBranch && <option value="">Select local branch</option>}
+            {!draft.baseBranch && (
+              <option value="">{t("Select local branch")}</option>
+            )}
             {branches.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -469,7 +488,9 @@ function CleanupSettings({
           </Select>
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-muted">Retention days</span>
+          <span className="block text-xs text-muted">
+            {t("Retention days")}
+          </span>
           <input
             className="h-9 w-24 rounded-md border border-control px-3"
             type="number"
@@ -490,18 +511,18 @@ function CleanupSettings({
           }
           onClick={() => onSave(draft)}
         >
-          Save settings
+          {t("Save settings")}
         </Button>
       </div>
       <p className="text-xs leading-5 text-muted">
-        Checks run hourly while the app is open, starting at the next scheduled
-        check. Retention starts at first observation or latest change. Base,
-        main, and release branches are always kept. Projects in the same
-        repository share these settings.
+        {t(
+          "Checks run hourly while the app is open, starting at the next scheduled check. Retention starts at first observation or latest change. Base, main, and release branches are always kept. Projects in the same repository share these settings.",
+        )}
       </p>
       <p className="text-xs leading-5 text-muted">
-        Codex worktrees must be managed in their own chats. Uncertain file or
-        process state prevents cleanup. Remote branches are unaffected.
+        {t(
+          "Codex worktrees must be managed in their own chats. Uncertain file or process state prevents cleanup. Remote branches are unaffected.",
+        )}
       </p>
     </div>
   );
@@ -536,11 +557,11 @@ function CleanupPreview({
     >
       <div className="mb-3 flex items-center gap-3">
         <h2 id="git-cleanup-title" className="flex-1 text-lg font-semibold">
-          Cleanup preview
+          {t("Cleanup preview")}
         </h2>
         <button
           className="icon-button"
-          aria-label="Close cleanup preview"
+          aria-label={t("Close cleanup preview")}
           disabled={pending}
           onClick={onClose}
         >
@@ -550,10 +571,10 @@ function CleanupPreview({
       {children}
       <div className="mt-4 flex justify-end gap-2">
         <Button disabled={pending} onClick={onClose}>
-          Cancel
+          {t("Cancel")}
         </Button>
         <Button primary disabled={pending || count === 0} onClick={onApply}>
-          {pending ? "Cleaning up…" : `Clean up ${count}  items`}
+          {pending ? t("Cleaning up…") : t("Clean up {0}  items", count)}
         </Button>
       </div>
     </dialog>
@@ -578,12 +599,12 @@ function GitRow({
       <h3 className="flex min-h-11 items-center gap-3 px-3 py-2">
         <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
           <span className="font-medium [overflow-wrap:anywhere]">{name}</span>
-          {marker && <span className="text-xs text-muted">{marker}</span>}
+          {marker && <span className="text-xs text-muted">{t(marker)}</span>}
         </span>
         <span
           className={`shrink-0 text-xs ${eligible ? "text-green-700" : "text-muted"}`}
         >
-          {status}
+          {t(status)}
         </span>
       </h3>
       <div className="space-y-1 border-t border-line-subtle bg-editor px-3 py-2 text-xs leading-5 text-muted">

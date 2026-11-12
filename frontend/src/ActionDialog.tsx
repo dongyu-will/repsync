@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useId, useReducer, useRef, type ReactNode } from "react";
 import { Button, Icon } from "./components";
 
@@ -78,6 +79,7 @@ export default function ActionDialog({
         id={dialogId}
         aria-labelledby={titleId}
         onCancel={(event) => {
+          event.stopPropagation();
           event.preventDefault();
           if (!busy) changeOpen(false);
         }}
@@ -96,7 +98,7 @@ export default function ActionDialog({
           <button
             type="button"
             className="icon-button shrink-0"
-            aria-label="Close"
+            aria-label={t("Close")}
             disabled={busy}
             onClick={() => changeOpen(false)}
           >
@@ -105,12 +107,12 @@ export default function ActionDialog({
         </div>
         {error && (
           <p role="alert" className="mb-3 break-words text-sm text-removed">
-            {error}
+            {t(error)}
           </p>
         )}
         {notice && (
           <p role="status" className="mb-3 break-words text-sm text-muted">
-            {notice}
+            {t(notice)}
           </p>
         )}
         <div className="min-w-0 space-y-3">{children}</div>

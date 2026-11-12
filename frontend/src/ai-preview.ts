@@ -4,18 +4,158 @@ export function previewAIResources(path: string): AIResourceReport {
   const project = path || "/Projects/atlas";
   return {
     scope: path,
+    contextVersion: "preview-context:" + path,
     checkedAt: "2026-11-10T10:30:00Z",
     issues: [],
     resources: [
       {
+        id: "candidate:skill:release-helper",
+        kind: "skill",
+        name: "frontend-release-helper",
+        description: "Review frontend changes and prepare release checks.",
+        source: "Candidate Skill",
+        location: "https://example.invalid/frontend-release-helper/SKILL.md",
+        version: "v1.0",
+        revision: "candidate-release-v1",
+        availability: "candidate",
+        detail: "Candidate source; installation not verified",
+        applicability: "candidate",
+        reason: "",
+        tasks: "",
+        projects: [],
+        assessment: {
+          resourceId: "candidate:skill:release-helper",
+          resourceRevision: "candidate-release-v1",
+          contextVersion:
+            path === "/Projects/notebook"
+              ? "previous-context"
+              : "preview-context:" + path,
+          scope: path,
+          candidate: {
+            name: "frontend-release-helper",
+            source: "https://example.invalid/frontend-release-helper/SKILL.md",
+            sourceVersion: "v1.0",
+            description: "Review frontend changes and prepare release checks.",
+          },
+          verdict: "conditional",
+          summary: "建议按条件接入：适合界面审查，但需保留本项目的验证门禁。",
+          fit: "适合前端改动后的界面审查。现有 interface-review 已覆盖布局检查，主要新增发布准备清单。",
+          adoptionCost:
+            "沿用原 Skill 安装渠道，不新增服务。接入时限定发布任务触发，并在项目规则中保留针对性验证要求；撤回时只移除本次接入配置。",
+          coverage:
+            "检查了候选 v1.0 正文、项目 AGENTS.md、README 及 interface-review；尚未实测，也未评估其他项目。",
+          findings: [
+            {
+              kind: "overlap",
+              resource: "interface-review",
+              evidence: "两个 Skill 都包含布局与交互审查。",
+              recommendation:
+                "日常界面检查复用现有 Skill；仅在发布准备时考虑候选的新增能力。",
+              sources: [
+                "https://example.invalid/frontend-release-helper/SKILL.md#review",
+                "/Projects/atlas/.agents/skills/interface-review/SKILL.md",
+              ],
+            },
+            {
+              kind: "conflict",
+              resource: "项目验证规则",
+              evidence:
+                "候选要求每次前端修改都运行完整 CI；项目规则要求日常改动按影响范围验证。",
+              recommendation:
+                "遵循项目门禁，限定候选在正式发布任务中使用，日常验证继续复用已有针对性检查。",
+              sources: [
+                "https://example.invalid/frontend-release-helper/SKILL.md#validation",
+                "/Projects/atlas/AGENTS.md:verification",
+              ],
+            },
+          ],
+          sources: [
+            "https://example.invalid/frontend-release-helper/SKILL.md",
+            "/Projects/atlas/AGENTS.md",
+          ],
+          checkedAt: "2026-11-12T00:00:00Z",
+          recordedAt: "2026-11-12T00:05:00Z",
+          version: "candidate-release-assessment",
+          stale: path === "/Projects/notebook",
+        },
+      },
+      {
+        id: "candidate:skill:unknown-helper",
+        kind: "skill",
+        name: "docs-helper",
+        description: "Evaluate a documentation workflow.",
+        source: "Candidate Skill",
+        location: "https://example.invalid/docs-helper/SKILL.md",
+        version: "",
+        revision: "candidate-docs-unknown",
+        availability: "candidate",
+        detail: "Candidate source; installation not verified",
+        applicability: "candidate",
+        reason: "",
+        tasks: "",
+        projects: [],
+        assessment: {
+          resourceId: "candidate:skill:unknown-helper",
+          resourceRevision: "candidate-docs-unknown",
+          contextVersion: "preview-context:" + path,
+          candidate: {
+            name: "docs-helper",
+            source: "https://example.invalid/docs-helper/SKILL.md",
+            sourceVersion: "",
+            description: "Evaluate a documentation workflow.",
+          },
+          verdict: "unknown",
+          summary: "候选正文暂不可读取，无法判断适配与冲突。",
+          fit: "尚未核对实际能力及与已有文档工具的重复范围。",
+          adoptionCost: "尚未确认安装渠道、依赖及撤回方式。",
+          coverage: "仅收到来源地址，未读取 Skill 正文或引用文档。",
+          findings: [
+            {
+              kind: "unknown",
+              resource: "候选来源",
+              evidence: "原始正文不可读取，缺少版本与能力依据。",
+              recommendation: "提供可访问的原始来源后重新评估。",
+              sources: [],
+            },
+          ],
+          sources: [],
+          checkedAt: "2026-11-12T00:00:00Z",
+          recordedAt: "2026-11-12T00:05:00Z",
+          scope: path,
+          version: "docs-unknown-assessment",
+          stale: false,
+        },
+      },
+      {
         id: "skill:design",
         kind: "skill",
-        name: "impeccable",
+        name: "interface-review",
         description:
           "Interface design, interaction details, accessibility, and visual verification.",
         source: "User Skill",
-        location: "/Users/chen/.agents/skills/impeccable/SKILL.md",
+        location: "/Users/chen/.agents/skills/interface-review/SKILL.md",
         version: "3e9d7d15a24c",
+        revision: "design-current",
+        note: {
+          resourceId: "skill:design",
+          resourceRevision: "design-current",
+          installedVersion: "1.0",
+          latestVersion: "1.1",
+          updateStatus: "available",
+          checkedAt: "2026-11-12T02:30:00Z",
+          recordedAt: "2026-11-12T02:35:00Z",
+          summary: "新版补充键盘操作与错误状态检查，适合本项目的界面验收。",
+          changes:
+            "- 新增键盘操作检查示例。\n- 新增步骤需要升级到 1.1 后使用。",
+          manual:
+            "### 能做什么\n审查页面布局、可访问性和交互细节。\n\n### 什么时候用\n调整前端界面后、提交前。\n\n### 准备\n启动本地页面，提供待检查的页面地址及项目设计指南。\n\n### 对 AI 说\n> 用 interface-review 检查当前页面，按项目规定的窗口尺寸验证布局，列出问题位置和修复建议。\n\n### 结果与限制\n得到带位置的检查结果；实际页面行为仍需在浏览器或桌面核验。",
+          sources: [
+            "https://example.invalid/interface-review/releases/1.1",
+            "/Users/chen/.agents/skills/interface-review/SKILL.md",
+          ],
+          version: "design-report",
+          stale: false,
+        },
         availability: "discovered",
         detail: "File discovered; current AI Session visibility unknown",
         applicability: "adopted",
@@ -34,6 +174,25 @@ export function previewAIResources(path: string): AIResourceReport {
         location:
           "/Users/chen/.codex/skills/project-release-verification/SKILL.md",
         version: "b6a834ac301c",
+        revision: "release-current",
+        note: {
+          resourceId: "skill:release",
+          resourceRevision: "release-previous",
+          installedVersion: "",
+          latestVersion: "",
+          updateStatus: "unknown",
+          checkedAt: "2026-11-10T10:00:00Z",
+          recordedAt: "2026-11-10T10:05:00Z",
+          summary: "本地指南已变化，需要重新读取并核对说明。",
+          changes: "",
+          manual:
+            "按照项目指南核验提交、推送、发布及线上验收。旧说明仅供参考。",
+          sources: [
+            "/Users/chen/.codex/skills/project-release-verification/SKILL.md",
+          ],
+          version: "release-report",
+          stale: true,
+        },
         availability: "discovered",
         detail: "File discovered; check session records to verify loading",
         applicability: "recommended",
@@ -44,6 +203,7 @@ export function previewAIResources(path: string): AIResourceReport {
       },
       {
         id: "mcp:codex:figma",
+        revision: "figma-config",
         kind: "mcp",
         name: "figma",
         description: "Read components, layouts, and design context.",
@@ -60,6 +220,7 @@ export function previewAIResources(path: string): AIResourceReport {
       },
       {
         id: "cli:gh",
+        revision: "gh-path",
         kind: "cli",
         name: "gh",
         description: "GitHub  repositories, PR  and  Actions.",
@@ -76,6 +237,7 @@ export function previewAIResources(path: string): AIResourceReport {
       },
       {
         id: "cli:pnpm",
+        revision: "pnpm-missing",
         kind: "cli",
         name: "pnpm",
         description: "The package manager declared by the project.",
@@ -92,6 +254,7 @@ export function previewAIResources(path: string): AIResourceReport {
       },
       {
         id: "skill:go",
+        revision: "go-current",
         kind: "skill",
         name: "golang-how-to",
         description: "Based on Go  tasks to select a development guide.",
@@ -107,6 +270,7 @@ export function previewAIResources(path: string): AIResourceReport {
       },
       {
         id: "mcp:codex:shadcn",
+        revision: "shadcn-config",
         kind: "mcp",
         name: "shadcn",
         description: "Component discovery and setup.",
@@ -141,7 +305,7 @@ export function previewAIUsage(path: string): AIUsageReport {
       id: "codex:atlas:skill1",
       resourceId: "skill:design",
       kind: "skill",
-      name: "impeccable",
+      name: "interface-review",
       action: "read",
       status: "succeeded",
       purpose: "instruction",
@@ -215,7 +379,7 @@ export function previewAIUsage(path: string): AIUsageReport {
       {
         resourceId: "skill:design",
         kind: "skill",
-        name: "impeccable",
+        name: "interface-review",
         sessions: 1,
         calls: 1,
         succeeded: 1,

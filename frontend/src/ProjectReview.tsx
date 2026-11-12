@@ -1,3 +1,4 @@
+import { getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useReducer, type FormEvent, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -45,7 +46,7 @@ const status: Record<string, string> = {
   not_applicable_tracking: "",
 };
 const date = (value: string) =>
-  new Date(value).toLocaleString("en-US", { hour12: false });
+  new Date(value).toLocaleString(getLocale(), { hour12: false });
 type State = {
   report: ProjectReview | null;
   section: Section;
@@ -123,18 +124,19 @@ export default function ProjectReviewPanel({
   };
   return (
     <section
-      aria-label="Pending project items"
+      aria-label={t("Pending project items")}
       className="mt-5 space-y-3 border-t border-line pt-5"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className="text-base font-semibold">
-            Pending{report ? ` · ${report.issues.length}` : ""}
+            {t("Pending")}
+            {report ? ` · ${report.issues.length}` : ""}
           </h2>
-          <span className="text-xs text-muted">{workspaceStatus}</span>
+          <span className="text-xs text-muted">{t(workspaceStatus)}</span>
         </div>
         <Button disabled={!native || pending} onClick={refresh}>
-          {pending ? "Checking…" : "Check current state"}
+          {pending ? t("Checking…") : t("Check current state")}
         </Button>
       </div>
       {state.error && (
@@ -142,12 +144,12 @@ export default function ProjectReviewPanel({
           role="alert"
           className="break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
         >
-          {state.error}
+          {t(state.error)}
         </p>
       )}
       {state.notice && (
         <p role="status" className="text-sm text-muted">
-          {state.notice}
+          {t(state.notice)}
         </p>
       )}
       {!report ? (
@@ -157,7 +159,9 @@ export default function ProjectReviewPanel({
               role="status"
               className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900"
             >
-              <p>More {stashCount} records stash Pending</p>
+              <p>
+                {t("More")} {stashCount} {t("records stash Pending")}
+              </p>
               <button
                 className="rounded px-2 py-1 underline underline-offset-2"
                 onClick={() => {
@@ -165,7 +169,7 @@ export default function ProjectReviewPanel({
                   onGit();
                 }}
               >
-                View stash
+                {t("View stash")}
               </button>
             </div>
           )}
@@ -179,7 +183,9 @@ export default function ProjectReviewPanel({
                   key={issue.key || issue.kind + issue.message}
                   className="flex items-center justify-between gap-3 border-b border-line-subtle px-3 py-2 text-sm last:border-0"
                 >
-                  <span className="min-w-0 break-words">{issue.message}</span>
+                  <span className="min-w-0 break-words">
+                    {t(issue.message)}
+                  </span>
                   <button
                     className="shrink-0 rounded px-2 py-1 text-accent hover:bg-selection"
                     onClick={() =>
@@ -188,23 +194,23 @@ export default function ProjectReviewPanel({
                         : select(issue.section)
                     }
                   >
-                    View
+                    {t("View")}
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
             <p role="status" className="text-sm">
-              No pending items in the declared scope.
+              {t("No pending items in the declared scope.")}
             </p>
           )}
           <ActionDialog
-            title="Project checks and records"
+            title={t("Project checks and records")}
             trigger={
               <>
                 {report.issues.length > 3
-                  ? `View all ${report.issues.length}  items and records`
-                  : "View details and history"}
+                  ? t("View all {0}  items and records", report.issues.length)
+                  : t("View details and history")}
               </>
             }
             open={state.expanded}
@@ -215,12 +221,12 @@ export default function ProjectReviewPanel({
           >
             <div className="mt-3 space-y-4">
               <p className="text-xs text-muted">
-                Loaded at {date(report.checkedAt)} · Does not confirm commit,
-                push, or release completion
+                {t("Loaded at")} {date(report.checkedAt)}{" "}
+                {t("· Does not confirm commit, push, or release completion")}
               </p>
               <div
                 role="group"
-                aria-label="Review sections"
+                aria-label={t("Review sections")}
                 className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg bg-sidebar p-1"
               >
                 {sections.map(([id, label]) => (
@@ -230,14 +236,14 @@ export default function ProjectReviewPanel({
                     onClick={() => select(id)}
                     className={`min-h-8 rounded-md px-3 text-sm ${state.section === id ? "bg-white font-medium" : "text-muted hover:text-ink"}`}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
               {report.issues.some((i) => i.section === state.section) && (
                 <section>
                   <h3 className="break-words text-sm font-medium">
-                    Review and resolve reminders ·{" "}
+                    {t("Review and resolve reminders ·")}{" "}
                     {
                       report.issues.filter((i) => i.section === state.section)
                         .length
@@ -269,7 +275,7 @@ export default function ProjectReviewPanel({
               {report.acknowledged.some((i) => i.section === state.section) && (
                 <section>
                   <h3 className="break-words text-sm font-medium">
-                    Reviewed; kept / Defer
+                    {t("Reviewed; kept / Defer")}
                   </h3>
                   <IssueList
                     issues={report.acknowledged.filter(
@@ -311,11 +317,14 @@ export default function ProjectReviewPanel({
                   }
                 >
                   <p className="text-xs leading-5 text-muted">
-                    Configure according to the project guide. Only selected
-                    scopes generate reminders. Saving does not run checks.
+                    {t(
+                      "Configure according to the project guide. Only selected scopes generate reminders. Saving does not run checks.",
+                    )}
                   </p>
                   <label className="block space-y-1">
-                    <span className="text-xs text-muted">Project type</span>
+                    <span className="text-xs text-muted">
+                      {t("Project type")}
+                    </span>
                     <Select
                       name="kind"
                       defaultValue={
@@ -324,12 +333,12 @@ export default function ProjectReviewPanel({
                           : report.profile.kind
                       }
                     >
-                      <option value="web">Web app</option>
-                      <option value="backend">Backend service</option>
-                      <option value="desktop">Desktop app</option>
-                      <option value="library">Library / tool</option>
-                      <option value="notes">Documents / Notes</option>
-                      <option value="custom">Custom</option>
+                      <option value="web">{t("Web app")}</option>
+                      <option value="backend">{t("Backend service")}</option>
+                      <option value="desktop">{t("Desktop app")}</option>
+                      <option value="library">{t("Library / tool")}</option>
+                      <option value="notes">{t("Documents / Notes")}</option>
+                      <option value="custom">{t("Custom")}</option>
                     </Select>
                   </label>
                   {Object.entries(areas).map(([area, name]) => (
@@ -337,15 +346,17 @@ export default function ProjectReviewPanel({
                       key={area}
                       className="space-y-2 border-t border-line pt-3"
                     >
-                      <legend className="text-sm font-medium">{name}</legend>
+                      <legend className="text-sm font-medium">{t(name)}</legend>
                       <CheckBox
                         name="areas"
                         value={area}
                         checked={report.profile.areas.includes(area)}
                       >
-                        This project includes {name}
+                        {t("This project includes")} {t(name)}
                       </CheckBox>
-                      <p className="text-xs text-muted">Checks to verify</p>
+                      <p className="text-xs text-muted">
+                        {t("Checks to verify")}
+                      </p>
                       {report.coverageOptions
                         .filter((r) => r.area === area)
                         .map((r) => (
@@ -355,14 +366,14 @@ export default function ProjectReviewPanel({
                             value={r.id}
                             checked={report.profile.requirements.includes(r.id)}
                           >
-                            {r.name}
+                            {t(r.name)}
                           </CheckBox>
                         ))}
                     </fieldset>
                   ))}
                   <fieldset className="space-y-2 border-t border-line pt-3">
                     <legend className="text-sm font-medium">
-                      Delivery stages
+                      {t("Delivery stages")}
                     </legend>
                     {report.delivery
                       .filter((s) => !["working", "commit"].includes(s.stage))
@@ -373,34 +384,39 @@ export default function ProjectReviewPanel({
                           value={s.stage}
                           checked={report.profile.stages.includes(s.stage)}
                         >
-                          {s.name}
+                          {t(s.name)}
                         </CheckBox>
                       ))}
                   </fieldset>
-                  <Submit pending={pending}>Save applicability</Submit>
+                  <Submit pending={pending}>{t("Save applicability")}</Submit>
                 </ReviewForm>
               )}
               {state.section === "changes" && (
                 <>
                   <dl className="grouped-list">
-                    <Info label="Upstream ref">
+                    <Info label={t("Upstream ref")}>
                       {report.snapshot.upstream ||
-                        "Not configured or unreadable"}
+                        t("Not configured or unreadable")}
                     </Info>
-                    <Info label="Commit differences">
+                    <Info label={t("Commit differences")}>
                       {report.snapshot.upstreamKnown
-                        ? `Ahead ${report.snapshot.ahead} / Behind ${report.snapshot.behind}`
-                        : "Unverified"}
+                        ? t(
+                            "Ahead {0} / Behind {1}",
+                            report.snapshot.ahead,
+                            report.snapshot.behind,
+                          )
+                        : t("Unverified")}
                     </Info>
-                    <Info label="Last fetch">
+                    <Info label={t("Last fetch")}>
                       {report.snapshot.fetchedAt
                         ? date(report.snapshot.fetchedAt)
-                        : "Unknown"}
+                        : t("Unknown")}
                     </Info>
                   </dl>
                   <p className="text-xs leading-5 text-muted">
-                    Calculated from local Git refs; remote state has not been
-                    checked online.
+                    {t(
+                      "Calculated from local Git refs; remote state has not been checked online.",
+                    )}
                   </p>
                   <Button
                     onClick={() => {
@@ -408,7 +424,7 @@ export default function ProjectReviewPanel({
                       onGit();
                     }}
                   >
-                    View worktrees, branches, and stash
+                    {t("View worktrees, branches, and stash")}
                   </Button>
                   {report.snapshot.files.length ? (
                     <ul className="grouped-list max-h-64 overflow-auto">
@@ -419,10 +435,10 @@ export default function ProjectReviewPanel({
                         >
                           <span className="shrink-0 text-xs text-muted">
                             {file.conflict
-                              ? "Conflicts"
+                              ? t("Conflicts")
                               : file.untracked
-                                ? "Untracked"
-                                : `${file.index !== " " ? "Staged" : ""}${file.index !== " " && file.worktree !== " " ? " / " : ""}${file.worktree !== " " ? "Unstaged" : ""}`}
+                                ? t("Untracked")
+                                : `${file.index !== " " ? t("Staged") : ""}${file.index !== " " && file.worktree !== " " ? " / " : ""}${file.worktree !== " " ? t("Unstaged") : ""}`}
                           </span>
                           <span className="min-w-0 break-all">{file.path}</span>
                         </li>
@@ -430,13 +446,14 @@ export default function ProjectReviewPanel({
                     </ul>
                   ) : (
                     <p className="text-sm text-muted">
-                      {report.snapshot.error || "No file changes loaded."}
+                      {t(report.snapshot.error) || t("No file changes loaded.")}
                     </p>
                   )}
                   {report.snapshot.files.length > 100 && (
                     <p className="text-xs text-muted">
-                      Showing the first 100 items, CLI The receipt includes the
-                      full loaded list.
+                      {t(
+                        "Showing the first 100 items, CLI The receipt includes the full loaded list.",
+                      )}
                     </p>
                   )}
                 </>
@@ -445,10 +462,9 @@ export default function ProjectReviewPanel({
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs leading-5 text-muted">
-                      Compares file contents and command configuration; ignored
-                      dependencies and external environments are excluded. After
-                      a commit changes, check whether verification depends on
-                      Git status.
+                      {t(
+                        "Compares file contents and command configuration; ignored dependencies and external environments are excluded. After a commit changes, check whether verification depends on Git status.",
+                      )}
                     </p>
                     <Button
                       onClick={() => {
@@ -456,7 +472,7 @@ export default function ProjectReviewPanel({
                         onCI();
                       }}
                     >
-                      Open CI/CD
+                      {t("Open CI/CD")}
                     </Button>
                   </div>
                   <div className="grouped-list">
@@ -466,24 +482,25 @@ export default function ProjectReviewPanel({
                         className="space-y-1 border-b border-line-subtle p-3 last:border-0"
                       >
                         <p className="text-sm font-medium">
-                          {item.requirement.name} ·{" "}
-                          {status[item.status] || item.status}
+                          {t(item.requirement.name)} ·{" "}
+                          {t(status[item.status] || item.status)}
                         </p>
                         <p className="break-words text-xs leading-5 text-muted">
-                          {item.reason}
+                          {t(item.reason)}
                         </p>
                         {(item.environment || item.target) && (
                           <p className="break-all text-xs text-muted">
-                            Environment: {item.environment || "Not provided"} ·
-                            Target:
-                            {item.target || "Not provided"}
+                            {t("Environment:")}{" "}
+                            {item.environment || t("Not provided")}{" "}
+                            {t("· Target:")}
+                            {item.target || t("Not provided")}
                           </p>
                         )}
                         {item.evidence && (
                           <p className="break-words text-xs text-muted">
                             {item.source === "pipeline"
-                              ? "App execution"
-                              : "Externally reported"}{" "}
+                              ? t("App execution")
+                              : t("Externally reported")}{" "}
                             · {item.evidence}
                           </p>
                         )}
@@ -492,7 +509,7 @@ export default function ProjectReviewPanel({
                   </div>
                   {!report.coverage.length && (
                     <p className="text-sm text-muted">
-                      Select required checks under Applicability.
+                      {t("Select required checks under Applicability.")}
                     </p>
                   )}
                   {report.checks.length ? (
@@ -504,34 +521,43 @@ export default function ProjectReviewPanel({
                         >
                           <p className="break-words text-sm font-medium">
                             {check.command} ·{" "}
-                            {status[check.status] || check.status}
+                            {t(status[check.status] || check.status)}
                           </p>
                           <p className="text-xs text-muted">
                             {check.source === "pipeline"
-                              ? "App execution"
-                              : "Externally reported; not executed by the app"}{" "}
-                            · {date(check.createdAt)} · {status[check.current]}
+                              ? t("App execution")
+                              : t(
+                                  "Externally reported; not executed by the app",
+                                )}{" "}
+                            · {date(check.createdAt)} ·{" "}
+                            {t(status[check.current])}
                           </p>
                           <p className="break-words text-xs leading-5 text-muted">
-                            Scope: {check.scope}; {check.reason}
+                            {t("Scope:")} {check.scope}; {t(check.reason)}
                             {check.coverage?.length
                               ? `; ${check.coverage.map((c) => coverageName(report.coverageOptions, c)).join(", ")}`
-                              : "; No verification categories declared"}
+                              : t("; No verification categories declared")}
                           </p>
                           <p className="break-words text-xs text-muted">
                             {check.evidence}
                             {(check.environment || check.target) &&
-                              ` · Environment: ${check.environment || "Not provided"} / Target: ${check.target || "Not provided"}`}
+                              t(
+                                " · Environment: {0} / Target: {1}",
+                                check.environment || t("Not provided"),
+                                check.target || t("Not provided"),
+                              )}
                           </p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted">No check records yet.</p>
+                    <p className="text-sm text-muted">
+                      {t("No check records yet.")}
+                    </p>
                   )}
                   <section>
                     <h3 className="break-words text-sm font-medium">
-                      Record external check
+                      {t("Record external check")}
                     </h3>
                     <ReviewForm
                       pending={pending}
@@ -555,35 +581,42 @@ export default function ProjectReviewPanel({
                         )
                       }
                     >
-                      <Field name="command" label="Check command" required />
+                      <Field
+                        name="command"
+                        label={t("Check command")}
+                        required
+                      />
                       <Field
                         name="scope"
-                        label="Actual coverage and limitations"
+                        label={t("Actual coverage and limitations")}
                         required
                       />
                       <fieldset className="space-y-2">
                         <legend className="mb-2 text-xs text-muted">
-                          Categories actually verified (select all that apply)
+                          {t(
+                            "Categories actually verified (select all that apply)",
+                          )}
                         </legend>
                         {report.coverageOptions.map((r) => (
                           <CheckBox key={r.id} name="coverage" value={r.id}>
-                            {r.name}
+                            {t(r.name)}
                           </CheckBox>
                         ))}
                         <CheckBox name="coverage" value="database-static">
-                          Database script static checks (do not replace real
-                          database verification)
+                          {t(
+                            "Database script static checks (do not replace real database verification)",
+                          )}
                         </CheckBox>
                       </fieldset>
                       <EnvironmentFields />
                       <ResultSelect />
                       <Field
                         name="evidence"
-                        label="Result notes or log location"
+                        label={t("Result notes or log location")}
                         multiline
                         required
                       />
-                      <Submit pending={pending}>Record check</Submit>
+                      <Submit pending={pending}>{t("Record check")}</Submit>
                     </ReviewForm>
                   </section>
                 </>
@@ -597,14 +630,15 @@ export default function ProjectReviewPanel({
                         className="space-y-1 border-b border-line-subtle p-3 last:border-0"
                       >
                         <p className="text-sm font-medium">
-                          {stage.name} · {status[stage.status] || stage.status}
+                          {t(stage.name)} ·{" "}
+                          {t(status[stage.status] || stage.status)}
                         </p>
                         <p className="break-words text-xs leading-5 text-muted">
-                          {stage.detail}
+                          {t(stage.detail)}
                         </p>
                         {stage.recordedAt && (
                           <p className="text-xs text-muted">
-                            Recorded at {date(stage.recordedAt)}
+                            {t("Recorded at")} {date(stage.recordedAt)}
                           </p>
                         )}
                       </div>
@@ -612,7 +646,7 @@ export default function ProjectReviewPanel({
                   </div>
                   <section>
                     <h3 className="break-words text-sm font-medium">
-                      Record stage verification
+                      {t("Record stage verification")}
                     </h3>
                     <ReviewForm
                       pending={pending}
@@ -631,7 +665,7 @@ export default function ProjectReviewPanel({
                       }
                     >
                       <label className="block space-y-1">
-                        <span className="text-xs text-muted">Stage</span>
+                        <span className="text-xs text-muted">{t("Stage")}</span>
                         <Select name="stage">
                           {report.delivery
                             .filter(
@@ -639,7 +673,7 @@ export default function ProjectReviewPanel({
                             )
                             .map((s) => (
                               <option key={s.stage} value={s.stage}>
-                                {s.name}
+                                {t(s.name)}
                               </option>
                             ))}
                         </Select>
@@ -647,15 +681,18 @@ export default function ProjectReviewPanel({
                       <ResultSelect allowNA />
                       <Field
                         name="note"
-                        label="Verification method, commit, or result URL"
+                        label={t("Verification method, commit, or result URL")}
                         multiline
                         required
                       />
                       <p className="text-xs text-muted">
-                        Save a manual verification record. This does not run
-                        push, deployment, or acceptance commands.
+                        {t(
+                          "Save a manual verification record. This does not run push, deployment, or acceptance commands.",
+                        )}
                       </p>
-                      <Submit pending={pending}>Save verification</Submit>
+                      <Submit pending={pending}>
+                        {t("Save verification")}
+                      </Submit>
                     </ReviewForm>
                   </section>
                 </>
@@ -669,7 +706,7 @@ export default function ProjectReviewPanel({
                           key={i}
                           className="border-b border-line-subtle p-3 text-sm last:border-0"
                         >
-                          {d.message}
+                          {t(d.message)}
                         </li>
                       ))}
                     </ul>
@@ -685,7 +722,7 @@ export default function ProjectReviewPanel({
                             <p className="text-sm font-medium">
                               {resource.state.definition.name} ·{" "}
                               {resource.status === "success"
-                                ? "Verification recorded"
+                                ? t("Verification recorded")
                                 : status[resource.status]}
                             </p>
                             <button
@@ -696,34 +733,36 @@ export default function ProjectReviewPanel({
                                 })
                               }
                             >
-                              Record verification
+                              {t("Record verification")}
                             </button>
                           </div>
                           <p className="break-all text-xs text-muted">
                             {resource.state.definition.target ||
-                              "Manual confirmation"}{" "}
-                            · {status[resource.state.observed]}
+                              t("Manual confirmation")}{" "}
+                            · {t(status[resource.state.observed])}
                             {resource.state.tracking !== "not_applicable"
-                              ? ` · ${status[resource.state.tracking] || resource.state.tracking}`
+                              ? ` · ${t(status[resource.state.tracking] || resource.state.tracking)}`
                               : ""}
                           </p>
                           {resource.state.error && (
                             <p className="break-words text-xs text-removed">
-                              {resource.state.error}
+                              {t(resource.state.error)}
                             </p>
                           )}
                           <p className="break-words text-xs leading-5 text-muted">
                             {resource.state.definition.guide ||
-                              "Existence does not prove a valid backup or recovery. Record how you verified it."}
+                              t(
+                                "Existence does not prove a valid backup or recovery. Record how you verified it.",
+                              )}
                           </p>
                           {resource.note && (
                             <p className="break-words text-xs text-muted">
-                              Reported: {resource.note}
+                              {t("Reported:")} {resource.note}
                             </p>
                           )}
                           {resource.recordedAt && (
                             <p className="text-xs text-muted">
-                              Reported at {date(resource.recordedAt)}
+                              {t("Reported at")} {date(resource.recordedAt)}
                             </p>
                           )}
                           {state.resourceTarget ===
@@ -751,12 +790,14 @@ export default function ProjectReviewPanel({
                               <ResultSelect allowNA />
                               <Field
                                 name="note"
-                                label="Backup, recovery drill, or status verification notes"
+                                label={t(
+                                  "Backup, recovery drill, or status verification notes",
+                                )}
                                 multiline
                                 required
                               />
                               <Submit pending={pending}>
-                                Save verification
+                                {t("Save verification")}
                               </Submit>
                             </ReviewForm>
                           )}
@@ -781,20 +822,21 @@ export default function ProjectReviewPanel({
                               )
                             }
                           >
-                            Remove declaration
+                            {t("Remove declaration")}
                           </button>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <p className="text-sm text-muted">
-                      No data or environment resources declared for
-                      verification.
+                      {t(
+                        "No data or environment resources declared for verification.",
+                      )}
                     </p>
                   )}
                   <section>
                     <h3 className="break-words text-sm font-medium">
-                      Add verification resource
+                      {t("Add verification resource")}
                     </h3>
                     <ReviewForm
                       pending={pending}
@@ -824,30 +866,36 @@ export default function ProjectReviewPanel({
                         )
                       }
                     >
-                      <Field name="name" label="Name" required />
+                      <Field name="name" label={t("Name")} required />
                       <label className="block space-y-1">
-                        <span className="text-xs text-muted">Type</span>
+                        <span className="text-xs text-muted">{t("Type")}</span>
                         <Select name="kind">
-                          <option value="file">Project file</option>
-                          <option value="directory">Project folder</option>
+                          <option value="file">{t("Project file")}</option>
+                          <option value="directory">
+                            {t("Project folder")}
+                          </option>
                           <option value="environment">
-                            Environment variable (checks definition only)
+                            {t("Environment variable (checks definition only)")}
                           </option>
                           <option value="manual">
-                            Manually verify databases, migrations, or backups
+                            {t(
+                              "Manually verify databases, migrations, or backups",
+                            )}
                           </option>
                         </Select>
                       </label>
                       <Field
                         name="target"
-                        label="Project-relative path or environment variable name (optional for manual verification)"
+                        label={t(
+                          "Project-relative path or environment variable name (optional for manual verification)",
+                        )}
                       />
                       <Field
                         name="guide"
-                        label="Verification method or project guide"
+                        label={t("Verification method or project guide")}
                         multiline
                       />
-                      <Submit pending={pending}>Save resource</Submit>
+                      <Submit pending={pending}>{t("Save resource")}</Submit>
                     </ReviewForm>
                   </section>
                 </>
@@ -879,16 +927,19 @@ export default function ProjectReviewPanel({
                       )
                     }
                   >
-                    <Field name="title" label="Task name" required />
+                    <Field name="title" label={t("Task name")} required />
                     <section>
                       <h3 className="break-words text-sm font-medium">
-                        Declare owner and change scope
+                        {t("Declare owner and change scope")}
                       </h3>
                       <div className="mt-3 space-y-3">
-                        <Field name="owner" label="Owner / AI Session alias" />
+                        <Field
+                          name="owner"
+                          label={t("Owner / AI Session alias")}
+                        />
                         <fieldset className="space-y-2">
                           <legend className="mb-2 text-xs text-muted">
-                            Affected scope
+                            {t("Affected scope")}
                           </legend>
                           {Object.entries(areas).map(([area, name]) => (
                             <CheckBox key={area} name="areas" value={area}>
@@ -898,17 +949,20 @@ export default function ProjectReviewPanel({
                         </fieldset>
                         <Field
                           name="paths"
-                          label="Project files or folders (one relative path per line)"
+                          label={t(
+                            "Project files or folders (one relative path per line)",
+                          )}
                           multiline
                         />
                         <EnvironmentFields />
                       </div>
                     </section>
-                    <Submit pending={pending}>Record task start</Submit>
+                    <Submit pending={pending}>{t("Record task start")}</Submit>
                   </ReviewForm>
                   <p className="text-xs leading-5 text-muted">
-                    Start and end are recorded manually. New content is not
-                    attributed to any AI .
+                    {t(
+                      "Start and end are recorded manually. New content is not attributed to any AI .",
+                    )}
                   </p>
                   {report.taskWarnings.map((warning) => (
                     <p
@@ -916,7 +970,7 @@ export default function ProjectReviewPanel({
                       role="status"
                       className="break-words text-sm text-removed"
                     >
-                      {warning}
+                      {t(warning)}
                     </p>
                   ))}
                   {report.tasks.map((task) => (
@@ -926,7 +980,7 @@ export default function ProjectReviewPanel({
                     >
                       <h3 className="break-words text-sm font-medium">
                         {task.title} ·{" "}
-                        {task.endedAt ? "Handed off" : "Not handed off"}
+                        {task.endedAt ? t("Handed off") : t("Not handed off")}
                       </h3>
                       <p className="mt-2 break-all text-xs text-muted">
                         {date(task.startedAt)} · {task.start.branch} ·{" "}
@@ -938,9 +992,10 @@ export default function ProjectReviewPanel({
                         task.environment ||
                         task.target) && (
                         <p className="mt-2 break-words text-xs leading-5 text-muted">
-                          {task.owner || "No owner declared"} ·{" "}
-                          {task.areas?.map((a) => areas[a] || a).join(", ") ||
-                            "No scope declared"}
+                          {task.owner || t("No owner declared")} ·{" "}
+                          {task.areas
+                            ?.map((a) => t(areas[a] || a))
+                            .join(", ") || t("No scope declared")}
                           {task.paths?.length
                             ? ` · ${task.paths.join(", ")}`
                             : ""}
@@ -951,8 +1006,9 @@ export default function ProjectReviewPanel({
                       {task.endedAt ? (
                         <div className="mt-3 space-y-2">
                           <p className="text-xs text-muted">
-                            Added during task {task.newStashes.length} records
-                            stash / {task.newUntracked.length} untracked files
+                            {t("Added during task")} {task.newStashes.length}{" "}
+                            {t("records stash /")} {task.newUntracked.length}{" "}
+                            {t("untracked files")}
                           </p>
                           <CopyHandover text={task.handover} />
                         </div>
@@ -979,21 +1035,21 @@ export default function ProjectReviewPanel({
                         >
                           <Field
                             name="summary"
-                            label="Completed work"
+                            label={t("Completed work")}
                             multiline
                             required
                           />
                           <Field
                             name="checks"
-                            label="Check notes and result location"
+                            label={t("Check notes and result location")}
                             multiline
                           />
                           <Field
                             name="blockers"
-                            label="Open issues and next steps"
+                            label={t("Open issues and next steps")}
                             multiline
                           />
-                          <Submit pending={pending}>Save handoff</Submit>
+                          <Submit pending={pending}>{t("Save handoff")}</Submit>
                         </ReviewForm>
                       )}
                     </section>
@@ -1012,7 +1068,7 @@ export default function ProjectReviewPanel({
 function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="info-row">
-      <dt className="text-muted">{label}</dt>
+      <dt className="text-muted">{t(label)}</dt>
       <dd className="break-all">{children}</dd>
     </div>
   );
@@ -1050,7 +1106,7 @@ function Field({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-xs text-muted">{label}</span>
+      <span className="block text-xs text-muted">{t(label)}</span>
       {multiline ? (
         <textarea
           name={name}
@@ -1073,11 +1129,13 @@ function Field({
 function ResultSelect({ allowNA = false }: { allowNA?: boolean }) {
   return (
     <label className="block space-y-1">
-      <span className="block text-xs text-muted">Result</span>
+      <span className="block text-xs text-muted">{t("Result")}</span>
       <Select name="status">
-        <option value="success">Verified</option>
-        <option value="failure">Failed</option>
-        {allowNA && <option value="not_applicable">Not applicable</option>}
+        <option value="success">{t("Verified")}</option>
+        <option value="failure">{t("Failed")}</option>
+        {allowNA && (
+          <option value="not_applicable">{t("Not applicable")}</option>
+        )}
       </Select>
     </label>
   );
@@ -1091,7 +1149,7 @@ function Submit({
 }) {
   return (
     <Button type="submit" disabled={!native || pending}>
-      {pending ? "Saving…" : children}
+      {pending ? t("Saving…") : children}
     </Button>
   );
 }
@@ -1111,11 +1169,11 @@ function CopyHandover({ text }: { text: string }) {
           }
         }}
       >
-        Copy handoff
+        {t("Copy handoff")}
       </Button>
       {notice && (
         <p role="status" className="text-xs text-muted">
-          {notice}
+          {t(notice)}
         </p>
       )}
       <pre tabIndex={0} className="source-panel max-h-80">
@@ -1132,8 +1190,8 @@ const areas: Record<string, string> = {
 };
 function coverageName(options: ReviewRequirement[], c: ReviewCoverage) {
   return (
-    options.find((r) => r.area === c.area && r.method === c.method)?.name ||
-    `${areas[c.area] || c.area} · ${c.method === "static" ? "Static checks" : c.method}`
+    t(options.find((r) => r.area === c.area && r.method === c.method)?.name) ||
+    `${t(areas[c.area] || c.area)} · ${c.method === "static" ? t("Static checks") : c.method}`
   );
 }
 function selectedCoverage(
@@ -1176,16 +1234,16 @@ function EnvironmentFields() {
     <>
       <Field
         name="environment"
-        label="Environment alias (e.g. local / staging / production)"
+        label={t("Environment alias (e.g. local / staging / production)")}
       />
       <Field
         name="target"
-        label="Target alias (service, database, or backup set)"
+        label={t("Target alias (service, database, or backup set)")}
       />
       <p className="text-xs leading-5 text-muted">
-        Required for database checks. Use aliases only, never connection
-        strings, passwords, or tokens. Matching content does not verify external
-        state.
+        {t(
+          "Required for database checks. Use aliases only, never connection strings, passwords, or tokens. Matching content does not verify external state.",
+        )}
       </p>
     </>
   );
@@ -1207,13 +1265,15 @@ function IssueList({
           key={issue.key || issue.kind}
           className="border-b border-line-subtle p-3 last:border-0"
         >
-          <h3 className="break-words text-sm font-medium">{issue.message}</h3>
+          <h3 className="break-words text-sm font-medium">
+            {t(issue.message)}
+          </h3>
           {issue.acknowledgement ? (
             <div className="mt-2 space-y-2">
               <p className="break-words text-xs text-muted">
                 {issue.acknowledgement.state === "retained"
-                  ? "Reviewed; kept"
-                  : "Defer"}{" "}
+                  ? t("Reviewed; kept")
+                  : t("Defer")}{" "}
                 · {issue.acknowledgement.reason} ·{" "}
                 {date(issue.acknowledgement.createdAt)}
               </p>
@@ -1221,7 +1281,7 @@ function IssueList({
                 disabled={!native || pending}
                 onClick={() => save(issue, "reopened", "")}
               >
-                Reopen reminder
+                {t("Reopen reminder")}
               </Button>
             </div>
           ) : (
@@ -1241,19 +1301,21 @@ function IssueList({
               }}
             >
               <label className="block space-y-1">
-                <span className="text-xs text-muted">Resolution status</span>
+                <span className="text-xs text-muted">
+                  {t("Resolution status")}
+                </span>
                 <Select name="state">
-                  <option value="retained">Reviewed; keep</option>
-                  <option value="later">Defer</option>
+                  <option value="retained">{t("Reviewed; keep")}</option>
+                  <option value="later">{t("Defer")}</option>
                 </Select>
               </label>
               <Field
                 name="reason"
-                label="Reason and follow-up"
+                label={t("Reason and follow-up")}
                 required
                 multiline
               />
-              <Submit pending={pending}>Save status</Submit>
+              <Submit pending={pending}>{t("Save status")}</Submit>
             </ReviewForm>
           )}
         </section>

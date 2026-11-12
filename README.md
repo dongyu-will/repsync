@@ -15,6 +15,7 @@ Manage local repositories, run existing development commands, and keep shared ru
 - **Services and pipelines:** manage development servers, ports, local CI/CD, logs, and GitHub Actions history.
 - **Git workspace:** inspect worktrees, branches, and stashes; preview cleanup and restore previous entries.
 - **Documents:** preview, edit, and search project Markdown files.
+- **Project map:** browse features and locate their implementations and entries. See the [map format](docs/usage.md#project-map).
 - **Shared resources:** maintain shared rules, reusable files, Skills, and Codex MCP configuration.
 - **Project context:** keep sourced memories, check records, and task handoffs alongside your projects.
 

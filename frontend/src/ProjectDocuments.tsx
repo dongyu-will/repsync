@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import { Service } from "./mygo";
@@ -24,14 +25,14 @@ export default function ProjectDocuments({
   const selected = names.includes(choice) ? choice : names[0];
   if (!selected)
     return (
-      <Empty icon="file" title="No Markdown documents found">
-        Only .md and .markdown files in the project root are listed.
+      <Empty icon="file" title={t("No Markdown documents found")}>
+        {t("Only .md and .markdown files in the project root are listed.")}
       </Empty>
     );
   return (
     <div className="grid h-full min-h-0 min-w-0 grid-cols-[144px_minmax(0,1fr)] gap-4">
       <nav
-        aria-label="Project documents"
+        aria-label={t("Project documents")}
         className="min-h-0 min-w-0 overflow-y-auto"
       >
         <ul className="space-y-1">
@@ -51,7 +52,7 @@ export default function ProjectDocuments({
       </nav>
       <section
         className="flex min-h-0 min-w-0 flex-col"
-        aria-label={`${selected} Documents`}
+        aria-label={t("{0} Documents", selected)}
       >
         <DocumentContent
           key={`${path}:${selected}`}
@@ -180,7 +181,7 @@ function DocumentContent({
   function reload() {
     if (
       dirty &&
-      !window.confirm("Discard unsaved changes and reload the file?")
+      !window.confirm(t("Discard unsaved changes and reload the file?"))
     )
       return;
     try {
@@ -203,12 +204,17 @@ function DocumentContent({
     return (
       <div role="alert" className="text-sm">
         <p className="mb-3 break-words text-removed">
-          Could not read {name}: {loadError}
+          {t("Could not read")} {name}: {t(loadError)}
         </p>
-        <Button onClick={reload}>Retry</Button>
+        <Button onClick={reload}>{t("Retry")}</Button>
       </div>
     );
-  if (!draft) return <p role="status">Loading {name}…</p>;
+  if (!draft)
+    return (
+      <p role="status">
+        {t("Loading")} {name}…
+      </p>
+    );
   return (
     <div
       className="flex min-h-0 flex-1 flex-col gap-3"
@@ -225,7 +231,7 @@ function DocumentContent({
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div
           role="group"
-          aria-label="Document view"
+          aria-label={t("Document view")}
           className="flex gap-1 rounded-md bg-surface p-1"
         >
           {(
@@ -240,19 +246,19 @@ function DocumentContent({
               onClick={() => setMode(value)}
               className={`min-h-7 rounded px-3 text-sm ${mode === value ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span role="status" className="text-xs text-muted">
-            {dirty ? "Unsaved" : notice}
+            {dirty ? t("Unsaved") : notice}
           </span>
           {mode === "preview" && <DocumentFind reader={reader} />}
           <button
             className="icon-button"
-            aria-label="Reload document"
-            title="Reload document"
+            aria-label={t("Reload document")}
+            title={t("Reload document")}
             disabled={busy}
             onClick={reload}
           >
@@ -265,23 +271,23 @@ function DocumentContent({
               onClick={() => void save()}
               title={
                 native
-                  ? "Save (⌘S / Ctrl+S)"
-                  : "File writes require the desktop app"
+                  ? t("Save (⌘S / Ctrl+S)")
+                  : t("File writes require the desktop app")
               }
             >
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("Saving…") : t("Save")}
             </Button>
           )}
         </div>
       </div>
       {(saveError || storageError) && (
         <p role="alert" className="shrink-0 break-words text-sm text-removed">
-          {saveError || storageError}
+          {t(saveError || storageError)}
         </p>
       )}
       {mode === "edit" ? (
         <textarea
-          aria-label={`${name} Editor`}
+          aria-label={t("{0} Editor", name)}
           spellCheck={false}
           autoCapitalize="none"
           autoCorrect="off"
@@ -294,7 +300,7 @@ function DocumentContent({
         <div
           ref={reader}
           role="region"
-          aria-label={`${name} Preview`}
+          aria-label={t("{0} Preview", name)}
           tabIndex={0}
           className="min-h-0 flex-1 overflow-auto rounded-md border border-line-subtle px-4 py-3"
         >
@@ -302,7 +308,7 @@ function DocumentContent({
             <Suspense
               fallback={
                 <p role="status" className="text-sm text-muted">
-                  Generating preview…
+                  {t("Generating preview…")}
                 </p>
               }
             >
@@ -315,7 +321,7 @@ function DocumentContent({
               </article>
             </Suspense>
           ) : (
-            <p className="text-sm text-muted">Empty file</p>
+            <p className="text-sm text-muted">{t("Empty file")}</p>
           )}
         </div>
       )}

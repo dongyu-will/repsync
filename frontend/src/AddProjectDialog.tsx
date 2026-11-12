@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./components";
 import { Desktop, Service, type CloneState, type Project } from "./mygo";
@@ -78,6 +79,8 @@ export default function AddProjectDialog({
     try {
       const selected = await Desktop.chooseDirectory(
         mode === "local" ? path : parent,
+        t("Choose project folder"),
+        t("Choose folder"),
       );
       if (selected) {
         if (mode === "local") setPath(selected);
@@ -134,11 +137,11 @@ export default function AddProjectDialog({
     >
       <form onSubmit={submit} className="space-y-4 p-5">
         <h2 id="add-project-title" className="text-xl font-semibold">
-          Add project
+          {t("Add project")}
         </h2>
         <div
           role="group"
-          aria-label="Project source"
+          aria-label={t("Project source")}
           className="flex gap-1 rounded-md bg-surface p-1"
         >
           {(
@@ -159,17 +162,17 @@ export default function AddProjectDialog({
               }}
               className={`min-h-8 flex-1 rounded px-3 text-sm disabled:opacity-50 ${mode === value ? "bg-white font-medium text-ink" : "text-muted"}`}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         {mode === "local" ? (
           <>
             <p className="text-sm text-muted">
-              Choose an existing project folder to add and open it.
+              {t("Choose an existing project folder to add and open it.")}
             </p>
             <label className="block text-sm font-medium" htmlFor="project-path">
-              Project folder
+              {t("Project folder")}
             </label>
             <div className="flex gap-2">
               <input
@@ -186,18 +189,19 @@ export default function AddProjectDialog({
                 className="h-9 min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
               />
               <Button type="button" disabled={busy} onClick={browse}>
-                Choose folder
+                {t("Choose folder")}
               </Button>
             </div>
           </>
         ) : (
           <>
             <p className="text-sm text-muted">
-              Clone and register a repository using your existing Git
-              credentials or SSH keys.
+              {t(
+                "Clone and register a repository using your existing Git credentials or SSH keys.",
+              )}
             </p>
             <label className="block text-sm font-medium" htmlFor="clone-remote">
-              Repository URL
+              {t("Repository URL")}
             </label>
             <input
               id="clone-remote"
@@ -208,11 +212,11 @@ export default function AddProjectDialog({
               disabled={busy}
               value={remote}
               onChange={(event) => setRemote(event.target.value)}
-              placeholder="https://github.com/owner/repo.git or git@…"
+              placeholder={t("https://github.com/owner/repo.git or git@…")}
               className="h-9 w-full rounded-md border border-control px-3 text-sm"
             />
             <label className="block text-sm font-medium" htmlFor="clone-parent">
-              Save to
+              {t("Save to")}
             </label>
             <div className="flex gap-2">
               <input
@@ -228,11 +232,11 @@ export default function AddProjectDialog({
                 className="h-9 min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
               />
               <Button type="button" disabled={busy} onClick={browse}>
-                Choose folder
+                {t("Choose folder")}
               </Button>
             </div>
             <label className="block text-sm font-medium" htmlFor="clone-name">
-              Folder name
+              {t("Folder name")}
             </label>
             <input
               id="clone-name"
@@ -255,33 +259,33 @@ export default function AddProjectDialog({
             role="alert"
             className="break-words text-sm leading-5 text-red-800"
           >
-            {error || clone?.error}
+            {t(error || clone?.error)}
           </p>
         )}
         {clone && (
-          <section aria-label="Clone progress" className="space-y-2">
+          <section aria-label={t("Clone progress")} className="space-y-2">
             <p role="status" className="text-sm">
               {running
                 ? stopping
-                  ? "Stopping clone…"
-                  : "Cloning repository…"
+                  ? t("Stopping clone…")
+                  : t("Cloning repository…")
                 : clone.status === "success"
-                  ? "Clone complete"
-                  : "Clone incomplete"}
+                  ? t("Clone complete")
+                  : t("Clone incomplete")}
             </p>
             {clone.log && (
               <pre
                 className="source-panel max-h-40"
                 tabIndex={0}
                 role="region"
-                aria-label="Clone output"
+                aria-label={t("Clone output")}
               >
                 {clone.log.replace(/\r/g, "\n")}
               </pre>
             )}
             {!running && (
               <p className="break-all text-xs text-muted">
-                Destination: {clone.destination}
+                {t("Destination:")} {clone.destination}
               </p>
             )}
             {!running && clone.cloned && (
@@ -294,18 +298,18 @@ export default function AddProjectDialog({
                   setError("");
                 }}
               >
-                Register cloned folder
+                {t("Register cloned folder")}
               </Button>
             )}
           </section>
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" disabled={busy} onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           {running ? (
             <Button type="button" disabled={stopping} onClick={stop}>
-              {stopping ? "Stopping…" : "Stop cloning"}
+              {stopping ? t("Stopping…") : t("Stop cloning")}
             </Button>
           ) : (
             <Button
@@ -319,10 +323,10 @@ export default function AddProjectDialog({
               }
             >
               {saving
-                ? "Working…"
+                ? t("Working…")
                 : mode === "local"
-                  ? "Add project"
-                  : "Clone and add"}
+                  ? t("Add project")
+                  : t("Clone and add")}
             </Button>
           )}
         </div>

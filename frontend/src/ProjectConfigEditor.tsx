@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
@@ -50,7 +51,10 @@ export default function ProjectConfigEditor({
 }) {
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
-  const title = `Configure ${section === "services" ? "services" : "pipelines"}`;
+  const title = t(
+    "Configure {0}",
+    section === "services" ? t("services") : t("pipelines"),
+  );
   return (
     <>
       <Button
@@ -61,11 +65,11 @@ export default function ProjectConfigEditor({
           setOpen(true);
         }}
       >
-        {title}
+        {t(title)}
       </Button>
       {notice && (
         <span role="status" className="text-xs text-muted">
-          {notice}
+          {t(notice)}
         </span>
       )}
       {open && (
@@ -251,7 +255,7 @@ function CommandDialog({
       >
         <div>
           <h2 id="command-dialog-title" className="text-xl font-semibold">
-            {title}
+            {t(title)}
           </h2>
           <p className="mt-1 truncate text-xs text-muted" title={path}>
             {path}
@@ -260,18 +264,22 @@ function CommandDialog({
         <div className="-mx-1 min-h-0 space-y-4 overflow-y-auto px-1 pb-1 pt-4">
           {loading ? (
             <p role="status" className="text-sm text-muted">
-              Loading…
+              {t("Loading…")}
             </p>
           ) : (
             config && (
               <fieldset disabled={busy} className="min-w-0 space-y-4">
                 <p className="text-sm leading-5 text-muted">
-                  Ask AI to configure existing{" "}
-                  {services ? "start" : "check or release"} commands, or edit
-                  them here.
+                  {services
+                    ? t(
+                        "Ask AI to configure existing start commands, or edit them here.",
+                      )
+                    : t(
+                        "Ask AI to configure existing check or release commands, or edit them here.",
+                      )}
                 </p>
                 <label className="block space-y-1.5 text-sm font-medium">
-                  {services ? "Service" : "Pipelines"}
+                  {services ? t("Service") : t("Pipelines")}
                   <Select
                     autoFocus
                     className="w-full"
@@ -288,7 +296,7 @@ function CommandDialog({
                         kind !== (item && "kind" in item ? item.kind : "ci");
                       if (
                         !changed ||
-                        window.confirm("Discard unsaved changes and switch?")
+                        window.confirm(t("Discard unsaved changes and switch?"))
                       )
                         selectItem(event.target.value, config);
                     }}
@@ -299,26 +307,27 @@ function CommandDialog({
                       </option>
                     ))}
                     <option value="">
-                      Add{services ? "Service" : "Pipelines"}
+                      {t("Add")}
+                      {services ? t("Service") : t("Pipelines")}
                     </option>
                   </Select>
                 </label>
                 <label className="block space-y-1.5 text-sm font-medium">
-                  Name
+                  {t("Name")}
                   <input
                     required
                     className={inputClass}
                     placeholder={
                       services
-                        ? "e.g. Frontend development"
-                        : "e.g. Project checks"
+                        ? t("e.g. Frontend development")
+                        : t("e.g. Project checks")
                     }
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                   />
                 </label>
                 <label className="block space-y-1.5 text-sm font-medium">
-                  Command
+                  {t("Command")}
                   <textarea
                     required
                     rows={3}
@@ -331,17 +340,17 @@ function CommandDialog({
                 </label>
                 <div className="mt-3 space-y-3">
                   <label className="block space-y-1.5 text-sm font-medium">
-                    Working directory
+                    {t("Working directory")}
                     <input
                       className={inputClass}
-                      placeholder="Leave blank for the project root"
+                      placeholder={t("Leave blank for the project root")}
                       value={cwd}
                       onChange={(event) => setCwd(event.target.value)}
                     />
                   </label>
                   {services ? (
                     <label className="block space-y-1.5 text-sm font-medium">
-                      Page URL
+                      {t("Page URL")}
                       <input
                         type={
                           config?.services.find((entry) => entry.id === id)
@@ -350,21 +359,21 @@ function CommandDialog({
                             : "url"
                         }
                         className={inputClass}
-                        placeholder="Optional, e.g. http://localhost:5173"
+                        placeholder={t("Optional, e.g. http://localhost:5173")}
                         value={url}
                         onChange={(event) => setUrl(event.target.value)}
                       />
                     </label>
                   ) : (
                     <label className="block space-y-1.5 text-sm font-medium">
-                      Purpose
+                      {t("Purpose")}
                       <Select
                         className="w-full"
                         value={kind}
                         onChange={(event) => setKind(event.target.value)}
                       >
-                        <option value="ci">Check</option>
-                        <option value="cd">Release</option>
+                        <option value="ci">{t("Check")}</option>
+                        <option value="cd">{t("Release")}</option>
                       </Select>
                     </label>
                   )}
@@ -375,7 +384,7 @@ function CommandDialog({
           {error && (
             <div className="space-y-2">
               <p role="alert" className="break-words text-sm text-removed">
-                {error}
+                {t(error)}
               </p>
               <button
                 type="button"
@@ -386,7 +395,7 @@ function CommandDialog({
                   setRevision((value) => value + 1);
                 }}
               >
-                Reload
+                {t("Reload")}
               </button>
             </div>
           )}
@@ -400,7 +409,7 @@ function CommandDialog({
                 disabled={!native || !config || busy || loading}
                 onClick={() => void save(true)}
               >
-                Remove
+                {t("Remove")}
               </button>
             )}
           </div>
@@ -410,7 +419,7 @@ function CommandDialog({
               disabled={busy}
               onClick={() => dialog.current?.close()}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               primary
@@ -424,7 +433,7 @@ function CommandDialog({
                 !command.trim()
               }
             >
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("Saving…") : t("Save")}
             </Button>
           </div>
         </div>

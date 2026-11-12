@@ -1,3 +1,4 @@
+import { formatMessage, getLocale, t } from "./i18n";
 import ActionDialog from "./ActionDialog";
 import { useEffect, useState } from "react";
 import { isMyGo } from "mygo-runtime";
@@ -104,7 +105,12 @@ export default function SharedRules({
       await Service.applyUpdate(preview.token);
       setPreview(null);
       setHistoryRevision((value) => value + 1);
-      setNotice(`Updated ${preview.project.name}   AGENTS.md, Backup saved.`);
+      setNotice(
+        formatMessage(
+          "Updated {0}   AGENTS.md, Backup saved.",
+          preview.project.name,
+        ),
+      );
       onUpdated?.();
     } catch (error) {
       setError(String(error));
@@ -122,7 +128,9 @@ export default function SharedRules({
     setPreview(null);
     try {
       await Service.restoreUpdate(record.id);
-      setNotice(`Restored ${record.project.name} Previous AGENTS.md.`);
+      setNotice(
+        formatMessage("Restored {0} Previous AGENTS.md.", record.project.name),
+      );
       onUpdated?.();
     } catch (error) {
       setError(String(error));
@@ -138,11 +146,13 @@ export default function SharedRules({
         {showProjectRules && (
           <ProjectRules path={project.path} onUpdated={onUpdated} />
         )}
-        <section aria-label="Shared rules" className="space-y-3">
+        <section aria-label={t("Shared rules")} className="space-y-3">
           <p className="text-sm text-muted">
-            Connect a shared rules source to preview and apply project updates.
+            {t(
+              "Connect a shared rules source to preview and apply project updates.",
+            )}
           </p>
-          <Button disabled>Preview diff</Button>
+          <Button disabled>{t("Preview diff")}</Button>
         </section>
       </div>
     );
@@ -150,12 +160,12 @@ export default function SharedRules({
     return (
       <div className="space-y-5">
         {showProjectRules && <ProjectRules />}
-        <Empty icon="layers" title="No shared rules connected">
-          Connect a rules file to preview changes for each project.
+        <Empty icon="layers" title={t("No shared rules connected")}>
+          {t("Connect a rules file to preview changes for each project.")}
         </Empty>
       </div>
     );
-  if (!ready) return <p role="status">Loading shared rules…</p>;
+  if (!ready) return <p role="status">{t("Loading shared rules…")}</p>;
 
   return (
     <div className="space-y-5">
@@ -167,21 +177,22 @@ export default function SharedRules({
           role="alert"
           className="break-words rounded-md bg-red-50 p-3 text-sm text-red-800"
         >
-          {error}
+          {t(error)}
         </p>
       )}
       {notice && (
         <p role="status" className="rounded-md bg-selection p-3 text-sm">
-          {notice}
+          {t(notice)}
         </p>
       )}
       {!project && (
-        <section aria-label="Shared rules source" className="space-y-3">
+        <section aria-label={t("Shared rules source")} className="space-y-3">
           <div className="section-heading">
-            <h2>Shared rules source</h2>
+            <h2>{t("Shared rules source")}</h2>
             <p>
-              Choose a shared rules Markdown file. Preview each project before
-              syncing to AGENTS.md shared block.
+              {t(
+                "Choose a shared rules Markdown file. Preview each project before syncing to AGENTS.md shared block.",
+              )}
             </p>
           </div>
           <form onSubmit={connect} className="space-y-3">
@@ -189,7 +200,7 @@ export default function SharedRules({
               htmlFor="shared-source"
               className="block text-sm font-medium"
             >
-              Shared rules file
+              {t("Shared rules file")}
             </label>
             <div className="flex gap-2">
               <input
@@ -212,7 +223,7 @@ export default function SharedRules({
                 primary
                 disabled={!!busy || !(draft ?? source?.path ?? "").trim()}
               >
-                {busy === "connect" ? "Connecting…" : "Connect file"}
+                {busy === "connect" ? t("Connecting…") : t("Connect file")}
               </Button>
             </div>
           </form>
@@ -220,7 +231,7 @@ export default function SharedRules({
             <>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="text-muted">
-                  Content version{" "}
+                  {t("Content version")}{" "}
                   <code title={source.version}>
                     {source.version.slice(0, 12)}
                   </code>
@@ -232,16 +243,16 @@ export default function SharedRules({
         </section>
       )}
       <section
-        aria-label={project ? "Shared rules" : "Project rule updates"}
+        aria-label={project ? t("Shared rules") : t("Project rule updates")}
         className={`space-y-4 ${project ? "" : "border-t border-line pt-5"}`}
       >
         <div className="section-heading">
-          {!project && <h2>Project rule updates</h2>}
+          {!project && <h2>{t("Project rule updates")}</h2>}
           <div className="space-y-3">
             <p className="mt-2 leading-5">
-              Project content outside the shared block is preserved. Source and
-              project files are rechecked before applying; backups stay on this
-              device.
+              {t(
+                "Project content outside the shared block is preserved. Source and project files are rechecked before applying; backups stay on this device.",
+              )}
             </p>
           </div>
         </div>
@@ -249,13 +260,17 @@ export default function SharedRules({
           (project ? (
             <>
               <p className="text-sm text-muted">
-                No shared rules source connected.
+                {t("No shared rules source connected.")}
               </p>
-              <Button onClick={onOpenShared}>Connect shared rules</Button>
+              <Button onClick={onOpenShared}>
+                {t("Connect shared rules")}
+              </Button>
             </>
           ) : (
             <p className="text-sm text-muted">
-              Connect a shared rules file above to preview project updates.
+              {t(
+                "Connect a shared rules file above to preview project updates.",
+              )}
             </p>
           ))}
         {projects.length ? (
@@ -282,7 +297,7 @@ export default function SharedRules({
                       className="mt-1 text-xs text-muted"
                       title={source.version}
                     >
-                      Source version {source.version.slice(0, 12)}
+                      {t("Source version")} {source.version.slice(0, 12)}
                     </p>
                   )}
                 </div>
@@ -291,7 +306,7 @@ export default function SharedRules({
                   className="min-w-0 flex-1 text-sm font-medium"
                   htmlFor="update-project"
                 >
-                  Target project
+                  {t("Target project")}
                   <Select
                     id="update-project"
                     className="mt-2 w-full"
@@ -316,25 +331,27 @@ export default function SharedRules({
                 onClick={previewUpdate}
                 disabled={!!busy || !source?.path}
               >
-                {busy === "preview" ? "Generating preview…" : "Preview diff"}
+                {busy === "preview"
+                  ? t("Generating preview…")
+                  : t("Preview diff")}
               </Button>
             </div>
             {project && source?.path && <RuleContent source={source} />}
             {preview && (
-              <section aria-label="Update preview" className="space-y-3">
+              <section aria-label={t("Update preview")} className="space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <h3 className="min-w-0 flex-1 text-sm font-semibold">
                     {preview.project.name} / AGENTS.md
                   </h3>
                   <span className="text-xs text-muted" title={preview.version}>
-                    Source version {preview.version.slice(0, 12)}
+                    {t("Source version")} {preview.version.slice(0, 12)}
                   </span>
                   <Button
                     primary
                     onClick={apply}
                     disabled={!!busy || !preview.changed}
                   >
-                    {busy === "apply" ? "Applying…" : "Apply update"}
+                    {busy === "apply" ? t("Applying…") : t("Apply update")}
                   </Button>
                 </div>
                 {preview.changed ? (
@@ -342,7 +359,7 @@ export default function SharedRules({
                     className="source-panel"
                     tabIndex={0}
                     role="region"
-                    aria-label="AGENTS.md Update diff"
+                    aria-label={t("AGENTS.md Update diff")}
                   >
                     {preview.diff.split("\n").map((line, index) => (
                       <span
@@ -355,11 +372,11 @@ export default function SharedRules({
                   </pre>
                 ) : (
                   <p role="status" className="text-sm text-muted">
-                    Shared rules are up to date.
+                    {t("Shared rules are up to date.")}
                   </p>
                 )}
                 <ActionDialog
-                  title="Preserved project content"
+                  title={t("Preserved project content")}
                   busy={!!busy}
                   error={error}
                   notice={notice}
@@ -368,20 +385,20 @@ export default function SharedRules({
                     <pre
                       className="source-panel mt-3"
                       tabIndex={0}
-                      aria-label="Project content outside the shared block"
+                      aria-label={t("Project content outside the shared block")}
                     >
                       {preview.projectContent}
                     </pre>
                   ) : (
                     <p className="mt-2 text-sm text-muted">
-                      No project content outside the shared block.
+                      {t("No project content outside the shared block.")}
                     </p>
                   )}
                 </ActionDialog>
               </section>
             )}
             <ActionDialog
-              title="Update history and restore"
+              title={t("Update history and restore")}
               busy={!!busy}
               error={error}
               notice={notice}
@@ -397,8 +414,8 @@ export default function SharedRules({
             </ActionDialog>
           </>
         ) : (
-          <Empty title="No projects added">
-            Add a local project in the sidebar to preview rule updates.
+          <Empty title={t("No projects added")}>
+            {t("Add a local project in the sidebar to preview rule updates.")}
           </Empty>
         )}
       </section>
@@ -453,19 +470,19 @@ function Adoptions({
   return (
     <section>
       <h3 className="break-words text-sm font-medium">
-        {project ? "Rule adoption" : "Adoption by project"}
+        {project ? t("Rule adoption") : t("Adoption by project")}
       </h3>
       <div className="mt-3 space-y-3">
         <Button onClick={() => setRevision((value) => value + 1)}>
-          Refresh adoption status
+          {t("Refresh adoption status")}
         </Button>
         {error ? (
           <p role="alert" className="break-words text-sm text-red-800">
-            {error}
+            {t(error)}
           </p>
         ) : !selected ? (
           <p role="status" className="text-sm text-muted">
-            Loading adoption status…
+            {t("Loading adoption status…")}
           </p>
         ) : (
           <div className="grouped-list">
@@ -492,10 +509,12 @@ function Adoptions({
                     {item.project.path}
                   </p>
                   <p className="mt-1 break-all text-xs text-muted">
-                    Source {item.sourceVersion.slice(0, 12) || "Unknown"} ·
-                    Adoption {item.adoptedVersion.slice(0, 12) || "Unknown"}
+                    {t("Source")}{" "}
+                    {item.sourceVersion.slice(0, 12) || t("Unknown")}{" "}
+                    {t("· Adoption")}{" "}
+                    {item.adoptedVersion.slice(0, 12) || t("Unknown")}
                     {item.hasProjectContent
-                      ? " · Preserve project content"
+                      ? t(" · Preserve project content")
                       : ""}
                   </p>
                   {item.error && (
@@ -503,11 +522,11 @@ function Adoptions({
                       role="alert"
                       className="mt-1 break-words text-xs text-red-800"
                     >
-                      {item.error}
+                      {t(item.error)}
                     </p>
                   )}
                 </div>
-                <span>{adoptionStates[item.status] || item.status}</span>
+                <span>{t(adoptionStates[item.status] || item.status)}</span>
               </div>
             ))}
           </div>
@@ -520,14 +539,14 @@ function Adoptions({
 function RuleContent({ source }: { source: SharedSource }) {
   return (
     <ActionDialog
-      title="Shared rules source"
-      trigger="View shared rules source"
+      title={t("Shared rules source")}
+      trigger={t("View shared rules source")}
     >
       <pre
         className="source-panel mt-3"
         tabIndex={0}
         role="region"
-        aria-label="Shared rules source"
+        aria-label={t("Shared rules source")}
       >
         {source.content}
       </pre>
@@ -567,18 +586,18 @@ function History({
     };
   }, [path]);
   return (
-    <section aria-label="Update history">
+    <section aria-label={t("Update history")}>
       {error ? (
         <p role="alert" className="break-words text-sm text-red-800">
-          Could not load update history: {error}
+          {t("Could not load update history:")} {t(error)}
         </p>
       ) : !records ? (
         <p role="status" className="text-sm text-muted">
-          Loading history…
+          {t("Loading history…")}
         </p>
       ) : !records.length ? (
         <p className="text-sm text-muted">
-          No update history for this project yet.
+          {t("No update history for this project yet.")}
         </p>
       ) : (
         <div className="grouped-list">
@@ -589,20 +608,21 @@ function History({
             >
               <div className="min-w-0 flex-1">
                 <time dateTime={record.createdAt}>
-                  {new Date(record.createdAt).toLocaleString()}
+                  {new Date(record.createdAt).toLocaleString(getLocale())}
                 </time>
                 <p className="mt-1 break-all text-xs text-muted">
-                  AGENTS.md · Source version {record.version.slice(0, 12)}
+                  {t("AGENTS.md · Source version")}{" "}
+                  {record.version.slice(0, 12)}
                 </p>
               </div>
               <span className="text-muted">
-                {historyStates[record.state] || record.state}
+                {t(historyStates[record.state] || record.state)}
               </span>
               <Button
                 disabled={busy || record.state !== "applied"}
                 onClick={() => onRestore(record)}
               >
-                Restore previous content
+                {t("Restore previous content")}
               </Button>
             </div>
           ))}

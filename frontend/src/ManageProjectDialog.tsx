@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./components";
 import { Desktop, Service, type Project } from "./mygo";
@@ -39,7 +40,11 @@ export default function ManageProjectDialog({
     setBusy(true);
     setError("");
     try {
-      const selected = await Desktop.chooseDirectory(path);
+      const selected = await Desktop.chooseDirectory(
+        path,
+        t("Choose project folder"),
+        t("Choose folder"),
+      );
       if (selected) setPath(selected);
     } catch (error) {
       setError(String(error));
@@ -67,14 +72,15 @@ export default function ManageProjectDialog({
         }}
       >
         <h2 id="manage-project-title" className="text-xl font-semibold">
-          Manage {project.name}
+          {t("Manage")} {project.name}
         </h2>
         <p className="text-sm leading-6 text-muted">
-          Update the path when a project moves. Removing a project keeps its
-          files, logs, and backups.
+          {t(
+            "Update the path when a project moves. Removing a project keeps its files, logs, and backups.",
+          )}
         </p>
         <label htmlFor="relocate-path" className="block text-sm font-medium">
-          Project folder
+          {t("Project folder")}
         </label>
         <div className="flex gap-2">
           <input
@@ -90,19 +96,20 @@ export default function ManageProjectDialog({
             className="h-9 min-w-0 flex-1 rounded-md border border-control px-3 text-sm"
           />
           <Button type="button" disabled={busy} onClick={browse}>
-            Choose folder
+            {t("Choose folder")}
           </Button>
         </div>
         <p className="text-xs leading-5 text-muted">
-          Updating the path does not move files. History stays with the original
-          path.
+          {t(
+            "Updating the path does not move files. History stays with the original path.",
+          )}
         </p>
         {error && (
           <p
             role="alert"
             className="break-words text-sm leading-6 text-red-800"
           >
-            {error}
+            {t(error)}
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -112,17 +119,17 @@ export default function ManageProjectDialog({
             disabled={busy}
             onClick={() => void change(true)}
           >
-            Remove registration
+            {t("Remove registration")}
           </Button>
           <Button type="button" disabled={busy} onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button
             primary
             type="submit"
             disabled={busy || !path.trim() || path.trim() === project.path}
           >
-            {busy ? "Working…" : "Save path"}
+            {busy ? t("Working…") : t("Save path")}
           </Button>
         </div>
       </form>

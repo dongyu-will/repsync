@@ -19,6 +19,82 @@ export interface AIResource {
   reason: string;
   tasks: string;
   projects: string[];
+  revision: string;
+  note?: AIResourceNote;
+  assessment?: AIResourceAssessment;
+}
+
+export interface AIResourceAssessment {
+  resourceId: string;
+  resourceRevision: string;
+  contextVersion: string;
+  candidate?: AISkillCandidate;
+  verdict: string;
+  summary: string;
+  fit: string;
+  adoptionCost: string;
+  coverage: string;
+  findings: AIResourceFinding[];
+  sources: string[];
+  checkedAt: string;
+  scope: string;
+  recordedAt: string;
+  version: string;
+  stale: boolean;
+}
+
+export interface AIResourceAssessmentInput {
+  resourceId: string;
+  resourceRevision: string;
+  contextVersion: string;
+  candidate?: AISkillCandidate;
+  verdict: string;
+  summary: string;
+  fit: string;
+  adoptionCost: string;
+  coverage: string;
+  findings: AIResourceFinding[];
+  sources: string[];
+  checkedAt: string;
+  expectedVersion: string;
+}
+
+export interface AIResourceFinding {
+  kind: string;
+  resource: string;
+  evidence: string;
+  recommendation: string;
+  sources: string[];
+}
+
+export interface AIResourceNote {
+  resourceId: string;
+  resourceRevision: string;
+  installedVersion: string;
+  latestVersion: string;
+  updateStatus: string;
+  checkedAt: string;
+  summary: string;
+  changes: string;
+  manual: string;
+  sources: string[];
+  recordedAt: string;
+  version: string;
+  stale: boolean;
+}
+
+export interface AIResourceNoteInput {
+  resourceId: string;
+  resourceRevision: string;
+  installedVersion: string;
+  latestVersion: string;
+  updateStatus: string;
+  checkedAt: string;
+  summary: string;
+  changes: string;
+  manual: string;
+  sources: string[];
+  expectedVersion: string;
 }
 
 export interface AIResourceReport {
@@ -26,6 +102,15 @@ export interface AIResourceReport {
   issues: string[];
   checkedAt: string;
   scope: string;
+  contextVersion: string;
+}
+
+export interface AISkillCandidate {
+  name: string;
+  source: string;
+  sourceVersion: string;
+  description: string;
+  installedResourceId?: string;
 }
 
 export interface AIUsageCoverage {
@@ -486,6 +571,37 @@ export interface ProjectDiagnosis {
   resources: ResourceAdoption[];
   issues: DiagnosisIssue[];
   aiResources: AIResource[];
+}
+
+export interface ProjectMap {
+  file: string;
+  exists: boolean;
+  modules: ProjectMapModule[];
+}
+
+export interface ProjectMapImplementation {
+  name: string;
+  source: ProjectMapReference;
+  entry?: ProjectMapReference;
+}
+
+export interface ProjectMapModule {
+  id: string;
+  name: string;
+  summary?: string;
+  overlap?: string;
+  implementations: ProjectMapImplementation[];
+}
+
+/**
+ * ProjectMapReference locates a declared implementation or entry in the current files.
+ * Line and Issue are recomputed on every read, never trusted from the document.
+ */
+export interface ProjectMapReference {
+  path: string;
+  find?: string;
+  line?: number;
+  issue?: string;
 }
 
 export interface ProjectMemory {
@@ -1009,6 +1125,14 @@ export const Service = {
   projectConfiguration(path: string): Promise<ProjectConfig> {
     return call("Service.ProjectConfiguration", path);
   },
+  /**
+   * ProjectMap reads a feature-first map maintained by the project's existing AI tools.
+   * It checks cited files and unique entry text; it does not infer semantic duplicates
+   * or claim that a located entry is reachable at runtime.
+   */
+  projectMap(path: string): Promise<ProjectMap> {
+    return call("Service.ProjectMap", path);
+  },
   /** ProjectMemories lists the registered project's records, including pending and archived ones. */
   projectMemories(path: string): Promise<ProjectMemory[]> {
     return call("Service.ProjectMemories", path);
@@ -1023,6 +1147,17 @@ export const Service = {
   /** ReadDocument reads a root Markdown file within a registered project, on demand. */
   readDocument(path: string, name: string): Promise<string> {
     return call("Service.ReadDocument", path, name);
+  },
+  /** RecordAIResourceAssessment saves a candidate or installed-resource assessment without installing anything. */
+  recordAIResourceAssessment(path: string, input: AIResourceAssessmentInput): Promise<AIResourceAssessment> {
+    return call("Service.RecordAIResourceAssessment", path, input);
+  },
+  /**
+   * RecordAIResourceNote saves an AI report against the inventoried resource snapshot.
+   * Installation, upstream checks and verification remain with the existing AI tools.
+   */
+  recordAIResourceNote(path: string, input: AIResourceNoteInput): Promise<AIResourceNote> {
+    return call("Service.RecordAIResourceNote", path, input);
   },
   /** RecordProjectMemory saves a user-entered record as confirmed. */
   recordProjectMemory(path: string, input: ProjectMemoryInput): Promise<ProjectMemory> {
@@ -1189,7 +1324,7 @@ export const Service = {
 
 /** Desktop provides the system directory picker for project registration and cloning. */
 export const Desktop = {
-  chooseDirectory(defaultPath: string): Promise<string> {
-    return call("Desktop.ChooseDirectory", defaultPath);
+  chooseDirectory(defaultPath: string, title: string, buttonLabel: string): Promise<string> {
+    return call("Desktop.ChooseDirectory", defaultPath, title, buttonLabel);
   },
 } as const;

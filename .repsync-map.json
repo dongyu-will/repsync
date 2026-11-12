@@ -1,0 +1,272 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "project-registration",
+      "name": "项目接入",
+      "summary": "添加本地项目、克隆仓库和修复登记路径",
+      "implementations": [
+        {
+          "name": "添加项目",
+          "source": {
+            "path": "frontend/src/AddProjectDialog.tsx",
+            "find": "export default function AddProjectDialog"
+          },
+          "entry": {
+            "path": "frontend/src/App.tsx",
+            "find": "<AddProjectDialog"
+          }
+        },
+        {
+          "name": "管理登记",
+          "source": {
+            "path": "frontend/src/ManageProjectDialog.tsx",
+            "find": "export default function ManageProjectDialog"
+          },
+          "entry": {
+            "path": "frontend/src/App.tsx",
+            "find": "<ManageProjectDialog"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-services",
+      "name": "本地服务",
+      "summary": "查看服务状态，启动、停止和读取日志",
+      "implementations": [
+        {
+          "name": "服务列表与操作",
+          "source": {
+            "path": "frontend/src/ProjectCommands.tsx",
+            "find": "export default function ProjectCommands"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<ProjectCommands"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pipelines",
+      "name": "CI/CD",
+      "summary": "运行本地检查和发布命令，查看远程工作流",
+      "implementations": [
+        {
+          "name": "本地流水线",
+          "source": {
+            "path": "frontend/src/ProjectPipelines.tsx",
+            "find": "function LocalPipelines("
+          },
+          "entry": {
+            "path": "frontend/src/ProjectPipelines.tsx",
+            "find": "<LocalPipelines"
+          }
+        },
+        {
+          "name": "GitHub Actions",
+          "source": {
+            "path": "frontend/src/ProjectPipelines.tsx",
+            "find": "function RemotePipelines("
+          },
+          "entry": {
+            "path": "frontend/src/ProjectPipelines.tsx",
+            "find": "<RemotePipelines"
+          }
+        }
+      ]
+    },
+    {
+      "id": "git-workspace",
+      "name": "工作树与分支",
+      "summary": "查看工作树和本地分支，预览清理并按记录恢复",
+      "implementations": [
+        {
+          "name": "Git 工作区",
+          "source": {
+            "path": "frontend/src/ProjectGit.tsx",
+            "find": "export default function ProjectGit"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<ProjectGit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stash",
+      "name": "Stash 待处理内容",
+      "summary": "审查暂存的改动，应用到当前工作树并保留原记录",
+      "implementations": [
+        {
+          "name": "Stash 列表与内容",
+          "source": {
+            "path": "frontend/src/ProjectStashes.tsx",
+            "find": "export default function ProjectStashes"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectGit.tsx",
+            "find": "<ProjectStashes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "project-rules",
+      "name": "项目规则",
+      "summary": "设置规则执行强度和例外，检查代码并生成规范说明",
+      "implementations": [
+        {
+          "name": "项目规则面板",
+          "source": {
+            "path": "frontend/src/ProjectRules.tsx",
+            "find": "export default function ProjectRules"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<ProjectRules"
+          }
+        }
+      ]
+    },
+    {
+      "id": "shared-resources",
+      "name": "公共规范与共享文件",
+      "summary": "维护公共来源，审查项目采用情况与更新差异",
+      "implementations": [
+        {
+          "name": "公共规范",
+          "source": {
+            "path": "frontend/src/SharedRules.tsx",
+            "find": "export default function SharedRules"
+          },
+          "entry": {
+            "path": "frontend/src/SharedWorkspace.tsx",
+            "find": "<SharedRules"
+          }
+        },
+        {
+          "name": "共享文件",
+          "source": {
+            "path": "frontend/src/SharedFiles.tsx",
+            "find": "export default function SharedFiles"
+          },
+          "entry": {
+            "path": "frontend/src/SharedWorkspace.tsx",
+            "find": "<SharedFiles"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ai-resources",
+      "name": "AI 资源",
+      "summary": "盘点 Skill、MCP 和 CLI，查看候选评估、冲突依据、使用证据与维护说明",
+      "implementations": [
+        {
+          "name": "全局与项目资源视图",
+          "source": {
+            "path": "frontend/src/AIResources.tsx",
+            "find": "export default function AIResources"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<AIResources"
+          }
+        }
+      ]
+    },
+    {
+      "id": "project-memory",
+      "name": "项目记忆",
+      "summary": "保留有来源的项目事实，并从已有 AI 会话提炼待确认记忆",
+      "implementations": [
+        {
+          "name": "记忆记录与确认",
+          "source": {
+            "path": "frontend/src/ProjectMemories.tsx",
+            "find": "export default function ProjectMemories"
+          },
+          "entry": {
+            "path": "frontend/src/AIResources.tsx",
+            "find": "<ProjectMemories"
+          }
+        }
+      ]
+    },
+    {
+      "id": "documents",
+      "name": "项目文档",
+      "summary": "阅读、搜索和编辑项目 Markdown 文档",
+      "implementations": [
+        {
+          "name": "文档列表与阅读器",
+          "source": {
+            "path": "frontend/src/ProjectDocuments.tsx",
+            "find": "export default function ProjectDocuments"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<ProjectDocuments"
+          }
+        }
+      ]
+    },
+    {
+      "id": "project-review",
+      "name": "项目收尾与交接",
+      "summary": "查看待处理事项，记录检查、交付阶段和任务交接",
+      "implementations": [
+        {
+          "name": "收尾检查面板",
+          "source": {
+            "path": "frontend/src/ProjectReview.tsx",
+            "find": "export default function ProjectReviewPanel"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<ProjectReviewPanel"
+          }
+        }
+      ]
+    },
+    {
+      "id": "project-map",
+      "name": "项目地图",
+      "summary": "按功能查看对应实现、入口和需要核对的重复线索",
+      "implementations": [
+        {
+          "name": "功能模块地图",
+          "source": {
+            "path": "frontend/src/ProjectMap.tsx",
+            "find": "export default function ProjectMap"
+          },
+          "entry": {
+            "path": "frontend/src/ProjectContent.tsx",
+            "find": "<ProjectMap"
+          }
+        }
+      ]
+    },
+    {
+      "id": "preferences",
+      "name": "语言与偏好设置",
+      "summary": "调整界面语言、启动恢复、文字和刷新偏好",
+      "implementations": [
+        {
+          "name": "设置页面",
+          "source": {
+            "path": "frontend/src/Settings.tsx",
+            "find": "export default function Settings"
+          },
+          "entry": {
+            "path": "frontend/src/App.tsx",
+            "find": "<Settings"
+          }
+        }
+      ]
+    }
+  ]
+}

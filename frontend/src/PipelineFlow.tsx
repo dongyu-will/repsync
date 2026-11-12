@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useReducer, useRef } from "react";
 import {
   Check,
@@ -88,7 +89,7 @@ export default function PipelineFlow({
       <ol
         ref={flow}
         className="pipeline-flow"
-        aria-label={`${pipeline.name}Execution steps`}
+        aria-label={t("{0}Execution steps", pipeline.name)}
       >
         {steps.map((args, index) => {
           const state = stepState(index);
@@ -102,7 +103,12 @@ export default function PipelineFlow({
               <button
                 type="button"
                 className="pipeline-node"
-                aria-label={`Step ${index + 1}: ${command}, ${label}`}
+                aria-label={t(
+                  "Step {0}: {1}, {2}",
+                  index + 1,
+                  command,
+                  t(label),
+                )}
                 aria-haspopup="dialog"
                 aria-current={currentStep === index + 1 ? "step" : undefined}
                 onClick={() => select(index)}
@@ -117,7 +123,9 @@ export default function PipelineFlow({
                   >
                     {command}
                   </span>
-                  <span className="mt-1 block text-xs text-muted">{label}</span>
+                  <span className="mt-1 block text-xs text-muted">
+                    {t(label)}
+                  </span>
                 </span>
               </button>
             </li>
@@ -126,19 +134,22 @@ export default function PipelineFlow({
       </ol>
       {observed && run && !known && (
         <p className="mt-2 text-xs text-muted">
-          Step evidence is unavailable for this run. Check the logs; nodes show
-          the current configuration.
+          {t(
+            "Step evidence is unavailable for this run. Check the logs; nodes show the current configuration.",
+          )}
         </p>
       )}
       {known && run.step === 0 && (
         <p className="mt-2 text-xs text-muted">
           {run.status === "running"
-            ? "Preparing to run. No steps have started."
-            : "The run ended before any steps executed. Check the logs."}
+            ? t("Preparing to run. No steps have started.")
+            : t("The run ended before any steps executed. Check the logs.")}
         </p>
       )}
       <ActionDialog
-        title={selected === null ? "Execution steps" : `Step ${selected + 1}`}
+        title={
+          selected === null ? t("Execution steps") : t("Step {0}", selected + 1)
+        }
         trigger={null}
         open={selected !== null}
         onOpenChange={(open) => {
@@ -147,19 +158,23 @@ export default function PipelineFlow({
       >
         {selected !== null && (
           <>
-            <p className="text-sm">{states[stepState(selected)].label}</p>
+            <p className="text-sm">{t(states[stepState(selected)].label)}</p>
             <pre className="source-panel" tabIndex={0}>
               {(steps[selected] || [])
                 .map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg))
                 .join(" ")}
             </pre>
             <p className="text-xs text-muted">
-              Working directory: {pipeline.cwd || "Project root"}
+              {t("Working directory:")} {pipeline.cwd || t("Project root")}
             </p>
             <p className="text-xs text-muted">
-              Timeout: {Math.ceil(pipeline.timeoutSeconds / 60)} minutes
+              {t("Timeout:")} {Math.ceil(pipeline.timeoutSeconds / 60)}{" "}
+              {t("minutes")}
               {Object.keys(pipeline.env || {}).length
-                ? ` · Environment variables: ${Object.keys(pipeline.env).join(", ")}`
+                ? t(
+                    " · Environment variables: {0}",
+                    Object.keys(pipeline.env).join(", "),
+                  )
                 : ""}
             </p>
             {run && (
@@ -169,7 +184,7 @@ export default function PipelineFlow({
                   onOpenLog(run.id);
                 }}
               >
-                View logs for this run
+                {t("View logs for this run")}
               </Button>
             )}
           </>

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Icon } from "./components";
 
@@ -183,9 +184,9 @@ export default function DocumentFind({
       <button
         ref={trigger}
         type="button"
-        aria-label="Find in document"
+        aria-label={t("Find in document")}
         aria-keyshortcuts="Meta+F Control+F"
-        title="Find in document (⌘F / Ctrl+F)"
+        title={t("Find in document (⌘F / Ctrl+F)")}
         onClick={() => setQuery("")}
         className="icon-button text-muted"
       >
@@ -197,7 +198,7 @@ export default function DocumentFind({
   return (
     <div
       role="search"
-      aria-label="Document body"
+      aria-label={t("Document body")}
       className="flex max-w-full items-center gap-0.5 rounded-md border border-control has-[input:focus]:border-accent"
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing) return;
@@ -209,8 +210,8 @@ export default function DocumentFind({
     >
       <input
         ref={input}
-        aria-label="Find in document"
-        placeholder="Find in document"
+        aria-label={t("Find in document")}
+        placeholder={t("Find in document")}
         value={query}
         onChange={(event) => {
           setQuery(event.target.value);
@@ -230,13 +231,13 @@ export default function DocumentFind({
         >
           {count
             ? `${current + 1} / ${count}${result?.truncated ? "+" : ""}`
-            : "No matches"}
+            : t("No matches")}
         </span>
       )}
       <button
         type="button"
-        aria-label="Previous match"
-        title="Previous match (Shift+Enter)"
+        aria-label={t("Previous match")}
+        title={t("Previous match (Shift+Enter)")}
         disabled={!count}
         onClick={() => move(-1)}
         className="icon-button disabled:opacity-40"
@@ -247,8 +248,8 @@ export default function DocumentFind({
       </button>
       <button
         type="button"
-        aria-label="Next match"
-        title="Next match (Enter)"
+        aria-label={t("Next match")}
+        title={t("Next match (Enter)")}
         disabled={!count}
         onClick={() => move(1)}
         className="icon-button disabled:opacity-40"
@@ -259,8 +260,8 @@ export default function DocumentFind({
       </button>
       <button
         type="button"
-        aria-label="Close find"
-        title="Close find (Esc)"
+        aria-label={t("Close find")}
+        title={t("Close find (Esc)")}
         onClick={close}
         className="icon-button"
       >

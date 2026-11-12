@@ -19,28 +19,30 @@ import (
 )
 
 type Request struct {
-	Memory          *workspace.ProjectMemoryInput    `json:"memory,omitempty"`
-	ResourceID      string                           `json:"resourceId,omitempty"`
-	Target          string                           `json:"target,omitempty"`
-	Action          string                           `json:"action"`
-	Paths           []string                         `json:"paths,omitempty"`
-	Path            string                           `json:"path,omitempty"`
-	Destination     string                           `json:"destination,omitempty"`
-	ServiceID       string                           `json:"serviceId,omitempty"`
-	Version         string                           `json:"version,omitempty"`
-	ObjectID        string                           `json:"objectId,omitempty"`
-	RunID           string                           `json:"runId,omitempty"`
-	Runs            []workspace.ServiceRunRef        `json:"runs,omitempty"`
-	DryRun          bool                             `json:"dryRun,omitempty"`
-	Title           string                           `json:"title,omitempty"`
-	ReviewCheck     *workspace.ReviewCheckInput      `json:"reviewCheck,omitempty"`
-	ReviewEvidence  *workspace.ReviewEvidenceInput   `json:"reviewEvidence,omitempty"`
-	ReviewFinish    *workspace.ReviewFinishInput     `json:"reviewFinish,omitempty"`
-	ReviewResources *[]workspace.ReviewResource      `json:"reviewResources,omitempty"`
-	ReviewProfile   *workspace.ReviewProfile         `json:"reviewProfile,omitempty"`
-	ReviewTask      *workspace.ReviewTaskContext     `json:"reviewTask,omitempty"`
-	ReviewIssue     *workspace.ReviewAcknowledgement `json:"reviewIssue,omitempty"`
-	CodexResource   *workspace.CodexResourceChange   `json:"codexResource,omitempty"`
+	AIResourceAssessment *workspace.AIResourceAssessmentInput `json:"aiResourceAssessment,omitempty"`
+	AIResourceNote       *workspace.AIResourceNoteInput       `json:"aiResourceNote,omitempty"`
+	Memory               *workspace.ProjectMemoryInput        `json:"memory,omitempty"`
+	ResourceID           string                               `json:"resourceId,omitempty"`
+	Target               string                               `json:"target,omitempty"`
+	Action               string                               `json:"action"`
+	Paths                []string                             `json:"paths,omitempty"`
+	Path                 string                               `json:"path,omitempty"`
+	Destination          string                               `json:"destination,omitempty"`
+	ServiceID            string                               `json:"serviceId,omitempty"`
+	Version              string                               `json:"version,omitempty"`
+	ObjectID             string                               `json:"objectId,omitempty"`
+	RunID                string                               `json:"runId,omitempty"`
+	Runs                 []workspace.ServiceRunRef            `json:"runs,omitempty"`
+	DryRun               bool                                 `json:"dryRun,omitempty"`
+	Title                string                               `json:"title,omitempty"`
+	ReviewCheck          *workspace.ReviewCheckInput          `json:"reviewCheck,omitempty"`
+	ReviewEvidence       *workspace.ReviewEvidenceInput       `json:"reviewEvidence,omitempty"`
+	ReviewFinish         *workspace.ReviewFinishInput         `json:"reviewFinish,omitempty"`
+	ReviewResources      *[]workspace.ReviewResource          `json:"reviewResources,omitempty"`
+	ReviewProfile        *workspace.ReviewProfile             `json:"reviewProfile,omitempty"`
+	ReviewTask           *workspace.ReviewTaskContext         `json:"reviewTask,omitempty"`
+	ReviewIssue          *workspace.ReviewAcknowledgement     `json:"reviewIssue,omitempty"`
+	CodexResource        *workspace.CodexResourceChange       `json:"codexResource,omitempty"`
 }
 
 type Response struct {
@@ -170,6 +172,8 @@ func writeResponse(w io.Writer, data any, err error) {
 
 func dispatch(service *workspace.Service, request Request) (any, error) {
 	switch request.Action {
+	case "project-map":
+		return service.ProjectMap(request.Path)
 	case "project-memory":
 		return service.ConfirmedProjectMemories(request.Path)
 	case "project-memory-propose":
@@ -189,6 +193,16 @@ func dispatch(service *workspace.Service, request Request) (any, error) {
 		return nil, service.ApplyCodexResource(request.Path, *request.CodexResource, request.Version)
 	case "ai-resources":
 		return service.AIResources(request.Path)
+	case "ai-resource-record":
+		if request.AIResourceNote == nil {
+			return nil, errors.New("missing AI resource report")
+		}
+		return service.RecordAIResourceNote(request.Path, *request.AIResourceNote)
+	case "ai-resource-assess":
+		if request.AIResourceAssessment == nil {
+			return nil, errors.New("missing AI resource assessment")
+		}
+		return service.RecordAIResourceAssessment(request.Path, *request.AIResourceAssessment)
 	case "ai-usage":
 		return service.AIUsage(request.Path)
 	case "review":

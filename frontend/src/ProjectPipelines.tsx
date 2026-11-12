@@ -1,3 +1,4 @@
+import { getLocale, t } from "./i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isMyGo } from "mygo-runtime";
 import {
@@ -45,12 +46,12 @@ function Status({ status }: { status: string }) {
         : "text-muted";
   return (
     <span className={`shrink-0 text-xs font-medium ${color}`}>
-      {labels[status] || status || "Result unknown"}
+      {t(labels[status] || status || t("Result unknown"))}
     </span>
   );
 }
 function timestamp(value: string) {
-  return new Date(value).toLocaleString("en-US", {
+  return new Date(value).toLocaleString(getLocale(), {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",
@@ -65,7 +66,7 @@ export default function ProjectPipelines({ path }: { path: string }) {
     <div
       className="flex gap-1 rounded-lg bg-sidebar p-1"
       role="group"
-      aria-label="Pipeline location"
+      aria-label={t("Pipeline location")}
     >
       {[
         ["local", "Local"],
@@ -77,7 +78,7 @@ export default function ProjectPipelines({ path }: { path: string }) {
           aria-pressed={source === id}
           className={`min-h-8 rounded-md px-3 text-sm ${source === id ? "bg-white font-medium text-ink" : "text-muted hover:text-ink"}`}
         >
-          {name}
+          {t(name)}
         </button>
       ))}
     </div>
@@ -252,7 +253,7 @@ function LocalPipelines({
           {native && (
             <button
               className="icon-button"
-              aria-label="Refresh pipelines"
+              aria-label={t("Refresh pipelines")}
               onClick={() => setRevision((value) => value + 1)}
             >
               <Icon name="refresh" size={16} />
@@ -262,26 +263,29 @@ function LocalPipelines({
       </div>
       {error && (
         <p role="alert" className="break-words text-sm text-removed">
-          {error}
+          {t(error)}
         </p>
       )}
       {configError && (
         <p role="alert" className="break-words text-sm text-removed">
-          Could not load configuration: {configError}
-          .Fix this in Configure pipelines. This page retries automatically.
+          {t("Could not load configuration:")} {t(configError)}
+          {t(
+            ".Fix this in Configure pipelines. This page retries automatically.",
+          )}
         </p>
       )}
       {runsError && (
         <p role="alert" className="break-words text-sm text-removed">
-          Could not load run status: {runsError}
-          .Showing the last loaded records. Current steps need verification;
-          this page retries automatically.
+          {t("Could not load run status:")} {t(runsError)}
+          {t(
+            ".Showing the last loaded records. Current steps need verification; this page retries automatically.",
+          )}
         </p>
       )}
       {!config ? (
         !configError && (
           <p role="status" className="text-sm text-muted">
-            Loading pipelines…
+            {t("Loading pipelines…")}
           </p>
         )
       ) : config.pipelines.length ? (
@@ -308,14 +312,14 @@ function LocalPipelines({
                       disabled={
                         !native || pending || !!running || configInvalid
                       }
-                      aria-label={`Run ${pipeline.name}`}
+                      aria-label={t("Run {0}", pipeline.name)}
                       onClick={() => void run(pipeline)}
                     >
                       {running?.pipelineId === pipeline.id
                         ? runsKnown
-                          ? "Running…"
-                          : "Run needs review"
-                        : "Run"}
+                          ? t("Running…")
+                          : t("Run needs review")
+                        : t("Run")}
                     </Button>
                   </div>
                   <PipelineFlow
@@ -338,17 +342,18 @@ function LocalPipelines({
           </div>
         </>
       ) : (
-        <Empty icon="file" title="No local pipelines yet">
-          Ask AI to connect existing check or release commands, or add them in
-          Configure pipelines.
+        <Empty icon="file" title={t("No local pipelines yet")}>
+          {t(
+            "Ask AI to connect existing check or release commands, or add them in Configure pipelines.",
+          )}
         </Empty>
       )}
-      <section aria-label="Local run history">
+      <section aria-label={t("Local run history")}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Recent runs</h3>
+          <h3 className="text-sm font-semibold">{t("Recent runs")}</h3>
           {running && (
             <Button disabled={!native || pending} onClick={() => void stop()}>
-              Stop run
+              {t("Stop run")}
             </Button>
           )}
         </div>
@@ -372,20 +377,20 @@ function LocalPipelines({
                   </strong>
                   <span className="mt-1 block text-xs text-muted">
                     {timestamp(run.startedAt)} ·{" "}
-                    {run.commit ? run.commit.slice(0, 7) : "No Git commit"}
+                    {run.commit ? run.commit.slice(0, 7) : t("No Git commit")}
                     {run.worktree === "dirty"
-                      ? "(includes local edits)"
+                      ? t("(includes local edits)")
                       : run.commit && run.worktree !== "clean"
-                        ? "(workspace status unknown)"
+                        ? t("(workspace status unknown)")
                         : ""}{" "}
                     ·{" "}
                     {run.status === "running"
                       ? run.step > 0
-                        ? `Step ${run.step}`
-                        : "Preparing"
+                        ? t("Step {0}", run.step)
+                        : t("Preparing")
                       : run.exitCode >= 0
-                        ? `Exit code ${run.exitCode}`
-                        : "No exit code"}
+                        ? t("Exit code {0}", run.exitCode)
+                        : t("No exit code")}
                   </span>
                 </span>
                 <Status
@@ -406,23 +411,25 @@ function LocalPipelines({
         ) : (
           <p className="text-sm text-muted">
             {runsKnown
-              ? "Not run from repsync  to run this project's pipelines yet."
+              ? t("Not run from repsync  to run this project's pipelines yet.")
               : runsError
-                ? "Run history is unavailable. Existing runs cannot be confirmed."
-                : "Loading run history…"}
+                ? t(
+                    "Run history is unavailable. Existing runs cannot be confirmed.",
+                  )
+                : t("Loading run history…")}
           </p>
         )}
       </section>
       {selected && (
-        <section ref={logSection} tabIndex={-1} aria-label="Pipeline logs">
+        <section ref={logSection} tabIndex={-1} aria-label={t("Pipeline logs")}>
           <h3 className="mb-3 text-sm font-semibold">
-            Run logs ·{" "}
+            {t("Run logs ·")}{" "}
             {runs.find((run) => run.id === selected)?.name || selected}
           </h3>
           {logError ? (
             <div className="space-y-2">
               <p role="alert" className="text-sm text-removed">
-                {logError}
+                {t(logError)}
               </p>
               <Button
                 onClick={() => {
@@ -431,27 +438,27 @@ function LocalPipelines({
                   setLogRevision((value) => value + 1);
                 }}
               >
-                Reload logs
+                {t("Reload logs")}
               </Button>
             </div>
           ) : output && output.run.id === selected ? (
             <>
               {output.run.error && (
                 <p className="mb-2 break-words text-sm text-removed">
-                  {output.run.error}
+                  {t(output.run.error)}
                 </p>
               )}
               <pre
                 className="source-panel max-h-64"
                 tabIndex={0}
-                aria-label="Run log content"
+                aria-label={t("Run log content")}
               >
-                {output.log || "No output yet"}
+                {output.log || t("No output yet")}
               </pre>
             </>
           ) : (
             <p role="status" className="text-sm text-muted">
-              Loading logs…
+              {t("Loading logs…")}
             </p>
           )}
         </section>
@@ -498,20 +505,20 @@ function RemotePipelines({
             }}
             disabled={!result}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
         )}
       </div>
       <p className="text-sm text-muted">
-        {result?.data?.repository || "No remote repository connected."}
+        {result?.data?.repository || t("No remote repository connected.")}
       </p>
       {!result ? (
         <p role="status" className="text-sm text-muted">
-          Loading GitHub Actions…
+          {t("Loading GitHub Actions…")}
         </p>
       ) : result.error ? (
         <p role="alert" className="break-words text-sm text-removed">
-          {result.error}
+          {t(result.error)}
         </p>
       ) : result.data?.runs.length ? (
         <div className="grouped-list">
@@ -522,7 +529,7 @@ function RemotePipelines({
             >
               <div className="min-w-0 flex-1">
                 <h3 className="break-words text-sm font-medium">
-                  {run.workflowName || "Workflow"} · {run.displayTitle}
+                  {run.workflowName || t("Workflow")} · {run.displayTitle}
                 </h3>
                 <p className="mt-1 break-all text-xs text-muted">
                   {run.headBranch} · {run.headSha.slice(0, 7)} ·{" "}
@@ -540,9 +547,12 @@ function RemotePipelines({
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex min-h-9 items-center gap-1 text-sm text-accent"
-                  aria-label={`View ${run.workflowName || "Workflow"}  logs`}
+                  aria-label={t(
+                    "View {0}  logs",
+                    run.workflowName || t("Workflow"),
+                  )}
                 >
-                  Logs
+                  {t("Logs")}
                   <Icon name="arrow" size={14} />
                 </a>
               )}
@@ -550,13 +560,14 @@ function RemotePipelines({
           ))}
         </div>
       ) : (
-        <Empty icon="branch" title="No remote runs">
-          No readable runs for this repository on GitHub Actions records.
+        <Empty icon="branch" title={t("No remote runs")}>
+          {t("No readable runs for this repository on GitHub Actions records.")}
         </Empty>
       )}
       <p className="text-xs leading-5 text-muted">
-        Remote status and local results are tracked separately. Open logs and
-        manage remote runs on GitHub .
+        {t(
+          "Remote status and local results are tracked separately. Open logs and manage remote runs on GitHub .",
+        )}
       </p>
     </div>
   );
